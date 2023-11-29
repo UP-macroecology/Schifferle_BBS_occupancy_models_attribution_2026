@@ -1,0 +1,50 @@
+
+model {
+  
+  # Specify priors ---------------------------------
+  
+  # Initial occupancy priors:
+  
+	psi1 ~ dunif(0, 1)
+  
+  # Colonisation and extinction priors:
+  
+  eps ~ dunif(0, 1)
+  gamma ~ dunif(0, 1)
+
+  # Detection priors:
+ 	p ~ dunif(0, 1)
+
+  # Likelihood: ---------
+  
+  # Ecological submodel:
+  
+  # Define occupancy state conditional on parameters
+  # state transitions:
+  
+  for (s in 1:nsites){
+    z[s,1] ~ dbern(psi1)
+    
+    for (t in 2:nyears){
+      z[s,t] ~ dbern(z[s,t-1]*(1-eps) + (1-z[s,t-1])*gamma)
+    }
+  }
+
+  # Observation model:
+  
+  for (s in 1:nsites){
+      for (j in 1:nsurveys){
+        for (t in 1:nyears){
+              y[s,j,t] ~ dbern(p * z[s,t])
+        }
+      }
+  }
+
+  # Derived parameters:
+  
+  # Population occupancy in each year:
+  psi[1] <- psi1                
+  for (t in 2:nyears){
+    psi[t] <- psi[t-1]*(1-eps) + (1-psi[t-1])*gamma
+  }
+}
