@@ -11,37 +11,14 @@ library(sf)
 
 ## BBS data:
 
-load(file = file.path("data", "BBS_data_merged.RData")) # output of DEBTs\analysis\Schifferle_BBS_explorations_2023\BBS_data_prep.R
+# BBS data formatted for occupancy modelling:
+load(file = file.path("data", "BBS_for_occ.RData")) # output of 1_0_reformat_BBS_data.R
 
-# reduce dataset to necessary columns:
-bbs_dt_occ <- bbs_dt %>% 
-  select(English_Common_Name, AOU, RTENO, Latitude, Longitude, BCR, Year, paste0("Count", seq(10, 50, 10)), Month, Day, ObsN) %>% 
-  # convert month and date to day of year:
-  mutate(date = lubridate::ymd(paste(Year, Month, Day, sep = "/"))) %>% 
-  mutate(doy = lubridate::yday(date)) %>% 
-  select(-c(Month, Day, date)) %>% 
-  # add column on whether route was surveyed (needed later):
-  mutate(Surveyed = 1) %>% 
-  # site needs to be numeric:
-  mutate(RTENO = as.numeric(RTENO))
-
-# starting points of routes:
-route_startpoints_sf <- read_sf(file.path("data", "route_starting_points.shp")) %>% 
-  mutate(RTENO = as.numeric(RTENO)) %>% 
-  mutate(BCR = factor(BCR))
-
-# reformat BBS data for occupancy modelling:
-
-## expand data to have one row per route and year:
-route_dt <- tidyr::expand_grid(RTENO = unique(bbs_dt_occ$RTENO),
-                               Year = min(bbs_dt_occ$Year):max(bbs_dt_occ$Year)) %>% # 224'124
-  # join route data:
-  collapse::join(bbs_dt_occ[, c("RTENO", "Latitude", "Longitude", "BCR")], on = c("RTENO"), how = "left") %>% 
-  
-  # add observer and date when route was surveyed:
-  collapse::join(bbs_dt_occ[, c("RTENO", "Year", "ObsN", "doy")], on = c("RTENO", "Year"), how = "left") %>%
-  # all route-year combinations without date / observer haven't been surveyed:
-  mutate(Surveyed = if_else(is.na(doy), 0, 1))
+# spatial data on routes:
+datashare_BBS <- file.path("//ibb-fs01.ibb.uni-potsdam.de", "daten$", "AG26", "Arbeit", "datashare", "data", "biodat", "distribution", "BBS")
+routes_sf <- read_sf(file.path(datashare_BBS, "bbs_routes", "bbsrtsl020.shp")) %>% 
+  st_transform(crs = "ESRI:102003") %>% # Albers Equal Area projection
+  mutate(RTENO_BBS = as.integer(paste0("840", stringr::str_pad(RTENO, width = 5, side = "left", pad = "0")))) # reformat RTENO to match RTENO from BBS data imported with the bbsAssistant package
 
 
 # route selection: ----
@@ -166,8 +143,47 @@ routes_sel <- sel_routes_temp_coverage(route_dt = route_dt_time,
                          nyears = nyears, 
                          version = "surveyed beginning & end, max. 5 years missing")
 
+## 2) spatial thinning: ----
 
-## 2) spatial coverage: ----
+# require minimum distance of route centroids of 100 km
+# equal area projection of route centroids
+
+# route centroids:
+
+routes_sf_sel <- routes_sf %>% 
+  filter(RTENO_BBS %in% routes_sel) %>% 
+  group_by(RTENO_BBS) %>% summarise %>% # merge lines if routes in shapefile consist of multiple adjacent lines
+  mutate(centroid_X = NA) %>% 
+  mutate(centroid_Y = NA)
+
+# coordinates of route centroids, if route geometry is available:
+for(j in 1:nrow(routes_sf_sel)){
+  
+  print(j)
+  
+  centroid_coords <- routes_sf_sel[j,] %>% 
+    st_bbox %>% 
+    st_as_sfc %>% 
+    st_centroid %>% 
+    st_coordinates
+  
+  routes_sf_sel$centroid_X[j] <- centroid_coords[1]
+  routes_sf_sel$centroid_Y[j] <- centroid_coords[2]
+}
+# change geometry from route line to centroid:
+routes_sf_centr <- routes_sf_sel %>% 
+  st_drop_geometry %>% 
+  st_as_sf(coords = c("centroid_X", "centroid_Y"), crs = "ESRI:102003")
+
+# load thinning function:
+source("0_functions.R") # to get thin()
+
+routes_sf_centr_thinned <- thin(sf = routes_sf_centr, thin_dist = 50000, runs = 1, ncores = 1) # 100 km apart -> 50 km thinning distance (radius)
+nrow(routes_sf_centr)
+nrow(routes_sf_centr_thinned)
+
+
+## 3) spatial coverage: ----
 
 # spatial subsampling as Jarzyna et al. 2017 & 2018:
 # "We removed routes from BCRs with more than 30 routes (in order of
@@ -196,7 +212,7 @@ subsample1 <- function(data, npoints_keep = 30){
       st_distance()
     
     # which pair of points are closest:
-    dist_mat[dist_mat==0] <- NA  # exclude 0 (distance to itself)
+    dist_mat[dist_mat==units::as_units(0, "m")] <- NA  # exclude 0 (distance to itself)
     ind <- arrayInd(which.min(dist_mat), dim(dist_mat))
     
     # corresponding RTENO:
@@ -257,15 +273,15 @@ subsample2 <- function(x, cols, npoints){
 # apply both versions:
 
 route_dt_temp_ss <- route_dt %>% 
-  # delete routes surveyed not often enough:
-  filter(RTENO %in% routes_sel)
+  # keep routes left after checking temporal coverage and after spatial thinning:
+  filter(RTENO %in% routes_sf_centr_thinned$RTENO_BBS)
 
 # number of routes per BCR:
 routes_per_BCR_dt <- route_dt_temp_ss %>% 
   select(RTENO, BCR, Latitude, Longitude) %>% 
   distinct() %>% 
   # convert to sf:
-  left_join(route_startpoints_sf[, c("RTENO", "BCR")]) %>% 
+  left_join(routes_sf_centr[, c("RTENO_BBS")], by = c("RTENO" = "RTENO_BBS")) %>% 
   st_as_sf() %>% 
   # number of routes per BCR:
   group_by(BCR) %>% 
@@ -310,7 +326,7 @@ for (b in 1:length(BCRs_to_subsample)){
 route_dt_spat_temp_ss1 <- route_dt_temp_ss %>% 
   filter(RTENO %in% c(routes_keep1, routes_keep2))
 
-length(unique(route_dt_spat_temp_ss1$RTENO)) # 648 routes
+length(unique(route_dt_spat_temp_ss1$RTENO)) # 539 routes
 
 
 ## version 2:
@@ -334,13 +350,13 @@ for (b in 1:length(BCRs_to_subsample)){
   
   # plots:
   subsample_dt_BCR %>%
-    left_join(route_startpoints_sf[, c("RTENO", "BCR")]) %>%
+    left_join(routes_sf_centr_thinned[, "RTENO_BBS"], by = c("RTENO" = "RTENO_BBS")) %>%
     st_as_sf() %>%
     st_geometry() %>%
-    plot(main = paste("version 2:",BCRs_to_subsample[b]))
+    plot(main = paste("version 2:", BCRs_to_subsample[b]))
 
   subsample_dt_BCR %>%
-    left_join(route_startpoints_sf[, c("RTENO", "BCR")]) %>%
+    left_join(routes_sf_centr_thinned[, "RTENO_BBS"], by = c("RTENO" = "RTENO_BBS")) %>%
     filter(RTENO %in% routes_keep_BCR) %>%
     st_as_sf() %>%
     st_geometry() %>%
@@ -350,12 +366,22 @@ for (b in 1:length(BCRs_to_subsample)){
 # subset data with selected routes:
 route_dt_spat_temp_ss2 <- route_dt_temp_ss %>% 
   filter(RTENO %in% c(routes_keep1, routes_keep2))
-length(unique(route_dt_spat_temp_ss2$RTENO)) # 648 routes: same = fine
-
+length(unique(route_dt_spat_temp_ss2$RTENO)) # 539
 
 # save output:
 sel_routes_final <- route_dt_spat_temp_ss2 %>% 
   pull(RTENO) %>% 
   unique
 save(sel_routes_final, 
-     file = file.path("data", "route_selection_25ys_surv_beg_end_max_5y_miss_max_30_r_per_BCR_v2.RData"))
+     file = file.path("data", "route_selection_25ys_surv_beg_end_max_5y_miss_max_30_r_per_BCR_v2_spat_thin_100km.RData"))
+
+# save selected routes as shapefile - lines:
+routes_sf %>% 
+  filter(RTENO_BBS %in% sel_routes_final) %>% 
+  st_write(file.path("data", "route_selection_25ys_surv_beg_end_max_5y_miss_max_30_r_per_BCR_v2_spat_thin_100km.shp"),
+           append = FALSE)
+# save selected routes as shapefile - centroids:
+routes_sf_centr %>% 
+  filter(RTENO_BBS %in% sel_routes_final) %>% 
+  st_write(file.path("data", "route_selection_25ys_surv_beg_end_max_5y_miss_max_30_r_per_BCR_v2_spat_thin_100km_centroids.shp"),
+           append = FALSE)
