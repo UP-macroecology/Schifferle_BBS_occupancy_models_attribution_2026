@@ -30,7 +30,7 @@ routes_sf <- read_sf(file.path(datashare_BBS, "bbs_routes", "bbsrtsl020.shp")) %
 # routes surveyed in considered time period:
 route_dt_time <- route_dt %>% 
   # time period to consider:
-  filter(Year >= 1995 & Year <= 2019) # no data in 2020 due to covid
+  filter(Year >= 1991 & Year <= 2015) # no data in 2020 due to covid
 
 nyears <- length(seq(min(route_dt_time$Year), max(route_dt_time$Year), 1))
 
@@ -141,7 +141,14 @@ sel_routes_temp_coverage <- function(route_dt, nyears, version) {
 
 routes_sel <- sel_routes_temp_coverage(route_dt = route_dt_time, 
                          nyears = nyears, 
-                         version = "surveyed beginning & end, max. 5 years missing")
+                         version = "surveyed beginning & end, max. 5 years missing") # 1990-2015: 781
+
+# save selected routes as shapefile - lines:
+routes_sf %>% 
+  filter(RTENO_BBS %in% routes_sel) %>% 
+  st_write(file.path("data", "route_selection_1991_2015_surv_beg_end_max_5y_miss.shp"),
+           append = FALSE)
+
 
 ## 2) spatial thinning: ----
 
@@ -180,7 +187,18 @@ source("0_functions.R") # to get thin()
 
 routes_sf_centr_thinned <- thin(sf = routes_sf_centr, thin_dist = 50000, runs = 1, ncores = 1) # 100 km apart -> 50 km thinning distance (radius)
 nrow(routes_sf_centr)
-nrow(routes_sf_centr_thinned)
+nrow(routes_sf_centr_thinned) # 1991-2015: 533, 1995-2019: 632
+
+# save selected routes as shapefile - lines:
+routes_sf %>% 
+  filter(RTENO_BBS %in% routes_sf_centr_thinned$RTENO_BBS) %>% 
+  st_write(file.path("data", "route_selection_1991_2015_surv_beg_end_max_5y_miss_v2_spat_thin_100km.shp"),
+           append = FALSE)
+
+# save selected routes as shapefile:
+routes_sf_centr_thinned %>% 
+  st_write(file.path("data", "route_selection_1991_2015_surv_beg_end_max_5y_miss_v2_spat_thin_100km_centroids.shp"),
+           append = FALSE)
 
 
 ## 3) spatial coverage: ----
@@ -326,7 +344,7 @@ for (b in 1:length(BCRs_to_subsample)){
 route_dt_spat_temp_ss1 <- route_dt_temp_ss %>% 
   filter(RTENO %in% c(routes_keep1, routes_keep2))
 
-length(unique(route_dt_spat_temp_ss1$RTENO)) # 539 routes
+length(unique(route_dt_spat_temp_ss1$RTENO)) # 1991-2015: 476 routes, 1995-2019: 539 routes
 
 
 ## version 2:
@@ -366,22 +384,22 @@ for (b in 1:length(BCRs_to_subsample)){
 # subset data with selected routes:
 route_dt_spat_temp_ss2 <- route_dt_temp_ss %>% 
   filter(RTENO %in% c(routes_keep1, routes_keep2))
-length(unique(route_dt_spat_temp_ss2$RTENO)) # 539
+length(unique(route_dt_spat_temp_ss2$RTENO)) # 1995-2019: 539; 1991-2015: 476
 
 # save output:
 sel_routes_final <- route_dt_spat_temp_ss2 %>% 
   pull(RTENO) %>% 
   unique
 save(sel_routes_final, 
-     file = file.path("data", "route_selection_25ys_surv_beg_end_max_5y_miss_max_30_r_per_BCR_v2_spat_thin_100km.RData"))
+     file = file.path("data", "route_selection_1991_2015_surv_beg_end_max_5y_miss_v2_spat_thin_100km_max_30_r_per_BCR.RData"))
 
 # save selected routes as shapefile - lines:
 routes_sf %>% 
   filter(RTENO_BBS %in% sel_routes_final) %>% 
-  st_write(file.path("data", "route_selection_25ys_surv_beg_end_max_5y_miss_max_30_r_per_BCR_v2_spat_thin_100km.shp"),
+  st_write(file.path("data", "route_selection_1991_2015_surv_beg_end_max_5y_miss_v2_spat_thin_100km_max_30_r_per_BCR.shp"),
            append = FALSE)
 # save selected routes as shapefile - centroids:
 routes_sf_centr %>% 
   filter(RTENO_BBS %in% sel_routes_final) %>% 
-  st_write(file.path("data", "route_selection_25ys_surv_beg_end_max_5y_miss_max_30_r_per_BCR_v2_spat_thin_100km_centroids.shp"),
+  st_write(file.path("data", "route_selection_1991_2015_surv_beg_end_max_5y_miss_v2_spat_thin_100km_max_30_r_per_BCR_centroids.shp"),
            append = FALSE)

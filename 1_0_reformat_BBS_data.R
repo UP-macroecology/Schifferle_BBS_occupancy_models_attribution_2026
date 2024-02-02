@@ -17,6 +17,8 @@ bbs_dt_occ <- bbs_dt %>%
   # site needs to be numeric:
   mutate(RTENO = as.numeric(RTENO))
 
+save(bbs_dt_occ, file = file.path("data", "BBS_for_occ_spec_records.RData"))
+
 # expand data to have one row per route and year:
 route_dt <- tidyr::expand_grid(RTENO = unique(bbs_dt_occ$RTENO),
                                Year = min(bbs_dt_occ$Year):max(bbs_dt_occ$Year)) %>% # 224'124

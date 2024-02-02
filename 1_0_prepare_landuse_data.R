@@ -15,7 +15,7 @@ ncores <- 3
 cl <- makeCluster(ncores, setup_timeout = 0.5)
 registerDoParallel(cl)
 
-# load data:
+# load data: ----
 luh2_path <- file.path("//ibb-fs01.ibb.uni-potsdam.de", "daten$", "AG26", "Arbeit", "datashare", "data", "envidat", 
                        "socioeconomic", "LUH2_v2h", "global")
 
@@ -25,9 +25,10 @@ nc_dt <- ncdf4::nc_open(file.path(luh2_path, "states.nc"))
 lu_classes <- names(nc_dt$var)[1:14]
 
 # years for which data should be extracted:
-years <- c(1990:2015) # historical period for LUH2 until 2015
+years <- c(1987:2015) # historical period for LUH2 until 2015
 
-# reproject and resample as climate data, crop to same extent:
+# reproject and resample: ----
+# as climate data, crop to same extent
 # load example climate file:
 clim_ex <- rast(file.path("data", "Env_data", "ISIMIP_CHELSA-W5E5v1.0", "monthly_albers_proj", "pr_199001_ESRI102003.tif"))
 extent_clim <- as.vector(ext(clim_ex)) # terra objects are not exportable for parallel processing
@@ -78,7 +79,6 @@ foreach(luc = lu_classes,
                             srcnodata = -9999,
                             te = extent_clim[c(1,3,2,4)] # extent of output file to be created
     )
-    # problem with coastal routes again -> using average?
   }
 }
 
@@ -92,7 +92,8 @@ foreach(luc = lu_classes,
 # we keep C3 and C4 perennial crops distinct as they may be relevant for different species groups (C3: trees, vine, C4: sugar cane)
 # also I keep managed pasture and rangeland seperate for now xx
 
-# summarise annual crops: c3ann, c4ann, c3nfx (following Naimi et al. 2022):
+# summarise annual crops: ----
+# c3ann, c4ann, c3nfx (following Naimi et al. 2022):
 for(year in years){
   
   print(year)
@@ -100,7 +101,7 @@ for(year in years){
   annual_crops <- rast(file.path(luh2_output_path2, paste0(c("c3ann", "c4ann", "c3nfx"), "_", year, "_ESRI102003_ave.tif")))
   annual_crops_sum <- sum(annual_crops)
   names(annual_crops_sum) <- "sum_annual_crops"
-  writeRaster(annual_crops_sum, file.path(luh2_output_path2, paste0("annual_crops_", year, "_ESRI102003_ave.tif")),
+  writeRaster(annual_crops_sum, file.path(luh2_output_path2, paste0("sum_annual_crops_", year, "_ESRI102003_ave.tif")),
               overwrite = TRUE)
 }
 
@@ -116,7 +117,24 @@ for(i in 1:nlyr(lu_rast)){
 }
 
 
-# future land use?
-# transitions?
+# predictor for initial occupancy: land use variables summarizing three years before start: ----
 
-# extract data for routes -> other script!
+year <- 1991 # start year
+
+for(luc in c(lu_classes, "sum_annual_crops")){
+  
+  print(luc)
+  
+  luc_3yrs <- rast(file.path(luh2_output_path2, paste0(luc, "_", c((year-1):(year-3)), "_ESRI102003_ave.tif")))
+  names(luc_3yrs) <- c((year-1):(year-3))
+  luc_3yrs_mean <- mean(luc_3yrs)
+  names(luc_3yrs_mean) <- luc
+  
+  writeRaster(luc_3yrs_mean, file.path(luh2_output_path2, paste0(luc, "_mean_", year-3, "_", year-1, "_ESRI102003_ave.tif")),
+              overwrite = TRUE)
+
+}
+
+
+
+# future land use?

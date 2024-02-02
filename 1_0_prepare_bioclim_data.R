@@ -3,7 +3,7 @@
 # climate data:
 
 # steps: 
-# 1) get climate data for 1995-2019 from Chelsa or ISIMIP, mask for conterminous US, transform to equal area (use square or hexagone grid?)
+# 1) get climate data for 1985-20196 from Chelsa or ISIMIP, mask for conterminous US, transform to equal area (use square or hexagone grid?)
 # 2) from ISIMIP I get daily data -> aggregate to monthly data
 # 3) calculate bioclim variables
 
@@ -22,14 +22,15 @@ registerDoParallel(cl)
 
 # xx so far only historical, add future!
 
-# download ISIMIP Chelsa observed climate:
+# download ISIMIP Chelsa observed climate (1800 arcsec resolution):
 
 # CHELSA-W5E5v1.0
 # e.g. https://data.isimip.org/datasets/4014abe4-32fb-46c9-b9b7-53b13f12166f/ -> configure download
 # chelsa-w5e5v1.0_obsclim_tasmax_1800arcsec_global_daily
 # bounding box: South: 24 North: 50 West: -126 East: -66
-# 1990-2016
+# 1985-2016
 
+# save e.g. as "pr.zip", "tasmin.zip", "tasmax.zip" here:
 chelsa_path <- file.path("data", "Env_data", "ISIMIP_CHELSA-W5E5v1.0")
 
 # iterate over variables (tasmin, tasmax, precipitation):
@@ -73,12 +74,11 @@ for(var in c("tasmin", "tasmax", "pr")) {
     gdalUtilities::gdalwarp(srcfile = file.path(chelsa_path, "monthly_EPSG4326", paste0(var, "_", filename, ".tif")),
                             dstfile = file.path(chelsa_path, "monthly_albers_proj", paste0(var, "_", filename, "_ESRI102003.tif")),
                             overwrite = TRUE,
-                            #tr = ,
-                            r = "bilinear", # resampling method
+                            r = "near", # resampling method, nearest neighbour fine when keeping resolution
                             t_srs = "ESRI:102003",
-                            dstnodata = -9999 # no data value in destination file ###
+                            dstnodata = -9999 # no data value in destination file
                             )
-  } # xx edges of US are not covered any more after reprojection -> xx (hexagonal grids?)
+  }
 }
 
 
@@ -109,7 +109,7 @@ bioclim_folder <- file.path(chelsa_path, "bioclim")
 if(!dir.exists(bioclim_folder)){dir.create(bioclim_folder, recursive = TRUE)}
 
 # iterate over years:
-foreach(year = 1995:2016, 
+foreach(year = 1990:2016, 
         .packages = c("raster", "terra", "dismo") , 
         .verbose = TRUE) %dopar% {
           
@@ -147,7 +147,7 @@ foreach(year = 1995:2016,
 
 # predictor for initial occupancy: bioclims summarizing three years before start:
 
-year <- 1995 # start year
+year <- 1991 # start year
 
 # template to store output:
 out <- raster::brick(raster::raster(list.files(file.path(chelsa_path, "monthly_albers_proj"), full.names = TRUE)[1]),
