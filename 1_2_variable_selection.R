@@ -50,7 +50,7 @@ for(i in 1:length(years)){
   # bioclims:
   bioclim_year_files <- bioclim_files[which(grepl(paste0("bio.{1,2}_", years[i], ".tif"), bioclim_files))]
   bioclim_year_rast <- rast(bioclim_year_files) %>% terra::mask(mask)
-  bioclim_lst[[i]] <- values(bioclim_year_rast, dataframe = TRUE) # each row = one cell, keep only rows with data (non NA cells)
+  bioclim_lst[[i]] <- values(bioclim_year_rast, dataframe = TRUE) # each row = one cell
   
   # land use:
   lu_year_rast <- rast(lu_files[which(grepl(paste0(years[i], "_ESRI102003_ave.tif$"), lu_files))]) %>% terra::mask(mask)
@@ -129,7 +129,7 @@ var_expl <- var.pca$eig / sum(var.pca$eig) # variance explained by each axis, sa
 variable_importance <- maxloads * var_expl[pc_maxloads]
 
 # rank variables: most important variable gets highest rank:
-variable_rank <- rev(seq_len(length(variable_rank)))
+variable_rank <- rev(seq_len(length(variable_importance)))
 names(variable_rank) <- names(maxloads)[order(variable_importance, decreasing = TRUE)]
 variable_rank
 
@@ -266,4 +266,96 @@ par(mar = c(2,5,5,2))
 plot(varclus(as.matrix(bioclim_lu_dt_cc_ss), similarity = "spearman",
              method = "complete")) 
 abline(h = 1-(0.7^2), lty = 2, col = "grey") # |r|^2 = 0.7^2 = 0.5
+abline(h = 0.1, lty = 2, col = "grey") 
 #dev.off()
+test <- varclus(as.matrix(bioclim_lu_dt_cc_ss), similarity = "spearman",
+                method = "complete")
+test
+
+
+# seasonal clim. variables: ----
+
+sclim_files <- list.files(file.path("data", "Env_data", "ISIMIP_CHELSA-W5E5v1.0", "seasonal"), 
+                            full.names = TRUE)
+
+
+years <- seq(1991, 2015) # historic period of LUH2 data until 2015 (for Chelsa until 2016)
+
+# store data of each year:
+sclim_lst <- vector(mode = "list", length = length(years))
+
+for(i in 1:length(years)){
+  
+  print(years[i])
+  
+  # seasonal clims:
+  sclim_year_files <- sclim_files[which(grepl(paste0(years[i], ".tif"), sclim_files))]
+  sclim_year_rast <- rast(sclim_year_files) %>% terra::mask(mask)
+  sclim_lst[[i]] <- values(sclim_year_rast, dataframe = TRUE) # each row = one cell
+  
+}
+
+sclim_dt <- bind_rows(sclim_lst)
+
+# which variables to inspect:
+# all bioclims except bio8, 9, 18, 19
+# + seasonal
+# + land use:
+
+# seasonal clim., bioclim and land use in one df for PCA:
+
+bioclim_sclim_lu_dt <- cbind(bioclim_dt, lu_dt, sclim_dt)
+# keep only complete rows (no NAs allowed in data for dudi.pca)
+bioclim_lu_sclim_dt_cc <- bioclim_sclim_lu_dt[complete.cases(bioclim_sclim_lu_dt), ]
+nrow(bioclim_lu_sclim_dt_cc)
+
+bioclim_lu_sclim_dt_cc_ss <- bioclim_lu_sclim_dt_cc %>% 
+  select(-c("bio8", "bio9", "bio18", "bio19", "c3ann", "c4ann", "c3nfx", "secma", "secmb"))
+
+ncol(bioclim_lu_sclim_dt_cc_ss) # 41
+
+
+## 1.) PCA of all candidate variables: -------------------------------------------
+
+var.pca <- dudi.pca(df = scale(bioclim_lu_sclim_dt_cc_ss),
+                    nf = ncol(bioclim_lu_sclim_dt_cc_ss), # number of kept axes
+                    scannf = FALSE) # display screeplot?
+
+## 2.) rank variables according to importance: ----------------------------------------------
+
+# importance = variance explained by principal axis on which variables loads most * loading on this axis
+
+pc_maxloads <- apply(abs(var.pca$c1), MARGIN = 1, which.max) # axis on which each variable loads most
+maxloads <- apply(abs(var.pca$c1), MARGIN = 1, max) # loading on this axis
+var_expl <- var.pca$eig / sum(var.pca$eig) # variance explained by each axis, same as get_eigenvalue(var.pca)
+
+variable_importance <- maxloads * var_expl[pc_maxloads]
+
+# rank variables: most important variable gets highest rank:
+variable_rank <- rev(seq_len(length(variable_importance)))
+names(variable_rank) <- names(maxloads)[order(variable_importance, decreasing = TRUE)]
+variable_rank
+
+
+## 3.) select variables: --------------------------------------------------------
+# find which variables are correlated >= 0.7 and of highly correlated variables 
+# choose the one with the highest rank
+
+# load select07 function:
+source("0_functions.R")
+
+selvar_seasonal <- select07(imp = variable_rank[colnames(bioclim_lu_sclim_dt_cc_ss)], # importance of variables
+                            X = bioclim_lu_sclim_dt_cc_ss)
+# save variable selection:
+save(selvar_seasonal, file = file.path("data", "selected_variables_seasonal.RData"))
+
+###
+
+M <- cor(bioclim_lu_sclim_dt_cc_ss, method = "s")
+
+corrplot(M, method = "square", order = "hclust",
+         addCoef.col = "black",
+         diag = FALSE,
+         tl.cex = 0.6,#1
+         number.cex = 0.4, # 0.8
+         number.digits= 2)

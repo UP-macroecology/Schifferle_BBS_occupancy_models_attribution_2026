@@ -1,7 +1,13 @@
 # reformat BBS data for occupancy modelling
 # one row per route-year combination, routes either surveyed or not
+# centroids of routes as shapefile
+
+# packages: ----
 
 library(dplyr)
+library(sf)
+
+# reformat BBS data: -----------------------------------------------------------
 
 load(file = file.path("data", "BBS_data_merged.RData")) # output of DEBTs\analysis\Schifferle_BBS_explorations_2023\BBS_data_prep.R
 
@@ -31,3 +37,43 @@ route_dt <- tidyr::expand_grid(RTENO = unique(bbs_dt_occ$RTENO),
   mutate(Surveyed = if_else(is.na(doy), 0, 1))
 
 save(route_dt, file = file.path("data", "BBS_for_occ.RData"))
+
+
+# save shapefile of route centroids: -------------------------------------------
+
+datashare_BBS <- file.path("//ibb-fs01.ibb.uni-potsdam.de", "daten$", "AG26", "Arbeit", "datashare", "data", "biodat", "distribution", "BBS")
+
+routes_sf <- read_sf(file.path(datashare_BBS, "bbs_routes", "bbsrtsl020.shp")) %>% 
+  st_transform(crs = "ESRI:102003") %>% # Albers Equal Area projection
+  mutate(RTENO_BBS = as.integer(paste0("840", stringr::str_pad(RTENO, width = 5, side = "left", pad = "0")))) # reformat RTENO to match RTENO from BBS data imported with the bbsAssistant package
+
+# route centroids:
+
+routes_sf2 <- routes_sf %>% 
+  group_by(RTENO_BBS) %>% summarise %>% # merge lines if routes in shapefile consist of multiple adjacent lines
+  mutate(centroid_X = NA) %>% 
+  mutate(centroid_Y = NA)
+
+# coordinates of route centroids, if route geometry is available:
+for(j in 1:nrow(routes_sf2)){
+  
+  print(j)
+  
+  centroid_coords <- routes_sf2[j,] %>% 
+    st_bbox %>% 
+    st_as_sfc %>% 
+    st_centroid %>% 
+    st_coordinates
+  
+  routes_sf2$centroid_X[j] <- centroid_coords[1]
+  routes_sf2$centroid_Y[j] <- centroid_coords[2]
+}
+# change geometry from route line to centroid:
+routes_sf_centr <- routes_sf2 %>% 
+  st_drop_geometry %>% 
+  st_as_sf(coords = c("centroid_X", "centroid_Y"), crs = "ESRI:102003")
+
+# save routes as shapefile - centroids:
+routes_sf_centr %>% 
+  st_write(file.path("data", "BBS_routes_all_centroids.shp"),
+           append = FALSE)

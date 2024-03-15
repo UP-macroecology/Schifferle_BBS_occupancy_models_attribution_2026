@@ -13,6 +13,7 @@ library(sf)
 
 # BBS data formatted for occupancy modelling:
 load(file = file.path("data", "BBS_for_occ.RData")) # output of 1_0_reformat_BBS_data.R
+route_dt
 
 # spatial data on routes:
 datashare_BBS <- file.path("//ibb-fs01.ibb.uni-potsdam.de", "daten$", "AG26", "Arbeit", "datashare", "data", "biodat", "distribution", "BBS")
@@ -209,84 +210,8 @@ routes_sf_centr_thinned %>%
 
 # I test two versions:
 
-# 1) first remove one of the two closest points, 
-# then calculate distances again and again remove one of the two closest points...
-
-subsample1 <- function(data, npoints_keep = 30){
-  
-  # data = sf object
-  
-  # number of points to remove:
-  remove_n <- nrow(data) - npoints_keep
-  
-  output_data <- data
-  
-  for(r in 1:remove_n){
-    
-    #print(r)
-    
-    # distance matrix:
-    dist_mat <- output_data %>% 
-      st_distance()
-    
-    # which pair of points are closest:
-    dist_mat[dist_mat==units::as_units(0, "m")] <- NA  # exclude 0 (distance to itself)
-    ind <- arrayInd(which.min(dist_mat), dim(dist_mat))
-    
-    # corresponding RTENO:
-    remove_this <- output_data %>% 
-      slice(ind[sample(c(1,2), 1)]) %>% # arbitrarily remove one of two closest points
-      pull(RTENO)
-    
-    # remove that route:
-    output_data <- output_data %>% 
-      filter(RTENO != remove_this)
-  }
-  return(output_data)
-}
-
-# 2) from: https://gist.github.com/danlwarren/271288d5bab45d2da549:
-
-# randomly choose one point, calculate distance to all others, choose the most distant one,
-# then find distance of all not chosen points to the chosen points and choose again the most distant point to all chosen points, repeat
-# input:
-# x, a data frame containing the columns to be used to calculate distances along with whatever other data you need
-# cols, a vector of column names or indices to use for calculating distances
-# npoints, the number of rarefied points to spit out
-# e.g. subsample2(my.data, c("latitude", "longitude"), 200)
-
-# advantage: random drawing -> repeat to get different sets -> what to use? xx
-
-subsample2 <- function(x, cols, npoints){
-  
-  # create empty vector for output:
-  inds <- vector(mode = "numeric")
-  
-  # create distance matrix:
-  this.dist <- as.matrix(dist(x[, cols], upper=TRUE))
-  
-  # draw first index at random:
-  inds <- c(inds, as.integer(runif(1, 1, length(this.dist[,1]))))
-  
-  # get second index from maximally distant point from first one (necessary for apply ftc)
-  inds <- c(inds, which.max(this.dist[,inds]))
-  
-  while(length(inds) < npoints){
-    # for each point, find its distance to the closest point that's already been selected:
-    min.dists <- apply(this.dist[,inds], 1, min)
-    
-    # select the point that is furthest from everything already selected:
-    this.ind <- which.max(min.dists)
-    
-    # get rid of ties, if they exist:
-    if(length(this.ind) > 1){
-      print("Breaking tie...")
-      this.ind <- this.ind[1]
-    }
-    inds <- c(inds, this.ind)
-  }
-  return(x[inds,])
-}
+# load 2 subsampling functions:
+source("0_functions.R") # to get subsample1() and subsample2()
 
 # apply both versions:
 

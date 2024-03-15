@@ -1,12 +1,13 @@
 # Select BBS species for which occupancy models are calculated:
 
 # Jarzyna et al. 2018: remove nocturnal, crepuscular, pelagic species (poorly captured by survey methodology) (no details, 494 species left)
-# Harris et al. 2018: exclude all nocturnal, crepuscular, and aquatic species (not well sampled by BBS methods) (385 species left)
-# Hurlbert & White 2005: excluding nocturnal, crepuscular, and otherwise difficult to survey groups (e.g., raptors) (372 species left)
-# https://ecologicaldata.org/wiki/breeding-bird-survey-north-america: # "For community analyses it is generally best to exclude 
+# Harris et al. 2018: exclude all nocturnal, crepuscular, and aquatic species (not well sampled by BBS methods) (385 species left, in supplementals is code, exclude:
+# same as in https://ecologicaldata.org/wiki/breeding-bird-survey-north-america: "For community analyses it is generally best to exclude 
 # nocturnal, crepuscular, and aquatic species as they are not well sampled. 
 # (That is, exclude AOU species codes <=2880 [waterbirds, shorebirds, etc], 
-# (>=3650 & <=3810) [owls], (>=3900 & <=3910) [kingfishers], (>=4160 & <=4210) [nightjars], 7010 [dipper].)"
+# (>=3650 & <=3810) [owls], (>=3900 & <=3910) [kingfishers], (>=4160 & <=4210) [nightjars], 7010 [dipper].)")
+# Hurlbert & White 2005: excluding nocturnal, crepuscular, and otherwise difficult to survey groups (e.g., raptors) (372 species left)
+
 
 # data availability for each species after route selection:
 # consider only species that have been detected at >= 50 (40) different BBS routes over the whole time period

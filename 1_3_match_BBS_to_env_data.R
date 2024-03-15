@@ -30,13 +30,21 @@ nrow(route_sel_dt) # 11900
 # selected variables (output of 1_2_variable_selection.R):
 load(file = file.path("data", "selected_variables.RData"))
 selvar
+selvar <- c(selvar, "bio1", "bio4", "bio7", "bio10", "bio11", "bio12", "bio15", "bio16", "bio17", "secdf", "primf") # xx
 
+load(file = file.path("data", "selected_variables_seasonal.RData"))
+selvar_seasonal
+selvar_seasonal2 <- unique(c(selvar_seasonal, selvar)) # xx
+selvar <- selvar_seasonal2
+# xx
 
 # 1) bioclim and land use variables for each route-year combination: -----------
 
 # files:
 bioclim_files <- list.files(file.path("data", "Env_data", "ISIMIP_CHELSA-W5E5v1.0", "bioclim"), full.names = TRUE)
 lu_files <- list.files(file.path("data", "Env_data", "LUH2", "albers_proj"), full.names = TRUE)
+sclim_files <- list.files(file.path("data", "Env_data", "ISIMIP_CHELSA-W5E5v1.0", "seasonal"), full.names = TRUE) #xx
+
 
 # iterate over years:
 ## extract BBS data matching year i, load bioclim and land use data of year i, extract values at route centroids:
@@ -71,7 +79,7 @@ for(i in 1:length(years)){
   lu_year <- rast(lu_files[which(grepl(paste0(years[i], "_ESRI102003_ave.tif$"), lu_files))])
   
   # reduce to selected variables:
-  lu_year_sel <- lu_year[[selvar[!grepl(pattern = "bio", x = selvar)]]]
+  lu_year_sel <- lu_year[[selvar[!grepl(pattern = "bio|pr_", x = selvar)]]] # xx
   
   # extract values of each land use class at each relevant route location:
   for(luvar in names(lu_year_sel)){
@@ -79,7 +87,18 @@ for(i in 1:length(years)){
       terra::extract(y = routes_sel_year_sf) %>% 
       pull(luvar)
   }
-
+  
+  # seasonal climate variables of year i: xx
+  sclim_year <- rast(sclim_files[which(grepl(paste0("(spring|summer|autumn|winter)", "_", years[i], ".tif"), sclim_files))])
+  # reduce to selected variables:
+  sclim_year_sel <- sclim_year[[selvar[grepl(pattern = "pr_", x = selvar)]]]
+  # extract values of each variable at each relevant route location:
+  for(sclimvar in names(sclim_year_sel)){
+    routes_sel_year_sf[, sclimvar] <- sclim_year_sel[[sclimvar]] %>% 
+      terra::extract(y = routes_sel_year_sf) %>% 
+      pull(sclimvar)
+  }
+  
   # merge data for all years:
   if(i == 1){
     routes_sel_all_sf <- routes_sel_year_sf
@@ -118,7 +137,7 @@ lu_3yrs_sp <- rast(lu_files[which(grepl("1988_1990", lu_files))])
 lu_3yrs_sp
 
 # reduce to selected variables:
-lu_3yrs_sp_sel <- lu_3yrs_sp[[selvar[!grepl(pattern = "bio", x = selvar)]]]
+lu_3yrs_sp_sel <- lu_3yrs_sp[[selvar[!grepl(pattern = "bio|pr_", x = selvar)]]] # xx
 
 # extract value of each lu variable at each route centroid:
 for(luvar in names(lu_3yrs_sp_sel)){
@@ -127,6 +146,22 @@ for(luvar in names(lu_3yrs_sp_sel)){
     terra::extract(y = routes_sel_sf) %>% 
     pull(luvar)
 }
+
+# seasonal climate variables: xx
+
+sclim_3yrs_sp <- rast(sclim_files[which(grepl("1988_1991", sclim_files))])
+
+# reduce to selected variables:
+sclim_3yrs_sp_sel <- sclim_3yrs_sp[[selvar[grepl(pattern = "(spring|summer|autumn|winter)", x = selvar)]]]
+
+# extract value of each bioclimatic variable at each route centroid:
+for(sclimvar in names(sclim_3yrs_sp_sel)){
+  
+  routes_sel_sf[, paste0(sclimvar, "_3yrs")] <- sclim_3yrs_sp_sel[[sclimvar]] %>% 
+    terra::extract(y = routes_sel_sf) %>% 
+    pull(sclimvar)
+}
+
 
 # match to BBS data:
 route_sel_env_dt_final <- route_sel_env_dt1 %>% 
