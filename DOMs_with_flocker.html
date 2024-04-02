@@ -1,0 +1,1349 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.3.353">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+
+<title>DOMS_with_flocker</title>
+<style>
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+/* CSS for syntax highlighting */
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+</style>
+
+
+<script src="DOMs_with_flocker_files/libs/clipboard/clipboard.min.js"></script>
+<script src="DOMs_with_flocker_files/libs/quarto-html/quarto.js"></script>
+<script src="DOMs_with_flocker_files/libs/quarto-html/popper.min.js"></script>
+<script src="DOMs_with_flocker_files/libs/quarto-html/tippy.umd.min.js"></script>
+<script src="DOMs_with_flocker_files/libs/quarto-html/anchor.min.js"></script>
+<link href="DOMs_with_flocker_files/libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="DOMs_with_flocker_files/libs/quarto-html/quarto-syntax-highlighting.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="DOMs_with_flocker_files/libs/bootstrap/bootstrap.min.js"></script>
+<link href="DOMs_with_flocker_files/libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="DOMs_with_flocker_files/libs/bootstrap/bootstrap.min.css" rel="stylesheet" id="quarto-bootstrap" data-mode="light">
+
+
+</head>
+
+<body class="fullcontent">
+
+<div id="quarto-content" class="page-columns page-rows-contents page-layout-article">
+
+<main class="content" id="quarto-document-content">
+
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<h1 class="title">DOMS_with_flocker</h1>
+</div>
+
+
+
+<div class="quarto-title-meta">
+
+    
+  
+    
+  </div>
+  
+
+</header>
+
+<section id="fit-doms-with-flocker" class="level2">
+<h2 class="anchored" data-anchor-id="fit-doms-with-flocker">Fit DOMs with flocker</h2>
+<p>Fit dynamic occupancy models with flocker package.</p>
+</section>
+<section id="install-load-packages" class="level2">
+<h2 class="anchored" data-anchor-id="install-load-packages">Install / load packages</h2>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb1"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="co">#install.packages("flocker", dependencies = TRUE)</span></span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(flocker)</span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="co">#install.packages("cmdstanr", repos = c("https://mc-stan.org/r-packages/", getOption("repos")))</span></span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(cmdstanr)</span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a><span class="fu">set_cmdstan_path</span>(<span class="at">path =</span> <span class="st">"C:/Users/schifferle1/Documents/cmdstan-2.34.1"</span>)</span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a><span class="co">#check_cmdstan_toolchain() # requires RTools installation, see https://mc-stan.org/cmdstanr/articles/cmdstanr.html and https://mc-stan.org/docs/cmdstan-guide/installation.html</span></span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a><span class="co">#install_cmdstan(dir = "C:/Users/schifferle1/Documents") # is that right?</span></span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(brms)</span>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(dplyr)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+</section>
+<section id="load-data" class="level2">
+<h2 class="anchored" data-anchor-id="load-data">Load data</h2>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb2"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="co"># selected routes and focal years matched to environmental data:</span></span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a><span class="co"># merged route, year, environment data:</span></span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a><span class="fu">load</span>(<span class="at">file =</span> <span class="fu">file.path</span>(<span class="st">"data"</span>, <span class="st">"route_year_env_data.RData"</span>))</span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a><span class="co"># scale covariates:</span></span>
+<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a>route_sel_env_dt_scaled <span class="ot">&lt;-</span> route_sel_env_dt_final <span class="sc">%&gt;%</span> </span>
+<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="fu">across</span>(bio2<span class="sc">:</span>pr_winter_3yrs, <span class="sc">~</span> (<span class="fu">scale</span>(.)) <span class="sc">%&gt;%</span> <span class="fu">as.vector</span>()))</span>
+<span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-9"><a href="#cb2-9" aria-hidden="true" tabindex="-1"></a><span class="co"># route-year-species information (only surveyed)</span></span>
+<span id="cb2-10"><a href="#cb2-10" aria-hidden="true" tabindex="-1"></a><span class="fu">load</span>(<span class="at">file =</span> <span class="fu">file.path</span>(<span class="st">"data"</span>, <span class="st">"BBS_for_occ_spec_records.RData"</span>)) <span class="co"># output of 1_0_reformat_BBS_data.R</span></span>
+<span id="cb2-11"><a href="#cb2-11" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-12"><a href="#cb2-12" aria-hidden="true" tabindex="-1"></a><span class="co"># selected species:</span></span>
+<span id="cb2-13"><a href="#cb2-13" aria-hidden="true" tabindex="-1"></a><span class="fu">load</span>(<span class="at">file =</span> <span class="fu">file.path</span>(<span class="st">"data"</span>, <span class="st">"final_species_selection.RData"</span>)) <span class="co"># output of 1_2_species_selection.R</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<p>Use House Finch as test species (fitting DOMs with JAGS went well for this).</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb3"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a>spec <span class="ot">&lt;-</span> <span class="st">"House Finch"</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<section id="assemble-data-for-flocker" class="level3">
+<h3 class="anchored" data-anchor-id="assemble-data-for-flocker">Assemble data for flocker</h3>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb4"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a>nyears <span class="ot">&lt;-</span> <span class="fu">length</span>(<span class="fu">unique</span>(route_sel_env_dt_final<span class="sc">$</span>Year)) <span class="co"># 25</span></span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a>nsurveys <span class="ot">&lt;-</span> <span class="dv">5</span></span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a>nsites <span class="ot">&lt;-</span> <span class="fu">length</span>(<span class="fu">unique</span>(route_sel_env_dt_final<span class="sc">$</span>RTENO)) <span class="co"># 476</span></span>
+<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a><span class="co"># species presences:</span></span>
+<span id="cb4-6"><a href="#cb4-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-7"><a href="#cb4-7" aria-hidden="true" tabindex="-1"></a>presences_spec <span class="ot">&lt;-</span> bbs_dt_occ <span class="sc">%&gt;%</span> </span>
+<span id="cb4-8"><a href="#cb4-8" aria-hidden="true" tabindex="-1"></a>  <span class="fu">select</span>(<span class="fu">c</span>(English_Common_Name, RTENO, Year, <span class="fu">paste0</span>(<span class="st">"Count"</span>, <span class="fu">seq</span>(<span class="dv">10</span>, <span class="dv">50</span>, <span class="dv">10</span>)))) <span class="sc">%&gt;%</span> </span>
+<span id="cb4-9"><a href="#cb4-9" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(English_Common_Name <span class="sc">==</span> spec)</span>
+<span id="cb4-10"><a href="#cb4-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-11"><a href="#cb4-11" aria-hidden="true" tabindex="-1"></a><span class="co"># match to routes-year-env:</span></span>
+<span id="cb4-12"><a href="#cb4-12" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-13"><a href="#cb4-13" aria-hidden="true" tabindex="-1"></a>occ_dt_spec <span class="ot">&lt;-</span> route_sel_env_dt_scaled <span class="sc">%&gt;%</span> </span>
+<span id="cb4-14"><a href="#cb4-14" aria-hidden="true" tabindex="-1"></a>  <span class="co"># add observations:</span></span>
+<span id="cb4-15"><a href="#cb4-15" aria-hidden="true" tabindex="-1"></a>  collapse<span class="sc">::</span><span class="fu">join</span>(presences_spec, <span class="at">on =</span> <span class="fu">c</span>(<span class="st">"RTENO"</span>, <span class="st">"Year"</span>), <span class="at">how =</span> <span class="st">"left"</span>) <span class="sc">%&gt;%</span> </span>
+<span id="cb4-16"><a href="#cb4-16" aria-hidden="true" tabindex="-1"></a>  <span class="co"># if route was surveyed but species not observed, replace NA with 0:</span></span>
+<span id="cb4-17"><a href="#cb4-17" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="fu">across</span>(Count10<span class="sc">:</span>Count50, <span class="sc">~</span> </span>
+<span id="cb4-18"><a href="#cb4-18" aria-hidden="true" tabindex="-1"></a>                  <span class="fu">case_when</span>(Surveyed <span class="sc">==</span> <span class="dv">1</span> <span class="sc">&amp;</span> <span class="fu">is.na</span>(.) <span class="sc">~</span> <span class="dv">0</span>,</span>
+<span id="cb4-19"><a href="#cb4-19" aria-hidden="true" tabindex="-1"></a>                            <span class="at">.default =</span> .))) <span class="sc">%&gt;%</span></span>
+<span id="cb4-20"><a href="#cb4-20" aria-hidden="true" tabindex="-1"></a>  <span class="co"># convert bird counts to presence / absence:</span></span>
+<span id="cb4-21"><a href="#cb4-21" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="fu">across</span>(Count10<span class="sc">:</span>Count50, <span class="sc">~</span> </span>
+<span id="cb4-22"><a href="#cb4-22" aria-hidden="true" tabindex="-1"></a>                  <span class="fu">case_when</span>(. <span class="sc">&gt;</span> <span class="dv">1</span> <span class="sc">~</span> <span class="dv">1</span>,</span>
+<span id="cb4-23"><a href="#cb4-23" aria-hidden="true" tabindex="-1"></a>                            <span class="at">.default =</span> .)))</span>
+<span id="cb4-24"><a href="#cb4-24" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-25"><a href="#cb4-25" aria-hidden="true" tabindex="-1"></a><span class="co"># reformat obs. as array sites x surveys x years (same as for JAGS):</span></span>
+<span id="cb4-26"><a href="#cb4-26" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-27"><a href="#cb4-27" aria-hidden="true" tabindex="-1"></a>years <span class="ot">&lt;-</span> <span class="fu">seq</span>(<span class="fu">min</span>(occ_dt_spec<span class="sc">$</span>Year), <span class="fu">max</span>(occ_dt_spec<span class="sc">$</span>Year))</span>
+<span id="cb4-28"><a href="#cb4-28" aria-hidden="true" tabindex="-1"></a>y_array <span class="ot">&lt;-</span> <span class="fu">array</span>(<span class="cn">NA</span>, <span class="at">dim =</span> <span class="fu">c</span>(nsites, nsurveys, nyears))</span>
+<span id="cb4-29"><a href="#cb4-29" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> (t <span class="cf">in</span> <span class="dv">1</span><span class="sc">:</span>nyears){</span>
+<span id="cb4-30"><a href="#cb4-30" aria-hidden="true" tabindex="-1"></a>  y_array[<span class="dv">1</span><span class="sc">:</span>nsites, <span class="dv">1</span><span class="sc">:</span>nsurveys, t] <span class="ot">&lt;-</span> <span class="fu">as.matrix</span>(occ_dt_spec[<span class="fu">which</span>(occ_dt_spec<span class="sc">$</span>Year <span class="sc">==</span> years[t]), <span class="fu">c</span>(<span class="fu">paste0</span>(<span class="st">"Count"</span>, <span class="fu">seq</span>(<span class="dv">10</span>, <span class="dv">50</span>, <span class="dv">10</span>)))])</span>
+<span id="cb4-31"><a href="#cb4-31" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb4-32"><a href="#cb4-32" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-33"><a href="#cb4-33" aria-hidden="true" tabindex="-1"></a><span class="co"># reformat environmental covariates:</span></span>
+<span id="cb4-34"><a href="#cb4-34" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-35"><a href="#cb4-35" aria-hidden="true" tabindex="-1"></a>route_sel_env_dt_scaled</span>
+<span id="cb4-36"><a href="#cb4-36" aria-hidden="true" tabindex="-1"></a>env_cov <span class="ot">&lt;-</span> <span class="fu">vector</span>(<span class="st">"list"</span>, <span class="at">length =</span> nyears)</span>
+<span id="cb4-37"><a href="#cb4-37" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> (t <span class="cf">in</span> <span class="dv">1</span><span class="sc">:</span>nyears){</span>
+<span id="cb4-38"><a href="#cb4-38" aria-hidden="true" tabindex="-1"></a>  env_cov[[t]] <span class="ot">&lt;-</span> route_sel_env_dt_scaled[<span class="fu">which</span>(route_sel_env_dt_scaled<span class="sc">$</span>Year <span class="sc">==</span> years[t]), <span class="fu">c</span>(<span class="st">"bio1"</span>, <span class="st">"bio2"</span>, <span class="st">"bio3"</span>, <span class="st">"pr_spring"</span>, <span class="st">"pr_summer"</span>,<span class="st">"pr_autumn"</span>, <span class="st">"pr_winter"</span>, <span class="st">"bio15"</span>,<span class="st">"bio1_3yrs"</span>, <span class="st">"bio2_3yrs"</span>, <span class="st">"bio3_3yrs"</span>, <span class="st">"pr_spring_3yrs"</span>, <span class="st">"pr_summer_3yrs"</span>, <span class="st">"pr_autumn_3yrs"</span>, <span class="st">"pr_winter_3yrs"</span>, <span class="st">"bio15_3yrs"</span>)]</span>
+<span id="cb4-39"><a href="#cb4-39" aria-hidden="true" tabindex="-1"></a>  }</span>
+<span id="cb4-40"><a href="#cb4-40" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-41"><a href="#cb4-41" aria-hidden="true" tabindex="-1"></a><span class="co"># covariate for detection probability:</span></span>
+<span id="cb4-42"><a href="#cb4-42" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-43"><a href="#cb4-43" aria-hidden="true" tabindex="-1"></a>det_cov <span class="ot">&lt;-</span> <span class="fu">vector</span>(<span class="st">"list"</span>, <span class="at">length =</span> <span class="dv">1</span>)</span>
+<span id="cb4-44"><a href="#cb4-44" aria-hidden="true" tabindex="-1"></a><span class="fu">names</span>(det_cov) <span class="ot">&lt;-</span> <span class="st">"route_section"</span></span>
+<span id="cb4-45"><a href="#cb4-45" aria-hidden="true" tabindex="-1"></a>det_cov<span class="sc">$</span>route_section <span class="ot">&lt;-</span> <span class="fu">array</span>(<span class="cn">NA</span>, <span class="at">dim =</span> <span class="fu">c</span>(nsites, nsurveys, nyears))</span>
+<span id="cb4-46"><a href="#cb4-46" aria-hidden="true" tabindex="-1"></a>det_cov<span class="sc">$</span>route_section[ , , <span class="dv">1</span><span class="sc">:</span>nyears] <span class="ot">&lt;-</span> <span class="fu">matrix</span>(<span class="fu">rep</span>(<span class="fu">c</span>(<span class="st">"Sect1"</span>, <span class="st">"Sect2"</span>, <span class="st">"Sect3"</span>, <span class="st">"Sect4"</span>, <span class="st">"Sect5"</span>), nsites), nsites, <span class="at">byrow =</span> <span class="cn">TRUE</span>)</span>
+<span id="cb4-47"><a href="#cb4-47" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-48"><a href="#cb4-48" aria-hidden="true" tabindex="-1"></a><span class="co"># make flocker data:</span></span>
+<span id="cb4-49"><a href="#cb4-49" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-50"><a href="#cb4-50" aria-hidden="true" tabindex="-1"></a>fd <span class="ot">&lt;-</span> <span class="fu">make_flocker_data_dynamic</span>(</span>
+<span id="cb4-51"><a href="#cb4-51" aria-hidden="true" tabindex="-1"></a>  <span class="at">obs =</span> y_array,</span>
+<span id="cb4-52"><a href="#cb4-52" aria-hidden="true" tabindex="-1"></a>  <span class="at">unit_covs =</span> env_cov, </span>
+<span id="cb4-53"><a href="#cb4-53" aria-hidden="true" tabindex="-1"></a>  <span class="at">event_covs =</span> det_cov, </span>
+<span id="cb4-54"><a href="#cb4-54" aria-hidden="true" tabindex="-1"></a>  <span class="at">quiet =</span> <span class="cn">FALSE</span></span>
+<span id="cb4-55"><a href="#cb4-55" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+</section>
+<section id="fit-flocker-model" class="level3">
+<h3 class="anchored" data-anchor-id="fit-flocker-model">Fit flocker model</h3>
+<section id="climate-only-with-default-priors" class="level4">
+<h4 class="anchored" data-anchor-id="climate-only-with-default-priors">Climate only with default priors:</h4>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb5"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="co"># multi_colex_cl &lt;- flock(</span></span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a><span class="co">#   f_occ = ~ bio1_3yrs + bio2_3yrs + bio3_3yrs + pr_spring_3yrs + pr_summer_3yrs + pr_autumn_3yrs + pr_winter_3yrs + bio15_3yrs +</span></span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a><span class="co">#     I(bio1_3yrs^2) + I(bio2_3yrs^2) + I(bio3_3yrs^2) + I(pr_spring_3yrs^2) + I(pr_summer_3yrs^2) + I(pr_autumn_3yrs^2) + I(pr_winter_3yrs^2) + I(bio15_3yrs^2),</span></span>
+<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a><span class="co">#   f_det = ~ 1,</span></span>
+<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a><span class="co">#   f_col = ~ bio1 + bio2 + bio3 + pr_spring + pr_summer + pr_autumn + pr_winter + bio15 +</span></span>
+<span id="cb5-6"><a href="#cb5-6" aria-hidden="true" tabindex="-1"></a><span class="co">#     I(bio1^2) + I(bio2^2) + I(bio3^2) + I(pr_spring^2) + I(pr_summer^2) + I(pr_autumn^2) + I(pr_winter^2) + I(bio15^2) ,</span></span>
+<span id="cb5-7"><a href="#cb5-7" aria-hidden="true" tabindex="-1"></a><span class="co">#   f_ex = ~ bio1 + bio2 + bio3 + pr_spring + pr_summer + pr_autumn + pr_winter + bio15 +</span></span>
+<span id="cb5-8"><a href="#cb5-8" aria-hidden="true" tabindex="-1"></a><span class="co">#     I(bio1^2) + I(bio2^2) + I(bio3^2) + I(pr_spring^2) + I(pr_summer^2) + I(pr_autumn^2) + I(pr_winter^2) + I(bio15^2),</span></span>
+<span id="cb5-9"><a href="#cb5-9" aria-hidden="true" tabindex="-1"></a><span class="co">#   flocker_data = fd,</span></span>
+<span id="cb5-10"><a href="#cb5-10" aria-hidden="true" tabindex="-1"></a><span class="co">#   multiseason = "colex",</span></span>
+<span id="cb5-11"><a href="#cb5-11" aria-hidden="true" tabindex="-1"></a><span class="co">#   multi_init = "explicit",</span></span>
+<span id="cb5-12"><a href="#cb5-12" aria-hidden="true" tabindex="-1"></a><span class="co">#   backend = "cmdstanr",</span></span>
+<span id="cb5-13"><a href="#cb5-13" aria-hidden="true" tabindex="-1"></a><span class="co">#   cores = 3,</span></span>
+<span id="cb5-14"><a href="#cb5-14" aria-hidden="true" tabindex="-1"></a><span class="co">#   chains = 3</span></span>
+<span id="cb5-15"><a href="#cb5-15" aria-hidden="true" tabindex="-1"></a><span class="co"># ) # 54 min</span></span>
+<span id="cb5-16"><a href="#cb5-16" aria-hidden="true" tabindex="-1"></a><span class="co"># save(multi_colex_cl, file = file.path("data", paste0(gsub(" ", "_", spec), "_cl4_quadr_Stan.RData")))</span></span>
+<span id="cb5-17"><a href="#cb5-17" aria-hidden="true" tabindex="-1"></a><span class="fu">load</span>(<span class="at">file =</span> <span class="fu">file.path</span>(<span class="st">"data"</span>, <span class="fu">paste0</span>(<span class="fu">gsub</span>(<span class="st">" "</span>, <span class="st">"_"</span>, spec), <span class="st">"_cl4_quadr_Stan.RData"</span>)))</span>
+<span id="cb5-18"><a href="#cb5-18" aria-hidden="true" tabindex="-1"></a>multi_colex_cl</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code> Family: occupancy_multi_colex 
+  Links: mu = identity; occ = identity; colo = identity; ex = identity 
+Formula: ff_y | vint(ff_n_series, ff_n_unit, ff_n_year, ff_n_rep, ff_Q, ff_unit_index1, ff_unit_index2, ff_unit_index3, ff_unit_index4, ff_unit_index5, ff_unit_index6, ff_unit_index7, ff_unit_index8, ff_unit_index9, ff_unit_index10, ff_unit_index11, ff_unit_index12, ff_unit_index13, ff_unit_index14, ff_unit_index15, ff_unit_index16, ff_unit_index17, ff_unit_index18, ff_unit_index19, ff_unit_index20, ff_unit_index21, ff_unit_index22, ff_unit_index23, ff_unit_index24, ff_unit_index25, ff_rep_index1, ff_rep_index2, ff_rep_index3, ff_rep_index4, ff_rep_index5) ~ 1 
+         occ ~ bio1_3yrs + bio2_3yrs + bio3_3yrs + pr_spring_3yrs + pr_summer_3yrs + pr_autumn_3yrs + pr_winter_3yrs + bio15_3yrs + I(bio1_3yrs^2) + I(bio2_3yrs^2) + I(bio3_3yrs^2) + I(pr_spring_3yrs^2) + I(pr_summer_3yrs^2) + I(pr_autumn_3yrs^2) + I(pr_winter_3yrs^2) + I(bio15_3yrs^2)
+         colo ~ bio1 + bio2 + bio3 + pr_spring + pr_summer + pr_autumn + pr_winter + bio15 + I(bio1^2) + I(bio2^2) + I(bio3^2) + I(pr_spring^2) + I(pr_summer^2) + I(pr_autumn^2) + I(pr_winter^2) + I(bio15^2)
+         ex ~ bio1 + bio2 + bio3 + pr_spring + pr_summer + pr_autumn + pr_winter + bio15 + I(bio1^2) + I(bio2^2) + I(bio3^2) + I(pr_spring^2) + I(pr_summer^2) + I(pr_autumn^2) + I(pr_winter^2) + I(bio15^2)
+   Data: data (Number of observations: 56100) 
+  Draws: 3 chains, each with iter = 2000; warmup = 1000; thin = 1;
+         total post-warmup draws = 3000
+
+Regression Coefficients:
+                      Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS
+Intercept                -0.08      0.01    -0.11    -0.06 1.00     5632
+occ_Intercept            -0.11      0.34    -0.76     0.54 1.00     3403
+colo_Intercept           -1.10      0.10    -1.30    -0.91 1.00     3801
+ex_Intercept             -1.87      0.11    -2.07    -1.66 1.00     4229
+occ_bio1_3yrs             0.65      0.31     0.05     1.28 1.00     2066
+occ_bio2_3yrs            -1.11      0.39    -1.88    -0.37 1.00     2145
+occ_bio3_3yrs             0.74      0.48    -0.20     1.70 1.00     1919
+occ_pr_spring_3yrs       -1.09      0.38    -1.82    -0.33 1.00     2611
+occ_pr_summer_3yrs       -0.99      0.30    -1.59    -0.41 1.00     2060
+occ_pr_autumn_3yrs        1.35      0.44     0.50     2.23 1.00     1981
+occ_pr_winter_3yrs        0.90      0.44     0.01     1.77 1.00     2025
+occ_bio15_3yrs           -1.38      0.34    -2.06    -0.73 1.00     2298
+occ_Ibio1_3yrsE2         -1.15      0.18    -1.50    -0.81 1.00     3728
+occ_Ibio2_3yrsE2          0.23      0.13    -0.03     0.50 1.00     4410
+occ_Ibio3_3yrsE2          0.42      0.18     0.06     0.79 1.00     3241
+occ_Ipr_spring_3yrsE2    -0.10      0.18    -0.45     0.25 1.00     3242
+occ_Ipr_summer_3yrsE2     0.17      0.19    -0.20     0.52 1.00     2360
+occ_Ipr_autumn_3yrsE2     0.21      0.16    -0.09     0.53 1.00     2917
+occ_Ipr_winter_3yrsE2    -0.49      0.20    -0.91    -0.10 1.00     2082
+occ_Ibio15_3yrsE2         0.04      0.14    -0.23     0.30 1.00     2986
+colo_bio1                 0.09      0.09    -0.08     0.27 1.00     2340
+colo_bio2                -0.34      0.11    -0.55    -0.13 1.00     3184
+colo_bio3                 0.20      0.11    -0.02     0.42 1.00     2319
+colo_pr_spring            0.19      0.09     0.03     0.36 1.00     3364
+colo_pr_summer            0.09      0.08    -0.05     0.25 1.00     2885
+colo_pr_autumn            0.14      0.08    -0.01     0.30 1.00     3780
+colo_pr_winter           -0.08      0.09    -0.25     0.09 1.00     3282
+colo_bio15               -0.16      0.09    -0.34     0.01 1.00     3517
+colo_Ibio1E2             -0.56      0.06    -0.67    -0.45 1.00     4135
+colo_Ibio2E2             -0.01      0.05    -0.11     0.09 1.00     4646
+colo_Ibio3E2              0.14      0.05     0.04     0.25 1.00     3799
+colo_Ipr_springE2        -0.05      0.04    -0.13     0.03 1.00     3477
+colo_Ipr_summerE2        -0.02      0.04    -0.11     0.05 1.00     3420
+colo_Ipr_autumnE2        -0.15      0.05    -0.26    -0.06 1.00     3679
+colo_Ipr_winterE2        -0.01      0.04    -0.09     0.07 1.00     2879
+colo_Ibio15E2             0.00      0.03    -0.06     0.07 1.00     2999
+ex_bio1                  -0.44      0.09    -0.63    -0.26 1.00     2546
+ex_bio2                   0.62      0.13     0.37     0.88 1.00     2682
+ex_bio3                  -0.04      0.14    -0.33     0.23 1.00     2219
+ex_pr_spring              0.10      0.09    -0.08     0.27 1.00     3232
+ex_pr_summer              0.27      0.09     0.10     0.45 1.00     2532
+ex_pr_autumn             -0.07      0.09    -0.24     0.11 1.00     2955
+ex_pr_winter             -0.47      0.10    -0.67    -0.28 1.00     3338
+ex_bio15                  0.47      0.11     0.26     0.68 1.00     4399
+ex_Ibio1E2                0.36      0.06     0.24     0.48 1.00     4683
+ex_Ibio2E2               -0.43      0.07    -0.56    -0.30 1.00     3977
+ex_Ibio3E2               -0.35      0.07    -0.50    -0.21 1.00     4468
+ex_Ipr_springE2           0.08      0.04    -0.01     0.16 1.00     3218
+ex_Ipr_summerE2          -0.04      0.05    -0.15     0.05 1.00     3337
+ex_Ipr_autumnE2           0.03      0.04    -0.05     0.11 1.00     3044
+ex_Ipr_winterE2           0.32      0.06     0.21     0.43 1.00     2618
+ex_Ibio15E2              -0.24      0.06    -0.36    -0.13 1.00     2825
+                      Tail_ESS
+Intercept                 2350
+occ_Intercept             2131
+colo_Intercept            2437
+ex_Intercept              2484
+occ_bio1_3yrs             2246
+occ_bio2_3yrs             2215
+occ_bio3_3yrs             2253
+occ_pr_spring_3yrs        2273
+occ_pr_summer_3yrs        2313
+occ_pr_autumn_3yrs        1978
+occ_pr_winter_3yrs        2194
+occ_bio15_3yrs            2473
+occ_Ibio1_3yrsE2          2154
+occ_Ibio2_3yrsE2          2245
+occ_Ibio3_3yrsE2          2169
+occ_Ipr_spring_3yrsE2     2199
+occ_Ipr_summer_3yrsE2     2301
+occ_Ipr_autumn_3yrsE2     2504
+occ_Ipr_winter_3yrsE2     1997
+occ_Ibio15_3yrsE2         2613
+colo_bio1                 2129
+colo_bio2                 2358
+colo_bio3                 2274
+colo_pr_spring            2335
+colo_pr_summer            2019
+colo_pr_autumn            2768
+colo_pr_winter            2640
+colo_bio15                2282
+colo_Ibio1E2              2380
+colo_Ibio2E2              2252
+colo_Ibio3E2              2457
+colo_Ipr_springE2         2489
+colo_Ipr_summerE2         2272
+colo_Ipr_autumnE2         2357
+colo_Ipr_winterE2         2173
+colo_Ibio15E2             2398
+ex_bio1                   2193
+ex_bio2                   2318
+ex_bio3                   2126
+ex_pr_spring              2747
+ex_pr_summer              2304
+ex_pr_autumn              2284
+ex_pr_winter              2328
+ex_bio15                  2239
+ex_Ibio1E2                2292
+ex_Ibio2E2                2319
+ex_Ibio3E2                2201
+ex_Ipr_springE2           2458
+ex_Ipr_summerE2           2340
+ex_Ipr_autumnE2           2463
+ex_Ipr_winterE2           2284
+ex_Ibio15E2               2494
+
+Draws were sampled using sample(hmc). For each parameter, Bulk_ESS
+and Tail_ESS are effective sample size measures, and Rhat is the potential
+scale reduction factor on split chains (at convergence, Rhat = 1).</code></pre>
+</div>
+</div>
+<p>Is effective sample size large enough to get stable estimate of uncertainty? -&gt; Bulk_ESS = bulk effective sample size = how well is center of posterior distribution resolved. Tail_ESS = how well are extreme quantiles resolved (?).</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb7"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="co"># extract estimates:</span></span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a><span class="fu">fixef</span>(multi_colex_cl, <span class="at">summary =</span> <span class="cn">TRUE</span>, <span class="at">robust =</span> <span class="cn">FALSE</span>, <span class="at">probs =</span> <span class="fu">c</span>(<span class="fl">0.025</span>, <span class="fl">0.975</span>))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>                          Estimate  Est.Error         Q2.5       Q97.5
+Intercept             -0.082954446 0.01324485 -0.109334950 -0.05671761
+occ_Intercept         -0.108862417 0.33690446 -0.760401850  0.53813045
+colo_Intercept        -1.103522054 0.09873855 -1.296945500 -0.91295032
+ex_Intercept          -1.866808750 0.10612331 -2.073705500 -1.66314575
+occ_bio1_3yrs          0.649507077 0.31213508  0.049073320  1.28097475
+occ_bio2_3yrs         -1.106967062 0.38649278 -1.884742750 -0.37146727
+occ_bio3_3yrs          0.737256872 0.47994728 -0.196587750  1.70435175
+occ_pr_spring_3yrs    -1.085096199 0.38255646 -1.821522750 -0.33272932
+occ_pr_summer_3yrs    -0.988680156 0.30332678 -1.587203000 -0.40534677
+occ_pr_autumn_3yrs     1.348512235 0.44426477  0.499432850  2.23029625
+occ_pr_winter_3yrs     0.895113420 0.44136350  0.012450340  1.77218350
+occ_bio15_3yrs        -1.375876985 0.34260251 -2.056057000 -0.72687117
+occ_Ibio1_3yrsE2      -1.145414354 0.17603739 -1.502061250 -0.81284353
+occ_Ibio2_3yrsE2       0.229532331 0.13251050 -0.030457862  0.49501535
+occ_Ibio3_3yrsE2       0.415194380 0.18338072  0.060428348  0.78921060
+occ_Ipr_spring_3yrsE2 -0.103574475 0.17879713 -0.452462475  0.24894678
+occ_Ipr_summer_3yrsE2  0.167649170 0.18544558 -0.199851725  0.52171943
+occ_Ipr_autumn_3yrsE2  0.208183253 0.16234916 -0.093051515  0.53069102
+occ_Ipr_winter_3yrsE2 -0.487989822 0.20263088 -0.914619025 -0.09998672
+occ_Ibio15_3yrsE2      0.041719525 0.13602714 -0.229293725  0.30417983
+colo_bio1              0.092185868 0.08944733 -0.081848647  0.26684915
+colo_bio2             -0.342316932 0.10754944 -0.554214575 -0.12919977
+colo_bio3              0.198152259 0.11221593 -0.023961365  0.42111635
+colo_pr_spring         0.194993898 0.08545290  0.029200770  0.36334870
+colo_pr_summer         0.093226189 0.07513213 -0.050918450  0.24754488
+colo_pr_autumn         0.139394614 0.07909314 -0.008074587  0.29644365
+colo_pr_winter        -0.080990247 0.08645152 -0.250366425  0.08771059
+colo_bio15            -0.159733858 0.08908208 -0.337835975  0.01481243
+colo_Ibio1E2          -0.555254609 0.05620080 -0.665491825 -0.44583030
+colo_Ibio2E2          -0.008261647 0.05163718 -0.110621875  0.09111744
+colo_Ibio3E2           0.143279371 0.05362134  0.039712952  0.24926410
+colo_Ipr_springE2     -0.051505918 0.04039705 -0.134344100  0.02507766
+colo_Ipr_summerE2     -0.024408660 0.04108502 -0.106248800  0.05409516
+colo_Ipr_autumnE2     -0.150451797 0.05120471 -0.255435550 -0.05529011
+colo_Ipr_winterE2     -0.006154458 0.04054023 -0.091308817  0.06983835
+colo_Ibio15E2          0.004906791 0.03340473 -0.061905417  0.06861623
+ex_bio1               -0.444221597 0.09412628 -0.626712000 -0.26119657
+ex_bio2                0.624449914 0.13331447  0.366006550  0.88044643
+ex_bio3               -0.041521738 0.14463897 -0.329911125  0.23350893
+ex_pr_spring           0.096885298 0.09132961 -0.081378820  0.27302673
+ex_pr_summer           0.270955561 0.08965366  0.095429357  0.45072075
+ex_pr_autumn          -0.065109814 0.09029176 -0.242287325  0.11376400
+ex_pr_winter          -0.471926760 0.09869004 -0.670851325 -0.28151165
+ex_bio15               0.468457830 0.10565210  0.261351500  0.67646100
+ex_Ibio1E2             0.360407304 0.06053883  0.239495775  0.48059010
+ex_Ibio2E2            -0.429753140 0.06549517 -0.559108525 -0.30392002
+ex_Ibio3E2            -0.349976951 0.07331195 -0.500027300 -0.21106282
+ex_Ipr_springE2        0.078627925 0.04350020 -0.010981850  0.15960550
+ex_Ipr_summerE2       -0.043067224 0.05122914 -0.149698675  0.05441057
+ex_Ipr_autumnE2        0.033837079 0.04244058 -0.054702305  0.11325833
+ex_Ipr_winterE2        0.320577719 0.05592597  0.210975225  0.43077923
+ex_Ibio15E2           -0.241123488 0.05759028 -0.356519250 -0.13146422</code></pre>
+</div>
+</div>
+<section id="get-estimates-for-occupancy-extinction-and-colonisation-probability" class="level5">
+<h5 class="anchored" data-anchor-id="get-estimates-for-occupancy-extinction-and-colonisation-probability">Get estimates for occupancy, extinction and colonisation probability:</h5>
+<p>For each site and year and survey (route section) we get mean and quantiles:</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb9"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a><span class="co"># posterior predictive distribution for the modeled probabilities (occ., det., col., ext.):</span></span>
+<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a><span class="co"># takes a while (20 min?)</span></span>
+<span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a><span class="co"># posterior_preds &lt;- fitted_flocker( </span></span>
+<span id="cb9-4"><a href="#cb9-4" aria-hidden="true" tabindex="-1"></a><span class="co">#   multi_colex_cl,</span></span>
+<span id="cb9-5"><a href="#cb9-5" aria-hidden="true" tabindex="-1"></a><span class="co">#   components = c("occ", "det", "col", "ex"),</span></span>
+<span id="cb9-6"><a href="#cb9-6" aria-hidden="true" tabindex="-1"></a><span class="co">#   new_data = NULL,</span></span>
+<span id="cb9-7"><a href="#cb9-7" aria-hidden="true" tabindex="-1"></a><span class="co">#   unit_level = FALSE,</span></span>
+<span id="cb9-8"><a href="#cb9-8" aria-hidden="true" tabindex="-1"></a><span class="co">#   summarise = TRUE,</span></span>
+<span id="cb9-9"><a href="#cb9-9" aria-hidden="true" tabindex="-1"></a><span class="co">#   CI = c(0.025, 0.975),</span></span>
+<span id="cb9-10"><a href="#cb9-10" aria-hidden="true" tabindex="-1"></a><span class="co">#   draw_ids = NULL,</span></span>
+<span id="cb9-11"><a href="#cb9-11" aria-hidden="true" tabindex="-1"></a><span class="co">#   response = TRUE, # response or logit scale</span></span>
+<span id="cb9-12"><a href="#cb9-12" aria-hidden="true" tabindex="-1"></a><span class="co">#   re_formula = NULL,</span></span>
+<span id="cb9-13"><a href="#cb9-13" aria-hidden="true" tabindex="-1"></a><span class="co">#   allow_new_levels = FALSE,</span></span>
+<span id="cb9-14"><a href="#cb9-14" aria-hidden="true" tabindex="-1"></a><span class="co">#   sample_new_levels = "uncertainty"</span></span>
+<span id="cb9-15"><a href="#cb9-15" aria-hidden="true" tabindex="-1"></a><span class="co"># )</span></span>
+<span id="cb9-16"><a href="#cb9-16" aria-hidden="true" tabindex="-1"></a><span class="co">#save(posterior_preds, file = file.path("data", paste0(gsub(" ", "_", spec), "_cl4_quadr_Stan_post_preds.RData")))</span></span>
+<span id="cb9-17"><a href="#cb9-17" aria-hidden="true" tabindex="-1"></a><span class="fu">load</span>(<span class="at">file =</span> <span class="fu">file.path</span>(<span class="st">"data"</span>, <span class="fu">paste0</span>(<span class="fu">gsub</span>(<span class="st">" "</span>, <span class="st">"_"</span>, spec), <span class="st">"_cl4_quadr_Stan_post_preds.RData"</span>)))</span>
+<span id="cb9-18"><a href="#cb9-18" aria-hidden="true" tabindex="-1"></a><span class="fu">str</span>(posterior_preds)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>List of 4
+ $ linpred_occ: num [1:476, 1:5, 1:25, 1:3] 0.00822 0.10817 0.1149 0.01719 0.05429 ...
+  ..- attr(*, "dimnames")=List of 4
+  .. ..$ : chr [1:476] "site_1" "site_2" "site_3" "site_4" ...
+  .. ..$ : chr [1:5] "visit_1" "visit_2" "visit_3" "visit_4" ...
+  .. ..$ : chr [1:25] "timestep_1" "timestep_2" "timestep_3" "timestep_4" ...
+  .. ..$ : chr [1:3] "mean" "Q2.5" "Q97.5"
+ $ linpred_col: num [1:476, 1:5, 1:25, 1:3] 0.0929 0.165 0.1515 0.0759 0.1474 ...
+  ..- attr(*, "dimnames")=List of 4
+  .. ..$ : chr [1:476] "site_1" "site_2" "site_3" "site_4" ...
+  .. ..$ : chr [1:5] "visit_1" "visit_2" "visit_3" "visit_4" ...
+  .. ..$ : chr [1:25] "timestep_1" "timestep_2" "timestep_3" "timestep_4" ...
+  .. ..$ : chr [1:3] "mean" "Q2.5" "Q97.5"
+ $ linpred_ex : num [1:476, 1:5, 1:25, 1:3] 0.59 0.37 0.231 0.567 0.2 ...
+  ..- attr(*, "dimnames")=List of 4
+  .. ..$ : chr [1:476] "site_1" "site_2" "site_3" "site_4" ...
+  .. ..$ : chr [1:5] "visit_1" "visit_2" "visit_3" "visit_4" ...
+  .. ..$ : chr [1:25] "timestep_1" "timestep_2" "timestep_3" "timestep_4" ...
+  .. ..$ : chr [1:3] "mean" "Q2.5" "Q97.5"
+ $ linpred_det: num [1:476, 1:5, 1:25, 1:3] 0.479 0.479 0.479 0.479 0.479 ...
+  ..- attr(*, "dimnames")=List of 4
+  .. ..$ : chr [1:476] "site_1" "site_2" "site_3" "site_4" ...
+  .. ..$ : chr [1:5] "visit_1" "visit_2" "visit_3" "visit_4" ...
+  .. ..$ : chr [1:25] "timestep_1" "timestep_2" "timestep_3" "timestep_4" ...
+  .. ..$ : chr [1:3] "mean" "Q2.5" "Q97.5"</code></pre>
+</div>
+<div class="sourceCode cell-code" id="cb11"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a>posterior_preds<span class="sc">$</span>linpred_occ[<span class="dv">1</span><span class="sc">:</span><span class="dv">10</span>, , <span class="dv">1</span>, ]</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>, , mean
+
+            visit_1     visit_2     visit_3     visit_4     visit_5
+site_1  0.008221026 0.008221026 0.008221026 0.008221026 0.008221026
+site_2  0.108171000 0.108171000 0.108171000 0.108171000 0.108171000
+site_3  0.114902563 0.114902563 0.114902563 0.114902563 0.114902563
+site_4  0.017188359 0.017188359 0.017188359 0.017188359 0.017188359
+site_5  0.054291965 0.054291965 0.054291965 0.054291965 0.054291965
+site_6  0.203589501 0.203589501 0.203589501 0.203589501 0.203589501
+site_7  0.041899753 0.041899753 0.041899753 0.041899753 0.041899753
+site_8  0.011406283 0.011406283 0.011406283 0.011406283 0.011406283
+site_9  0.025184780 0.025184780 0.025184780 0.025184780 0.025184780
+site_10 0.017740666 0.017740666 0.017740666 0.017740666 0.017740666
+
+, , Q2.5
+
+             visit_1      visit_2      visit_3      visit_4      visit_5
+site_1  0.0007281831 0.0007281831 0.0007281831 0.0007281831 0.0007281831
+site_2  0.0259409993 0.0259409993 0.0259409993 0.0259409993 0.0259409993
+site_3  0.0416066614 0.0416066614 0.0416066614 0.0416066614 0.0416066614
+site_4  0.0017544480 0.0017544480 0.0017544480 0.0017544480 0.0017544480
+site_5  0.0154470171 0.0154470171 0.0154470171 0.0154470171 0.0154470171
+site_6  0.0934887064 0.0934887064 0.0934887064 0.0934887064 0.0934887064
+site_7  0.0122337527 0.0122337527 0.0122337527 0.0122337527 0.0122337527
+site_8  0.0013886466 0.0013886466 0.0013886466 0.0013886466 0.0013886466
+site_9  0.0049984203 0.0049984203 0.0049984203 0.0049984203 0.0049984203
+site_10 0.0022080650 0.0022080650 0.0022080650 0.0022080650 0.0022080650
+
+, , Q97.5
+
+           visit_1    visit_2    visit_3    visit_4    visit_5
+site_1  0.02974116 0.02974116 0.02974116 0.02974116 0.02974116
+site_2  0.26074313 0.26074313 0.26074313 0.26074313 0.26074313
+site_3  0.22331818 0.22331818 0.22331818 0.22331818 0.22331818
+site_4  0.06144262 0.06144262 0.06144262 0.06144262 0.06144262
+site_5  0.12253877 0.12253877 0.12253877 0.12253877 0.12253877
+site_6  0.35977817 0.35977817 0.35977817 0.35977817 0.35977817
+site_7  0.09612020 0.09612020 0.09612020 0.09612020 0.09612020
+site_8  0.03893006 0.03893006 0.03893006 0.03893006 0.03893006
+site_9  0.07031825 0.07031825 0.07031825 0.07031825 0.07031825
+site_10 0.05583060 0.05583060 0.05583060 0.05583060 0.05583060</code></pre>
+</div>
+</div>
+</section>
+</section>
+<section id="modify-priors" class="level4">
+<h4 class="anchored" data-anchor-id="modify-priors">Modify priors:</h4>
+<p>Flocker gives us default priors for a model formula:</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb13"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a><span class="fu">get_flocker_prior</span>(<span class="at">f_occ =</span> <span class="sc">~</span> bio1_3yrs <span class="sc">+</span> bio2_3yrs <span class="sc">+</span> bio3_3yrs <span class="sc">+</span> pr_spring_3yrs <span class="sc">+</span> pr_summer_3yrs <span class="sc">+</span> pr_autumn_3yrs <span class="sc">+</span> pr_winter_3yrs <span class="sc">+</span> bio15_3yrs <span class="sc">+</span></span>
+<span id="cb13-2"><a href="#cb13-2" aria-hidden="true" tabindex="-1"></a>     <span class="fu">I</span>(bio1_3yrs<span class="sc">^</span><span class="dv">2</span>) <span class="sc">+</span> <span class="fu">I</span>(bio2_3yrs<span class="sc">^</span><span class="dv">2</span>) <span class="sc">+</span> <span class="fu">I</span>(bio3_3yrs<span class="sc">^</span><span class="dv">2</span>) <span class="sc">+</span> <span class="fu">I</span>(pr_spring_3yrs<span class="sc">^</span><span class="dv">2</span>) <span class="sc">+</span> <span class="fu">I</span>(pr_summer_3yrs<span class="sc">^</span><span class="dv">2</span>) <span class="sc">+</span> <span class="fu">I</span>(pr_autumn_3yrs<span class="sc">^</span><span class="dv">2</span>) <span class="sc">+</span> <span class="fu">I</span>(pr_winter_3yrs<span class="sc">^</span><span class="dv">2</span>) <span class="sc">+</span> <span class="fu">I</span>(bio15_3yrs<span class="sc">^</span><span class="dv">2</span>),</span>
+<span id="cb13-3"><a href="#cb13-3" aria-hidden="true" tabindex="-1"></a>   <span class="at">f_det =</span> <span class="sc">~</span> <span class="dv">1</span>,</span>
+<span id="cb13-4"><a href="#cb13-4" aria-hidden="true" tabindex="-1"></a>   <span class="at">f_col =</span> <span class="sc">~</span> bio1 <span class="sc">+</span> bio2 <span class="sc">+</span> bio3 <span class="sc">+</span> pr_spring <span class="sc">+</span> pr_summer <span class="sc">+</span> pr_autumn <span class="sc">+</span> pr_winter <span class="sc">+</span> bio15 <span class="sc">+</span></span>
+<span id="cb13-5"><a href="#cb13-5" aria-hidden="true" tabindex="-1"></a>     <span class="fu">I</span>(bio1<span class="sc">^</span><span class="dv">2</span>) <span class="sc">+</span> <span class="fu">I</span>(bio2<span class="sc">^</span><span class="dv">2</span>) <span class="sc">+</span> <span class="fu">I</span>(bio3<span class="sc">^</span><span class="dv">2</span>) <span class="sc">+</span> <span class="fu">I</span>(pr_spring<span class="sc">^</span><span class="dv">2</span>) <span class="sc">+</span> <span class="fu">I</span>(pr_summer<span class="sc">^</span><span class="dv">2</span>) <span class="sc">+</span> <span class="fu">I</span>(pr_autumn<span class="sc">^</span><span class="dv">2</span>) <span class="sc">+</span> <span class="fu">I</span>(pr_winter<span class="sc">^</span><span class="dv">2</span>) <span class="sc">+</span> <span class="fu">I</span>(bio15<span class="sc">^</span><span class="dv">2</span>),</span>
+<span id="cb13-6"><a href="#cb13-6" aria-hidden="true" tabindex="-1"></a>   <span class="at">f_ex =</span> <span class="sc">~</span> bio1 <span class="sc">+</span> bio2 <span class="sc">+</span> bio3 <span class="sc">+</span> pr_spring <span class="sc">+</span> pr_summer <span class="sc">+</span> pr_autumn <span class="sc">+</span> pr_winter <span class="sc">+</span> bio15 <span class="sc">+</span></span>
+<span id="cb13-7"><a href="#cb13-7" aria-hidden="true" tabindex="-1"></a>     <span class="fu">I</span>(bio1<span class="sc">^</span><span class="dv">2</span>) <span class="sc">+</span> <span class="fu">I</span>(bio2<span class="sc">^</span><span class="dv">2</span>) <span class="sc">+</span> <span class="fu">I</span>(bio3<span class="sc">^</span><span class="dv">2</span>) <span class="sc">+</span> <span class="fu">I</span>(pr_spring<span class="sc">^</span><span class="dv">2</span>) <span class="sc">+</span> <span class="fu">I</span>(pr_summer<span class="sc">^</span><span class="dv">2</span>) <span class="sc">+</span> <span class="fu">I</span>(pr_autumn<span class="sc">^</span><span class="dv">2</span>) <span class="sc">+</span> <span class="fu">I</span>(pr_winter<span class="sc">^</span><span class="dv">2</span>) <span class="sc">+</span> <span class="fu">I</span>(bio15<span class="sc">^</span><span class="dv">2</span>),</span>
+<span id="cb13-8"><a href="#cb13-8" aria-hidden="true" tabindex="-1"></a>                  <span class="at">flocker_data =</span> fd,</span>
+<span id="cb13-9"><a href="#cb13-9" aria-hidden="true" tabindex="-1"></a>                  <span class="at">multiseason =</span> <span class="st">"colex"</span>,</span>
+<span id="cb13-10"><a href="#cb13-10" aria-hidden="true" tabindex="-1"></a>                  <span class="at">multi_init =</span> <span class="st">"explicit"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>                prior     class              coef group resp dpar nlpar lb ub
+ student_t(3, 0, 2.5) Intercept                                              
+               (flat)         b                              colo            
+               (flat)         b              bio1            colo            
+               (flat)         b             bio15            colo            
+               (flat)         b              bio2            colo            
+               (flat)         b              bio3            colo            
+               (flat)         b          Ibio15E2            colo            
+               (flat)         b           Ibio1E2            colo            
+               (flat)         b           Ibio2E2            colo            
+               (flat)         b           Ibio3E2            colo            
+               (flat)         b      Ipr_autumnE2            colo            
+               (flat)         b      Ipr_springE2            colo            
+               (flat)         b      Ipr_summerE2            colo            
+               (flat)         b      Ipr_winterE2            colo            
+               (flat)         b         pr_autumn            colo            
+               (flat)         b         pr_spring            colo            
+               (flat)         b         pr_summer            colo            
+               (flat)         b         pr_winter            colo            
+               (flat) Intercept                              colo            
+               (flat)         b                                ex            
+               (flat)         b              bio1              ex            
+               (flat)         b             bio15              ex            
+               (flat)         b              bio2              ex            
+               (flat)         b              bio3              ex            
+               (flat)         b          Ibio15E2              ex            
+               (flat)         b           Ibio1E2              ex            
+               (flat)         b           Ibio2E2              ex            
+               (flat)         b           Ibio3E2              ex            
+               (flat)         b      Ipr_autumnE2              ex            
+               (flat)         b      Ipr_springE2              ex            
+               (flat)         b      Ipr_summerE2              ex            
+               (flat)         b      Ipr_winterE2              ex            
+               (flat)         b         pr_autumn              ex            
+               (flat)         b         pr_spring              ex            
+               (flat)         b         pr_summer              ex            
+               (flat)         b         pr_winter              ex            
+               (flat) Intercept                                ex            
+               (flat)         b                               occ            
+               (flat)         b         bio1_3yrs             occ            
+               (flat)         b        bio15_3yrs             occ            
+               (flat)         b         bio2_3yrs             occ            
+               (flat)         b         bio3_3yrs             occ            
+               (flat)         b      Ibio1_3yrsE2             occ            
+               (flat)         b     Ibio15_3yrsE2             occ            
+               (flat)         b      Ibio2_3yrsE2             occ            
+               (flat)         b      Ibio3_3yrsE2             occ            
+               (flat)         b Ipr_autumn_3yrsE2             occ            
+               (flat)         b Ipr_spring_3yrsE2             occ            
+               (flat)         b Ipr_summer_3yrsE2             occ            
+               (flat)         b Ipr_winter_3yrsE2             occ            
+               (flat)         b    pr_autumn_3yrs             occ            
+               (flat)         b    pr_spring_3yrs             occ            
+               (flat)         b    pr_summer_3yrs             occ            
+               (flat)         b    pr_winter_3yrs             occ            
+               (flat) Intercept                               occ            
+       source
+      default
+      default
+ (vectorized)
+ (vectorized)
+ (vectorized)
+ (vectorized)
+ (vectorized)
+ (vectorized)
+ (vectorized)
+ (vectorized)
+ (vectorized)
+ (vectorized)
+ (vectorized)
+ (vectorized)
+ (vectorized)
+ (vectorized)
+ (vectorized)
+ (vectorized)
+      default
+      default
+ (vectorized)
+ (vectorized)
+ (vectorized)
+ (vectorized)
+ (vectorized)
+ (vectorized)
+ (vectorized)
+ (vectorized)
+ (vectorized)
+ (vectorized)
+ (vectorized)
+ (vectorized)
+ (vectorized)
+ (vectorized)
+ (vectorized)
+ (vectorized)
+      default
+      default
+ (vectorized)
+ (vectorized)
+ (vectorized)
+ (vectorized)
+ (vectorized)
+ (vectorized)
+ (vectorized)
+ (vectorized)
+ (vectorized)
+ (vectorized)
+ (vectorized)
+ (vectorized)
+ (vectorized)
+ (vectorized)
+ (vectorized)
+ (vectorized)
+      default</code></pre>
+</div>
+</div>
+<p>To change priors we use the brms implementation. Brms includes two shrinkage/ regularization priors, horseshoe and R2D2.</p>
+<ul>
+<li><p>horseshoe:</p>
+<ul>
+<li><p>“Horseshoe prior is symmetric around zero with fat tails and an infinitely large spike at zero. This makes it ideal for sparse models that have many regression coefficients, although only a minority of them is non-zero.”</p></li>
+<li><p>uses two levels of regularization, global and local, the global parameter τ pulls all the weights globally towards zero, while the thick half-Cauchy tails for the local scales λj allow some of the weights to escape the shrinkage</p></li>
+<li><p>brms arguments (regularized horseshoe):</p>
+<ul>
+<li><p>df (default 1): Degrees of freedom of student-t prior of the local shrinkage parameters</p></li>
+<li><p>scale_global (default 1): Scale of the student-t prior of the global shrinkage parameter; determines how much shrinkage is applied, Piironen and Vehtari (2017) recommend to specifying the ratio of the expected number of non-zero coefficients to the expected number of zero coefficients `par_ratio` rather than `scale_global` directly</p></li>
+<li><p>df_global (default 1): Degrees of freedom of student-t prior of the global shrinkage parameter</p></li>
+<li><p>scale_slab (default = 2): scale of student-t-slab (regularization, only affects non-zero coeff., expected value of the non-zero coefficient?)</p></li>
+<li><p>df_slab (default = 4): df of the student-t-slab (regularization, only affects non-zero coeff.)</p></li>
+<li><p>par_ratio: Ratio of the expected number of non-zero coefficients to the expected number of zero coefficients; specified,&nbsp;<code>scale_global</code>&nbsp;is ignored and internally computed as&nbsp;<code>par_ratio / sqrt(N)</code>, <code>N</code>&nbsp;is the total number of observations in the data</p></li>
+</ul></li>
+</ul></li>
+</ul>
+<p>For now, I defined par_ratio instead of scale_global. I assumed that roughly 1/4 of the coefficients may be non-zero -&gt; par_ratio = (1/4)/(3/4) = 0.33. This results in a scale_global of 0.3/sqrt(11900) = 0.003 (default is 1). Not sure about this.</p>
+<p>“Specifying priors for parameters in formulas other than detection can be done with reference to the <code>dpar</code> column.”</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb15"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true" tabindex="-1"></a><span class="co"># multi_colex_all_cl_prior &lt;- flock(</span></span>
+<span id="cb15-2"><a href="#cb15-2" aria-hidden="true" tabindex="-1"></a><span class="co">#   f_occ = ~ bio1_3yrs + bio2_3yrs + bio3_3yrs + pr_spring_3yrs + pr_summer_3yrs + pr_autumn_3yrs + pr_winter_3yrs + bio15_3yrs +</span></span>
+<span id="cb15-3"><a href="#cb15-3" aria-hidden="true" tabindex="-1"></a><span class="co">#     I(bio1_3yrs^2) + I(bio2_3yrs^2) + I(bio3_3yrs^2) + I(pr_spring_3yrs^2) + I(pr_summer_3yrs^2) + I(pr_autumn_3yrs^2) + I(pr_winter_3yrs^2) + I(bio15_3yrs^2),</span></span>
+<span id="cb15-4"><a href="#cb15-4" aria-hidden="true" tabindex="-1"></a><span class="co">#   f_det = ~ 1,</span></span>
+<span id="cb15-5"><a href="#cb15-5" aria-hidden="true" tabindex="-1"></a><span class="co">#   f_col = ~ bio1 + bio2 + bio3 + pr_spring + pr_summer + pr_autumn + pr_winter + bio15 +</span></span>
+<span id="cb15-6"><a href="#cb15-6" aria-hidden="true" tabindex="-1"></a><span class="co">#     I(bio1^2) + I(bio2^2) + I(bio3^2) + I(pr_spring^2) + I(pr_summer^2) + I(pr_autumn^2) + I(pr_winter^2) + I(bio15^2) ,</span></span>
+<span id="cb15-7"><a href="#cb15-7" aria-hidden="true" tabindex="-1"></a><span class="co">#   f_ex = ~ bio1 + bio2 + bio3 + pr_spring + pr_summer + pr_autumn + pr_winter + bio15 +</span></span>
+<span id="cb15-8"><a href="#cb15-8" aria-hidden="true" tabindex="-1"></a><span class="co">#     I(bio1^2) + I(bio2^2) + I(bio3^2) + I(pr_spring^2) + I(pr_summer^2) + I(pr_autumn^2) + I(pr_winter^2) + I(bio15^2),</span></span>
+<span id="cb15-9"><a href="#cb15-9" aria-hidden="true" tabindex="-1"></a><span class="co">#   flocker_data = fd2_det,</span></span>
+<span id="cb15-10"><a href="#cb15-10" aria-hidden="true" tabindex="-1"></a><span class="co">#   prior = c(brms::set_prior("logistic(0,1)", class = "Intercept") + # flat on probability scale (https://cran.r-project.org/web/packages/flocker/vignettes/flocker_tutorial.html)</span></span>
+<span id="cb15-11"><a href="#cb15-11" aria-hidden="true" tabindex="-1"></a><span class="co">#             brms::set_prior("logistic(0,1)", class = "Intercept", dpar = "occ"),</span></span>
+<span id="cb15-12"><a href="#cb15-12" aria-hidden="true" tabindex="-1"></a><span class="co">#             brms::set_prior("logistic(0,1)", class = "Intercept", dpar = "colo"),</span></span>
+<span id="cb15-13"><a href="#cb15-13" aria-hidden="true" tabindex="-1"></a><span class="co">#             brms::set_prior("logistic(0,1)", class = "Intercept", dpar = "ex"),</span></span>
+<span id="cb15-14"><a href="#cb15-14" aria-hidden="true" tabindex="-1"></a><span class="co">#             brms::set_prior("horseshoe(df = 1, par_ratio = 0.3)", dpar = "occ", class = "b"),</span></span>
+<span id="cb15-15"><a href="#cb15-15" aria-hidden="true" tabindex="-1"></a><span class="co">#             brms::set_prior("horseshoe(df = 1, par_ratio = 0.3)", dpar = "colo", class = "b"),</span></span>
+<span id="cb15-16"><a href="#cb15-16" aria-hidden="true" tabindex="-1"></a><span class="co">#             brms::set_prior("horseshoe(df = 1, par_ratio = 0.3)", dpar = "ex", class = "b")),</span></span>
+<span id="cb15-17"><a href="#cb15-17" aria-hidden="true" tabindex="-1"></a><span class="co">#   multiseason = "colex",</span></span>
+<span id="cb15-18"><a href="#cb15-18" aria-hidden="true" tabindex="-1"></a><span class="co">#   multi_init = "explicit",</span></span>
+<span id="cb15-19"><a href="#cb15-19" aria-hidden="true" tabindex="-1"></a><span class="co">#   backend = "cmdstanr",</span></span>
+<span id="cb15-20"><a href="#cb15-20" aria-hidden="true" tabindex="-1"></a><span class="co">#   cores = 3,</span></span>
+<span id="cb15-21"><a href="#cb15-21" aria-hidden="true" tabindex="-1"></a><span class="co">#   chains = 3</span></span>
+<span id="cb15-22"><a href="#cb15-22" aria-hidden="true" tabindex="-1"></a><span class="co"># )# 11 of 3000 transitions divergent, 12000s = 3.3 hrs</span></span>
+<span id="cb15-23"><a href="#cb15-23" aria-hidden="true" tabindex="-1"></a><span class="co"># save(multi_colex_all_cl_prior, file = file.path("data", paste0(gsub(" ", "_", spec), "_cl4_quadr_Stan_prior.RData")))</span></span>
+<span id="cb15-24"><a href="#cb15-24" aria-hidden="true" tabindex="-1"></a><span class="fu">load</span>(<span class="at">file =</span> <span class="fu">file.path</span>(<span class="st">"data"</span>, <span class="fu">paste0</span>(<span class="fu">gsub</span>(<span class="st">" "</span>, <span class="st">"_"</span>, spec), <span class="st">"_cl4_quadr_Stan_prior.RData"</span>)))</span>
+<span id="cb15-25"><a href="#cb15-25" aria-hidden="true" tabindex="-1"></a>multi_colex_all_cl_prior</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stderr">
+<pre><code>Warning: There were 11 divergent transitions after warmup. Increasing
+adapt_delta above 0.8 may help. See
+http://mc-stan.org/misc/warnings.html#divergent-transitions-after-warmup</code></pre>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code> Family: occupancy_multi_colex 
+  Links: mu = identity; occ = identity; colo = identity; ex = identity 
+Formula: ff_y | vint(ff_n_series, ff_n_unit, ff_n_year, ff_n_rep, ff_Q, ff_unit_index1, ff_unit_index2, ff_unit_index3, ff_unit_index4, ff_unit_index5, ff_unit_index6, ff_unit_index7, ff_unit_index8, ff_unit_index9, ff_unit_index10, ff_unit_index11, ff_unit_index12, ff_unit_index13, ff_unit_index14, ff_unit_index15, ff_unit_index16, ff_unit_index17, ff_unit_index18, ff_unit_index19, ff_unit_index20, ff_unit_index21, ff_unit_index22, ff_unit_index23, ff_unit_index24, ff_unit_index25, ff_rep_index1, ff_rep_index2, ff_rep_index3, ff_rep_index4, ff_rep_index5) ~ 1 
+         occ ~ bio1_3yrs + bio2_3yrs + bio3_3yrs + pr_spring_3yrs + pr_summer_3yrs + pr_autumn_3yrs + pr_winter_3yrs + bio15_3yrs + I(bio1_3yrs^2) + I(bio2_3yrs^2) + I(bio3_3yrs^2) + I(pr_spring_3yrs^2) + I(pr_summer_3yrs^2) + I(pr_autumn_3yrs^2) + I(pr_winter_3yrs^2) + I(bio15_3yrs^2)
+         colo ~ bio1 + bio2 + bio3 + pr_spring + pr_summer + pr_autumn + pr_winter + bio15 + I(bio1^2) + I(bio2^2) + I(bio3^2) + I(pr_spring^2) + I(pr_summer^2) + I(pr_autumn^2) + I(pr_winter^2) + I(bio15^2)
+         ex ~ bio1 + bio2 + bio3 + pr_spring + pr_summer + pr_autumn + pr_winter + bio15 + I(bio1^2) + I(bio2^2) + I(bio3^2) + I(pr_spring^2) + I(pr_summer^2) + I(pr_autumn^2) + I(pr_winter^2) + I(bio15^2)
+   Data: data (Number of observations: 56100) 
+  Draws: 3 chains, each with iter = 2000; warmup = 1000; thin = 1;
+         total post-warmup draws = 3000
+
+Regression Coefficients:
+                      Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS
+Intercept                -0.08      0.01    -0.11    -0.06 1.00     3937
+occ_Intercept            -0.07      0.32    -0.68     0.57 1.00     2572
+colo_Intercept           -1.15      0.09    -1.33    -0.97 1.00     2893
+ex_Intercept             -1.86      0.10    -2.06    -1.66 1.00     2895
+occ_bio1_3yrs             0.40      0.29    -0.07     0.96 1.00     1796
+occ_bio2_3yrs            -1.01      0.36    -1.72    -0.35 1.00     1934
+occ_bio3_3yrs             0.71      0.44    -0.07     1.55 1.00     1730
+occ_pr_spring_3yrs       -0.89      0.38    -1.65    -0.13 1.00     2153
+occ_pr_summer_3yrs       -0.73      0.31    -1.33    -0.10 1.00     2092
+occ_pr_autumn_3yrs        1.04      0.43     0.18     1.89 1.00     2412
+occ_pr_winter_3yrs        0.78      0.45    -0.03     1.66 1.00     1578
+occ_bio15_3yrs           -1.13      0.32    -1.75    -0.50 1.00     2612
+occ_Ibio1_3yrsE2         -1.03      0.17    -1.36    -0.71 1.00     2698
+occ_Ibio2_3yrsE2          0.21      0.13    -0.01     0.46 1.00     1931
+occ_Ibio3_3yrsE2          0.34      0.19    -0.01     0.71 1.00     1686
+occ_Ipr_spring_3yrsE2    -0.04      0.14    -0.35     0.21 1.00     2574
+occ_Ipr_summer_3yrsE2     0.11      0.15    -0.16     0.44 1.00     2343
+occ_Ipr_autumn_3yrsE2     0.18      0.15    -0.06     0.50 1.00     2475
+occ_Ipr_winter_3yrsE2    -0.43      0.20    -0.81    -0.04 1.00     1928
+occ_Ibio15_3yrsE2         0.04      0.10    -0.17     0.26 1.00     2473
+colo_bio1                 0.11      0.08    -0.02     0.26 1.00     1304
+colo_bio2                -0.22      0.11    -0.44    -0.00 1.00     1364
+colo_bio3                 0.04      0.07    -0.05     0.23 1.00     1305
+colo_pr_spring            0.09      0.08    -0.01     0.26 1.00     1644
+colo_pr_summer            0.06      0.06    -0.03     0.21 1.00     1960
+colo_pr_autumn            0.11      0.09    -0.01     0.29 1.00     1469
+colo_pr_winter           -0.00      0.04    -0.09     0.09 1.00     2293
+colo_bio15               -0.04      0.06    -0.19     0.05 1.00     1403
+colo_Ibio1E2             -0.51      0.06    -0.63    -0.40 1.00     2204
+colo_Ibio2E2              0.00      0.03    -0.06     0.07 1.00     2834
+colo_Ibio3E2              0.08      0.06    -0.01     0.20 1.00     1214
+colo_Ipr_springE2        -0.02      0.03    -0.09     0.03 1.00     2236
+colo_Ipr_summerE2        -0.00      0.02    -0.06     0.04 1.00     2637
+colo_Ipr_autumnE2        -0.12      0.05    -0.23    -0.01 1.00     2124
+colo_Ipr_winterE2        -0.01      0.03    -0.07     0.03 1.00     2588
+colo_Ibio15E2            -0.01      0.02    -0.06     0.02 1.00     2486
+ex_bio1                  -0.41      0.08    -0.57    -0.24 1.00     2754
+ex_bio2                   0.59      0.12     0.37     0.83 1.00     2683
+ex_bio3                  -0.05      0.10    -0.30     0.13 1.00     3394
+ex_pr_spring              0.09      0.09    -0.04     0.27 1.00     2305
+ex_pr_summer              0.21      0.09     0.04     0.39 1.00     2078
+ex_pr_autumn             -0.02      0.06    -0.17     0.10 1.00     2679
+ex_pr_winter             -0.45      0.09    -0.63    -0.26 1.00     2870
+ex_bio15                  0.43      0.10     0.22     0.62 1.00     2503
+ex_Ibio1E2                0.34      0.06     0.22     0.46 1.00     2986
+ex_Ibio2E2               -0.41      0.06    -0.53    -0.28 1.00     2871
+ex_Ibio3E2               -0.33      0.07    -0.48    -0.20 1.00     3173
+ex_Ipr_springE2           0.07      0.04    -0.01     0.15 1.00     1968
+ex_Ipr_summerE2          -0.02      0.04    -0.11     0.05 1.00     2468
+ex_Ipr_autumnE2           0.02      0.03    -0.04     0.09 1.00     2372
+ex_Ipr_winterE2           0.29      0.06     0.19     0.40 1.00     2846
+ex_Ibio15E2              -0.21      0.06    -0.32    -0.10 1.00     2952
+                      Tail_ESS
+Intercept                 2152
+occ_Intercept             2583
+colo_Intercept            2907
+ex_Intercept              2765
+occ_bio1_3yrs             2152
+occ_bio2_3yrs             2016
+occ_bio3_3yrs             1144
+occ_pr_spring_3yrs        1573
+occ_pr_summer_3yrs        1771
+occ_pr_autumn_3yrs        1639
+occ_pr_winter_3yrs        1325
+occ_bio15_3yrs            2591
+occ_Ibio1_3yrsE2          2631
+occ_Ibio2_3yrsE2          1533
+occ_Ibio3_3yrsE2          1158
+occ_Ipr_spring_3yrsE2     2739
+occ_Ipr_summer_3yrsE2     2511
+occ_Ipr_autumn_3yrsE2     2454
+occ_Ipr_winter_3yrsE2     1758
+occ_Ibio15_3yrsE2         2920
+colo_bio1                 1332
+colo_bio2                  868
+colo_bio3                 2708
+colo_pr_spring            2590
+colo_pr_summer            2554
+colo_pr_autumn            1801
+colo_pr_winter            1233
+colo_bio15                2342
+colo_Ibio1E2              2327
+colo_Ibio2E2              2653
+colo_Ibio3E2              1303
+colo_Ipr_springE2         2741
+colo_Ipr_summerE2         2682
+colo_Ipr_autumnE2         1953
+colo_Ipr_winterE2         2770
+colo_Ibio15E2             1869
+ex_bio1                   2628
+ex_bio2                   2561
+ex_bio3                   2837
+ex_pr_spring              2274
+ex_pr_summer              1624
+ex_pr_autumn              2852
+ex_pr_winter              2884
+ex_bio15                  2364
+ex_Ibio1E2                2832
+ex_Ibio2E2                2547
+ex_Ibio3E2                2576
+ex_Ipr_springE2           1574
+ex_Ipr_summerE2           2679
+ex_Ipr_autumnE2           2422
+ex_Ipr_winterE2           2592
+ex_Ibio15E2               2362
+
+Draws were sampled using sample(hmc). For each parameter, Bulk_ESS
+and Tail_ESS are effective sample size measures, and Rhat is the potential
+scale reduction factor on split chains (at convergence, Rhat = 1).</code></pre>
+</div>
+</div>
+<section id="compare-to-same-model-in-jags-using-lasso-regularization" class="level5">
+<h5 class="anchored" data-anchor-id="compare-to-same-model-in-jags-using-lasso-regularization">Compare to same model in JAGS using lasso regularization:</h5>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb18"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb18-1"><a href="#cb18-1" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(jagsUI)</span>
+<span id="cb18-2"><a href="#cb18-2" aria-hidden="true" tabindex="-1"></a><span class="fu">load</span>(<span class="fu">file.path</span>(<span class="st">"results"</span>, <span class="st">"House_Finch_cl_alt4_quadr_lasso_GoF_inits.RData"</span>))</span>
+<span id="cb18-3"><a href="#cb18-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-4"><a href="#cb18-4" aria-hidden="true" tabindex="-1"></a>jags_estimates <span class="ot">&lt;-</span> out<span class="sc">$</span>summary[<span class="fu">which</span>(<span class="fu">grepl</span>(<span class="st">"(alpha)|(beta)"</span>, <span class="fu">rownames</span>(out<span class="sc">$</span>summary))), <span class="fu">c</span>(<span class="st">"mean"</span>, <span class="st">"2.5%"</span>, <span class="st">"97.5%"</span>)]</span>
+<span id="cb18-5"><a href="#cb18-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-6"><a href="#cb18-6" aria-hidden="true" tabindex="-1"></a>stan_estimates <span class="ot">&lt;-</span> <span class="fu">fixef</span>(multi_colex_all_cl_prior, <span class="at">summary =</span> <span class="cn">TRUE</span>, <span class="at">robust =</span> <span class="cn">FALSE</span>, <span class="at">probs =</span> <span class="fu">c</span>(<span class="fl">0.025</span>, <span class="fl">0.975</span>))</span>
+<span id="cb18-7"><a href="#cb18-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-8"><a href="#cb18-8" aria-hidden="true" tabindex="-1"></a>jags_reformatted <span class="ot">&lt;-</span> <span class="fu">rbind</span>(<span class="fu">c</span>(<span class="cn">NA</span>,<span class="cn">NA</span>, <span class="cn">NA</span>),</span>
+<span id="cb18-9"><a href="#cb18-9" aria-hidden="true" tabindex="-1"></a>                          jags_estimates[<span class="st">"alpha_psi"</span>, <span class="fu">c</span>(<span class="st">"mean"</span>, <span class="st">"2.5%"</span>, <span class="st">"97.5%"</span>)],</span>
+<span id="cb18-10"><a href="#cb18-10" aria-hidden="true" tabindex="-1"></a>                          jags_estimates[<span class="st">"alpha_gamma"</span>, <span class="fu">c</span>(<span class="st">"mean"</span>, <span class="st">"2.5%"</span>, <span class="st">"97.5%"</span>)],</span>
+<span id="cb18-11"><a href="#cb18-11" aria-hidden="true" tabindex="-1"></a>                          jags_estimates[<span class="st">"alpha_eps"</span>, <span class="fu">c</span>(<span class="st">"mean"</span>, <span class="st">"2.5%"</span>, <span class="st">"97.5%"</span>)],</span>
+<span id="cb18-12"><a href="#cb18-12" aria-hidden="true" tabindex="-1"></a>                          jags_estimates[<span class="st">"beta_psi[1]"</span>, <span class="fu">c</span>(<span class="st">"mean"</span>, <span class="st">"2.5%"</span>, <span class="st">"97.5%"</span>)],</span>
+<span id="cb18-13"><a href="#cb18-13" aria-hidden="true" tabindex="-1"></a>                          jags_estimates[<span class="st">"beta_psi[2]"</span>, <span class="fu">c</span>(<span class="st">"mean"</span>, <span class="st">"2.5%"</span>, <span class="st">"97.5%"</span>)],</span>
+<span id="cb18-14"><a href="#cb18-14" aria-hidden="true" tabindex="-1"></a>                          jags_estimates[<span class="st">"beta_psi[3]"</span>, <span class="fu">c</span>(<span class="st">"mean"</span>, <span class="st">"2.5%"</span>, <span class="st">"97.5%"</span>)],</span>
+<span id="cb18-15"><a href="#cb18-15" aria-hidden="true" tabindex="-1"></a>                          jags_estimates[<span class="st">"beta_psi[4]"</span>, <span class="fu">c</span>(<span class="st">"mean"</span>, <span class="st">"2.5%"</span>, <span class="st">"97.5%"</span>)],</span>
+<span id="cb18-16"><a href="#cb18-16" aria-hidden="true" tabindex="-1"></a>                          jags_estimates[<span class="st">"beta_psi[5]"</span>, <span class="fu">c</span>(<span class="st">"mean"</span>, <span class="st">"2.5%"</span>, <span class="st">"97.5%"</span>)],</span>
+<span id="cb18-17"><a href="#cb18-17" aria-hidden="true" tabindex="-1"></a>                          jags_estimates[<span class="st">"beta_psi[6]"</span>, <span class="fu">c</span>(<span class="st">"mean"</span>, <span class="st">"2.5%"</span>, <span class="st">"97.5%"</span>)],</span>
+<span id="cb18-18"><a href="#cb18-18" aria-hidden="true" tabindex="-1"></a>                          jags_estimates[<span class="st">"beta_psi[7]"</span>, <span class="fu">c</span>(<span class="st">"mean"</span>, <span class="st">"2.5%"</span>, <span class="st">"97.5%"</span>)],</span>
+<span id="cb18-19"><a href="#cb18-19" aria-hidden="true" tabindex="-1"></a>                          jags_estimates[<span class="st">"beta_psi[8]"</span>, <span class="fu">c</span>(<span class="st">"mean"</span>, <span class="st">"2.5%"</span>, <span class="st">"97.5%"</span>)],</span>
+<span id="cb18-20"><a href="#cb18-20" aria-hidden="true" tabindex="-1"></a>                          jags_estimates[<span class="st">"beta_psi[9]"</span>, <span class="fu">c</span>(<span class="st">"mean"</span>, <span class="st">"2.5%"</span>, <span class="st">"97.5%"</span>)],</span>
+<span id="cb18-21"><a href="#cb18-21" aria-hidden="true" tabindex="-1"></a>                          jags_estimates[<span class="st">"beta_psi[10]"</span>, <span class="fu">c</span>(<span class="st">"mean"</span>, <span class="st">"2.5%"</span>, <span class="st">"97.5%"</span>)],</span>
+<span id="cb18-22"><a href="#cb18-22" aria-hidden="true" tabindex="-1"></a>                          jags_estimates[<span class="st">"beta_psi[11]"</span>, <span class="fu">c</span>(<span class="st">"mean"</span>, <span class="st">"2.5%"</span>, <span class="st">"97.5%"</span>)],</span>
+<span id="cb18-23"><a href="#cb18-23" aria-hidden="true" tabindex="-1"></a>                          jags_estimates[<span class="st">"beta_psi[12]"</span>, <span class="fu">c</span>(<span class="st">"mean"</span>, <span class="st">"2.5%"</span>, <span class="st">"97.5%"</span>)],</span>
+<span id="cb18-24"><a href="#cb18-24" aria-hidden="true" tabindex="-1"></a>                          jags_estimates[<span class="st">"beta_psi[13]"</span>, <span class="fu">c</span>(<span class="st">"mean"</span>, <span class="st">"2.5%"</span>, <span class="st">"97.5%"</span>)],</span>
+<span id="cb18-25"><a href="#cb18-25" aria-hidden="true" tabindex="-1"></a>                          jags_estimates[<span class="st">"beta_psi[14]"</span>, <span class="fu">c</span>(<span class="st">"mean"</span>, <span class="st">"2.5%"</span>, <span class="st">"97.5%"</span>)],</span>
+<span id="cb18-26"><a href="#cb18-26" aria-hidden="true" tabindex="-1"></a>                          jags_estimates[<span class="st">"beta_psi[15]"</span>, <span class="fu">c</span>(<span class="st">"mean"</span>, <span class="st">"2.5%"</span>, <span class="st">"97.5%"</span>)],</span>
+<span id="cb18-27"><a href="#cb18-27" aria-hidden="true" tabindex="-1"></a>                          jags_estimates[<span class="st">"beta_psi[16]"</span>, <span class="fu">c</span>(<span class="st">"mean"</span>, <span class="st">"2.5%"</span>, <span class="st">"97.5%"</span>)],</span>
+<span id="cb18-28"><a href="#cb18-28" aria-hidden="true" tabindex="-1"></a>                          jags_estimates[<span class="st">"beta_gamma[1]"</span>, <span class="fu">c</span>(<span class="st">"mean"</span>, <span class="st">"2.5%"</span>, <span class="st">"97.5%"</span>)],</span>
+<span id="cb18-29"><a href="#cb18-29" aria-hidden="true" tabindex="-1"></a>                          jags_estimates[<span class="st">"beta_gamma[2]"</span>, <span class="fu">c</span>(<span class="st">"mean"</span>, <span class="st">"2.5%"</span>, <span class="st">"97.5%"</span>)],</span>
+<span id="cb18-30"><a href="#cb18-30" aria-hidden="true" tabindex="-1"></a>                          jags_estimates[<span class="st">"beta_gamma[3]"</span>, <span class="fu">c</span>(<span class="st">"mean"</span>, <span class="st">"2.5%"</span>, <span class="st">"97.5%"</span>)],</span>
+<span id="cb18-31"><a href="#cb18-31" aria-hidden="true" tabindex="-1"></a>                          jags_estimates[<span class="st">"beta_gamma[4]"</span>, <span class="fu">c</span>(<span class="st">"mean"</span>, <span class="st">"2.5%"</span>, <span class="st">"97.5%"</span>)],</span>
+<span id="cb18-32"><a href="#cb18-32" aria-hidden="true" tabindex="-1"></a>                          jags_estimates[<span class="st">"beta_gamma[5]"</span>, <span class="fu">c</span>(<span class="st">"mean"</span>, <span class="st">"2.5%"</span>, <span class="st">"97.5%"</span>)],</span>
+<span id="cb18-33"><a href="#cb18-33" aria-hidden="true" tabindex="-1"></a>                          jags_estimates[<span class="st">"beta_gamma[6]"</span>, <span class="fu">c</span>(<span class="st">"mean"</span>, <span class="st">"2.5%"</span>, <span class="st">"97.5%"</span>)],</span>
+<span id="cb18-34"><a href="#cb18-34" aria-hidden="true" tabindex="-1"></a>                          jags_estimates[<span class="st">"beta_gamma[7]"</span>, <span class="fu">c</span>(<span class="st">"mean"</span>, <span class="st">"2.5%"</span>, <span class="st">"97.5%"</span>)],</span>
+<span id="cb18-35"><a href="#cb18-35" aria-hidden="true" tabindex="-1"></a>                          jags_estimates[<span class="st">"beta_gamma[8]"</span>, <span class="fu">c</span>(<span class="st">"mean"</span>, <span class="st">"2.5%"</span>, <span class="st">"97.5%"</span>)],</span>
+<span id="cb18-36"><a href="#cb18-36" aria-hidden="true" tabindex="-1"></a>                          jags_estimates[<span class="st">"beta_gamma[9]"</span>, <span class="fu">c</span>(<span class="st">"mean"</span>, <span class="st">"2.5%"</span>, <span class="st">"97.5%"</span>)],</span>
+<span id="cb18-37"><a href="#cb18-37" aria-hidden="true" tabindex="-1"></a>                          jags_estimates[<span class="st">"beta_gamma[10]"</span>, <span class="fu">c</span>(<span class="st">"mean"</span>, <span class="st">"2.5%"</span>, <span class="st">"97.5%"</span>)],</span>
+<span id="cb18-38"><a href="#cb18-38" aria-hidden="true" tabindex="-1"></a>                          jags_estimates[<span class="st">"beta_gamma[11]"</span>, <span class="fu">c</span>(<span class="st">"mean"</span>, <span class="st">"2.5%"</span>, <span class="st">"97.5%"</span>)],</span>
+<span id="cb18-39"><a href="#cb18-39" aria-hidden="true" tabindex="-1"></a>                          jags_estimates[<span class="st">"beta_gamma[12]"</span>, <span class="fu">c</span>(<span class="st">"mean"</span>, <span class="st">"2.5%"</span>, <span class="st">"97.5%"</span>)],</span>
+<span id="cb18-40"><a href="#cb18-40" aria-hidden="true" tabindex="-1"></a>                          jags_estimates[<span class="st">"beta_gamma[13]"</span>, <span class="fu">c</span>(<span class="st">"mean"</span>, <span class="st">"2.5%"</span>, <span class="st">"97.5%"</span>)],</span>
+<span id="cb18-41"><a href="#cb18-41" aria-hidden="true" tabindex="-1"></a>                          jags_estimates[<span class="st">"beta_gamma[14]"</span>, <span class="fu">c</span>(<span class="st">"mean"</span>, <span class="st">"2.5%"</span>, <span class="st">"97.5%"</span>)],</span>
+<span id="cb18-42"><a href="#cb18-42" aria-hidden="true" tabindex="-1"></a>                          jags_estimates[<span class="st">"beta_gamma[15]"</span>, <span class="fu">c</span>(<span class="st">"mean"</span>, <span class="st">"2.5%"</span>, <span class="st">"97.5%"</span>)],</span>
+<span id="cb18-43"><a href="#cb18-43" aria-hidden="true" tabindex="-1"></a>                          jags_estimates[<span class="st">"beta_gamma[16]"</span>, <span class="fu">c</span>(<span class="st">"mean"</span>, <span class="st">"2.5%"</span>, <span class="st">"97.5%"</span>)],</span>
+<span id="cb18-44"><a href="#cb18-44" aria-hidden="true" tabindex="-1"></a>                          jags_estimates[<span class="st">"beta_eps[1]"</span>, <span class="fu">c</span>(<span class="st">"mean"</span>, <span class="st">"2.5%"</span>, <span class="st">"97.5%"</span>)],</span>
+<span id="cb18-45"><a href="#cb18-45" aria-hidden="true" tabindex="-1"></a>                          jags_estimates[<span class="st">"beta_eps[2]"</span>, <span class="fu">c</span>(<span class="st">"mean"</span>, <span class="st">"2.5%"</span>, <span class="st">"97.5%"</span>)],</span>
+<span id="cb18-46"><a href="#cb18-46" aria-hidden="true" tabindex="-1"></a>                          jags_estimates[<span class="st">"beta_eps[3]"</span>, <span class="fu">c</span>(<span class="st">"mean"</span>, <span class="st">"2.5%"</span>, <span class="st">"97.5%"</span>)],</span>
+<span id="cb18-47"><a href="#cb18-47" aria-hidden="true" tabindex="-1"></a>                          jags_estimates[<span class="st">"beta_eps[4]"</span>, <span class="fu">c</span>(<span class="st">"mean"</span>, <span class="st">"2.5%"</span>, <span class="st">"97.5%"</span>)],</span>
+<span id="cb18-48"><a href="#cb18-48" aria-hidden="true" tabindex="-1"></a>                          jags_estimates[<span class="st">"beta_eps[5]"</span>, <span class="fu">c</span>(<span class="st">"mean"</span>, <span class="st">"2.5%"</span>, <span class="st">"97.5%"</span>)],</span>
+<span id="cb18-49"><a href="#cb18-49" aria-hidden="true" tabindex="-1"></a>                          jags_estimates[<span class="st">"beta_eps[6]"</span>, <span class="fu">c</span>(<span class="st">"mean"</span>, <span class="st">"2.5%"</span>, <span class="st">"97.5%"</span>)],</span>
+<span id="cb18-50"><a href="#cb18-50" aria-hidden="true" tabindex="-1"></a>                          jags_estimates[<span class="st">"beta_eps[7]"</span>, <span class="fu">c</span>(<span class="st">"mean"</span>, <span class="st">"2.5%"</span>, <span class="st">"97.5%"</span>)],</span>
+<span id="cb18-51"><a href="#cb18-51" aria-hidden="true" tabindex="-1"></a>                          jags_estimates[<span class="st">"beta_eps[8]"</span>, <span class="fu">c</span>(<span class="st">"mean"</span>, <span class="st">"2.5%"</span>, <span class="st">"97.5%"</span>)],</span>
+<span id="cb18-52"><a href="#cb18-52" aria-hidden="true" tabindex="-1"></a>                          jags_estimates[<span class="st">"beta_eps[9]"</span>, <span class="fu">c</span>(<span class="st">"mean"</span>, <span class="st">"2.5%"</span>, <span class="st">"97.5%"</span>)],</span>
+<span id="cb18-53"><a href="#cb18-53" aria-hidden="true" tabindex="-1"></a>                          jags_estimates[<span class="st">"beta_eps[10]"</span>, <span class="fu">c</span>(<span class="st">"mean"</span>, <span class="st">"2.5%"</span>, <span class="st">"97.5%"</span>)],</span>
+<span id="cb18-54"><a href="#cb18-54" aria-hidden="true" tabindex="-1"></a>                          jags_estimates[<span class="st">"beta_eps[11]"</span>, <span class="fu">c</span>(<span class="st">"mean"</span>, <span class="st">"2.5%"</span>, <span class="st">"97.5%"</span>)],</span>
+<span id="cb18-55"><a href="#cb18-55" aria-hidden="true" tabindex="-1"></a>                          jags_estimates[<span class="st">"beta_eps[12]"</span>, <span class="fu">c</span>(<span class="st">"mean"</span>, <span class="st">"2.5%"</span>, <span class="st">"97.5%"</span>)],</span>
+<span id="cb18-56"><a href="#cb18-56" aria-hidden="true" tabindex="-1"></a>                          jags_estimates[<span class="st">"beta_eps[13]"</span>, <span class="fu">c</span>(<span class="st">"mean"</span>, <span class="st">"2.5%"</span>, <span class="st">"97.5%"</span>)],</span>
+<span id="cb18-57"><a href="#cb18-57" aria-hidden="true" tabindex="-1"></a>                          jags_estimates[<span class="st">"beta_eps[14]"</span>, <span class="fu">c</span>(<span class="st">"mean"</span>, <span class="st">"2.5%"</span>, <span class="st">"97.5%"</span>)],</span>
+<span id="cb18-58"><a href="#cb18-58" aria-hidden="true" tabindex="-1"></a>                          jags_estimates[<span class="st">"beta_eps[15]"</span>, <span class="fu">c</span>(<span class="st">"mean"</span>, <span class="st">"2.5%"</span>, <span class="st">"97.5%"</span>)],</span>
+<span id="cb18-59"><a href="#cb18-59" aria-hidden="true" tabindex="-1"></a>                          jags_estimates[<span class="st">"beta_eps[16]"</span>, <span class="fu">c</span>(<span class="st">"mean"</span>, <span class="st">"2.5%"</span>, <span class="st">"97.5%"</span>)])</span>
+<span id="cb18-60"><a href="#cb18-60" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-61"><a href="#cb18-61" aria-hidden="true" tabindex="-1"></a>comparison <span class="ot">&lt;-</span> <span class="fu">cbind</span>(<span class="fu">as.data.frame</span>(stan_estimates)[,<span class="fu">c</span>(<span class="dv">1</span>,<span class="dv">3</span>,<span class="dv">4</span>)], jags_reformatted)</span>
+<span id="cb18-62"><a href="#cb18-62" aria-hidden="true" tabindex="-1"></a><span class="fu">colnames</span>(comparison) <span class="ot">&lt;-</span> <span class="fu">c</span>(<span class="st">"Stan_mean"</span>, <span class="st">"Stan_2.5%"</span>, <span class="st">"Stan_97.5%"</span>,</span>
+<span id="cb18-63"><a href="#cb18-63" aria-hidden="true" tabindex="-1"></a>                          <span class="st">"JAGS_mean"</span>, <span class="st">"JAGS_2.5%"</span>, <span class="st">"JAGS_97.5%"</span>)</span>
+<span id="cb18-64"><a href="#cb18-64" aria-hidden="true" tabindex="-1"></a>comparison <span class="ot">&lt;-</span> comparison[,<span class="fu">c</span>(<span class="dv">1</span>,<span class="dv">4</span>,<span class="dv">2</span>,<span class="dv">5</span>,<span class="dv">3</span>,<span class="dv">6</span>)]</span>
+<span id="cb18-65"><a href="#cb18-65" aria-hidden="true" tabindex="-1"></a>comparison</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>                          Stan_mean     JAGS_mean    Stan_2.5%    JAGS_2.5%
+Intercept             -0.0822452383            NA -0.107857825           NA
+occ_Intercept         -0.0683503039 -0.0642274810 -0.679089075 -0.685412000
+colo_Intercept        -1.1527798403 -1.1362771998 -1.331168750 -1.322507081
+ex_Intercept          -1.8595954733 -1.8659996264 -2.055140500 -2.057516437
+occ_bio1_3yrs          0.4020563680  0.4368768704 -0.068786320 -0.089095159
+occ_bio2_3yrs         -1.0141307709 -0.9500574567 -1.720864000 -1.593167968
+occ_bio3_3yrs          0.7087486704  0.6261029185 -0.066211317 -0.075993420
+occ_pr_spring_3yrs    -0.8881981362 -0.8691551312 -1.650127250 -1.542486118
+occ_pr_summer_3yrs    -0.7313735452 -0.7067892324 -1.325740750 -1.233693936
+occ_pr_autumn_3yrs     1.0390351432  0.9371098809  0.180181075  0.237099789
+occ_pr_winter_3yrs     0.7758141760  0.8647625425 -0.030811662  0.157990969
+occ_bio15_3yrs        -1.1347516271 -1.0951443003 -1.750982750 -1.715651919
+occ_Ibio1_3yrsE2      -1.0280097417 -1.0057216035 -1.358025250 -1.334674315
+occ_Ibio2_3yrsE2       0.2078614577  0.2289858596 -0.013761145  0.004016017
+occ_Ibio3_3yrsE2       0.3356029871  0.3329181705 -0.005850204  0.019718687
+occ_Ipr_spring_3yrsE2 -0.0426722352 -0.0733635168 -0.351493625 -0.371053872
+occ_Ipr_summer_3yrsE2  0.1100460845  0.0944082202 -0.160271550 -0.211073834
+occ_Ipr_autumn_3yrsE2  0.1820573704  0.2365345495 -0.056559382 -0.047738873
+occ_Ipr_winter_3yrsE2 -0.4317592122 -0.4879985904 -0.812022725 -0.894670012
+occ_Ibio15_3yrsE2      0.0372678306  0.0389320907 -0.170418100 -0.179327899
+colo_bio1              0.1081510049  0.1071595387 -0.015549062 -0.024214572
+colo_bio2             -0.2234209563 -0.2217036057 -0.435318525 -0.410108577
+colo_bio3              0.0444780556  0.0771049654 -0.054253677 -0.068035065
+colo_pr_spring         0.0894741175  0.1364932686 -0.013896973  0.002120507
+colo_pr_summer         0.0629649038  0.0835164447 -0.025695953 -0.033371062
+colo_pr_autumn         0.1090749431  0.1172116443 -0.013112805 -0.010344838
+colo_pr_winter        -0.0007842717  0.0007255593 -0.092883922 -0.127268891
+colo_bio15            -0.0384324655 -0.0820194530 -0.193310775 -0.251247728
+colo_Ibio1E2          -0.5128343650 -0.5078556481 -0.625891425 -0.621052636
+colo_Ibio2E2           0.0022683295  0.0010774427 -0.060335337 -0.082260834
+colo_Ibio3E2           0.0840976052  0.1051077951 -0.006472069  0.009565338
+colo_Ipr_springE2     -0.0178799970 -0.0360971465 -0.090784035 -0.113585171
+colo_Ipr_summerE2     -0.0042453281 -0.0173106406 -0.060700588 -0.091326959
+colo_Ipr_autumnE2     -0.1182382431 -0.1274082877 -0.228995775 -0.223291012
+colo_Ipr_winterE2     -0.0143257085 -0.0167448657 -0.072558120 -0.082436706
+colo_Ibio15E2         -0.0123557653 -0.0078924610 -0.061992483 -0.067121736
+ex_bio1               -0.4116297687 -0.4046832303 -0.569738525 -0.561535221
+ex_bio2                0.5895844320  0.5834128218  0.365375950  0.352899114
+ex_bio3               -0.0476740761 -0.0503657790 -0.295437300 -0.278990356
+ex_pr_spring           0.0913183776  0.1019593922 -0.043756605 -0.054581609
+ex_pr_summer           0.2125295578  0.2362300883  0.043123895  0.060782069
+ex_pr_autumn          -0.0197370521 -0.0529780774 -0.165254650 -0.225067333
+ex_pr_winter          -0.4463375037 -0.4289624197 -0.625917850 -0.616606499
+ex_bio15               0.4278092518  0.4147701142  0.223658625  0.211672189
+ex_Ibio1E2             0.3449525977  0.3522712342  0.217737600  0.234766197
+ex_Ibio2E2            -0.4065271580 -0.4033344498 -0.532548175 -0.526780824
+ex_Ibio3E2            -0.3348525256 -0.3339459640 -0.483584250 -0.471958615
+ex_Ipr_springE2        0.0660707080  0.0663329042 -0.010882295 -0.012877787
+ex_Ipr_summerE2       -0.0190483372 -0.0337968013 -0.109539125 -0.135759649
+ex_Ipr_autumnE2        0.0189109918  0.0309493927 -0.040804910 -0.046194285
+ex_Ipr_winterE2        0.2906655569  0.2839284923  0.185373000  0.178536633
+ex_Ibio15E2           -0.2095685288 -0.2051275843 -0.322739875 -0.327736647
+                        Stan_97.5%  JAGS_97.5%
+Intercept             -0.057374790          NA
+occ_Intercept          0.571708675  0.56856622
+colo_Intercept        -0.965956275 -0.97713633
+ex_Intercept          -1.660250500 -1.67673958
+occ_bio1_3yrs          0.958508050  0.94646554
+occ_bio2_3yrs         -0.352005625 -0.30525907
+occ_bio3_3yrs          1.552512500  1.39255795
+occ_pr_spring_3yrs    -0.132245375 -0.19300337
+occ_pr_summer_3yrs    -0.103859175 -0.17503710
+occ_pr_autumn_3yrs     1.885012750  1.61480409
+occ_pr_winter_3yrs     1.663714500  1.71835181
+occ_bio15_3yrs        -0.498071450 -0.53964252
+occ_Ibio1_3yrsE2      -0.711895425 -0.69606167
+occ_Ibio2_3yrsE2       0.464105700  0.44931287
+occ_Ibio3_3yrsE2       0.713751375  0.66907965
+occ_Ipr_spring_3yrsE2  0.207712175  0.20662797
+occ_Ipr_summer_3yrsE2  0.439200050  0.42606278
+occ_Ipr_autumn_3yrsE2  0.500264625  0.58235147
+occ_Ipr_winter_3yrsE2 -0.037167192 -0.13560596
+occ_Ibio15_3yrsE2      0.255876325  0.27519987
+colo_bio1              0.264935400  0.25021991
+colo_bio2             -0.003357925 -0.03153688
+colo_bio3              0.227445175  0.25556243
+colo_pr_spring         0.255993575  0.28092512
+colo_pr_summer         0.206317750  0.21718507
+colo_pr_autumn         0.293078225  0.26401787
+colo_pr_winter         0.090580458  0.13171926
+colo_bio15             0.046430110  0.04861843
+colo_Ibio1E2          -0.397782075 -0.39649370
+colo_Ibio2E2           0.066441370  0.08878952
+colo_Ibio3E2           0.198084500  0.20460850
+colo_Ipr_springE2      0.028728515  0.03177881
+colo_Ipr_summerE2      0.043113833  0.04626645
+colo_Ipr_autumnE2     -0.014389362 -0.04064924
+colo_Ipr_winterE2      0.028081488  0.04151751
+colo_Ibio15E2          0.023114965  0.04556341
+ex_bio1               -0.243324075 -0.24200367
+ex_bio2                0.827351400  0.82132367
+ex_bio3                0.134657400  0.18199622
+ex_pr_spring           0.273640450  0.26184340
+ex_pr_summer           0.385368700  0.39643496
+ex_pr_autumn           0.101772250  0.09445730
+ex_pr_winter          -0.260352500 -0.23487573
+ex_bio15               0.622561575  0.62162986
+ex_Ibio1E2             0.464884675  0.47642595
+ex_Ibio2E2            -0.284653950 -0.29320572
+ex_Ibio3E2            -0.201324825 -0.20150348
+ex_Ipr_springE2        0.146348675  0.14889201
+ex_Ipr_summerE2        0.050803535  0.05710146
+ex_Ipr_autumnE2        0.089210918  0.10533057
+ex_Ipr_winterE2        0.398221825  0.39912408
+ex_Ibio15E2           -0.102338225 -0.08770125</code></pre>
+</div>
+</div>
+<p>Quite similar.</p>
+</section>
+</section>
+<section id="post-processing" class="level4">
+<h4 class="anchored" data-anchor-id="post-processing">Post-processing:</h4>
+<p>Posterior distribution for the latent occupancy state / occupancy probabilities across sites (option to do this for new data):</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb20"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb20-1"><a href="#cb20-1" aria-hidden="true" tabindex="-1"></a><span class="co">#lat_occ &lt;- get_Z(multi_colex_all_cl_prior) # takes a while</span></span>
+<span id="cb20-2"><a href="#cb20-2" aria-hidden="true" tabindex="-1"></a><span class="co">#save(lat_occ, file = file.path("data", paste0(gsub(" ", "_", spec), "_cl_lat_occ_hs.RData")))</span></span>
+<span id="cb20-3"><a href="#cb20-3" aria-hidden="true" tabindex="-1"></a><span class="fu">load</span>(<span class="at">file =</span> <span class="fu">file.path</span>(<span class="st">"data"</span>, <span class="fu">paste0</span>(<span class="fu">gsub</span>(<span class="st">" "</span>, <span class="st">"_"</span>, spec), <span class="st">"_cl_lat_occ_hs.RData"</span>)))</span>
+<span id="cb20-4"><a href="#cb20-4" aria-hidden="true" tabindex="-1"></a><span class="fu">str</span>(lat_occ) <span class="co"># for each site and year we have 3000 draws</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code> 'postZ' num [1:476, 1:25, 1:3000] 1.00 1.00 1.00 1.04e-07 7.09e-01 ...</code></pre>
+</div>
+<div class="sourceCode cell-code" id="cb22"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb22-1"><a href="#cb22-1" aria-hidden="true" tabindex="-1"></a>lat_occ[<span class="dv">241</span>,<span class="dv">3</span>,][<span class="dv">1</span><span class="sc">:</span><span class="dv">10</span>]</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code> [1] 0.393800972 0.190129424 0.061429473 0.022525294 0.167447760 0.039733681
+ [7] 0.212382152 0.027052706 0.001267152 0.094998854</code></pre>
+</div>
+</div>
+<p>Posterior predictions at the observed points (e.g.&nbsp;for use in posterior predictive checking) or for new data:</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb24"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb24-1"><a href="#cb24-1" aria-hidden="true" tabindex="-1"></a><span class="co">#post_preds &lt;- predict_flocker(multi_colex_all_cl_prior) </span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<p>Model comparison:</p>
+<p>The “leave-one-out” holdouts consist of entire closure-units (single-season models), series (multi-season models).</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb25"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb25-1"><a href="#cb25-1" aria-hidden="true" tabindex="-1"></a><span class="co">#loo_mod &lt;- loo_flocker(multi_colex_all_cl_prior, thin = 2)</span></span>
+<span id="cb25-2"><a href="#cb25-2" aria-hidden="true" tabindex="-1"></a><span class="co"># Warning: Some Pareto k diagnostic values are too high. See help('pareto-k-diagnostic') for details</span></span>
+<span id="cb25-3"><a href="#cb25-3" aria-hidden="true" tabindex="-1"></a><span class="co">#save(loo_mod, file = file.path("data", paste0(gsub(" ", "_", spec), "_cl_loo_hs.RData")))</span></span>
+<span id="cb25-4"><a href="#cb25-4" aria-hidden="true" tabindex="-1"></a><span class="fu">load</span>(<span class="at">file =</span> <span class="fu">file.path</span>(<span class="st">"data"</span>, <span class="fu">paste0</span>(<span class="fu">gsub</span>(<span class="st">" "</span>, <span class="st">"_"</span>, spec), <span class="st">"_cl_loo_hs.RData"</span>)))</span>
+<span id="cb25-5"><a href="#cb25-5" aria-hidden="true" tabindex="-1"></a>loo_mod</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>
+Computed from 1500 by 476 log-likelihood matrix.
+
+         Estimate     SE
+elpd_loo -23986.1  698.2
+p_loo       109.4    6.2
+looic     47972.2 1396.4
+------
+MCSE of elpd_loo is NA.
+MCSE and ESS estimates assume MCMC draws (r_eff in [0.6, 1.1]).
+
+Pareto k diagnostic values:
+                          Count Pct.    Min. ESS
+(-Inf, 0.69]   (good)     474   99.6%   117     
+   (0.69, 1]   (bad)        2    0.4%   &lt;NA&gt;    
+    (1, Inf)   (very bad)   0    0.0%   &lt;NA&gt;    
+See help('pareto-k-diagnostic') for details.</code></pre>
+</div>
+<div class="sourceCode cell-code" id="cb27"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb27-1"><a href="#cb27-1" aria-hidden="true" tabindex="-1"></a><span class="co">#loo::pareto_k_table(loo_mod)</span></span>
+<span id="cb27-2"><a href="#cb27-2" aria-hidden="true" tabindex="-1"></a>loo<span class="sc">::</span><span class="fu">pareto_k_ids</span>(loo_mod) <span class="co"># 419, 422 = sites above threshold, highly influential?</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>[1] 419 422</code></pre>
+</div>
+<div class="sourceCode cell-code" id="cb29"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb29-1"><a href="#cb29-1" aria-hidden="true" tabindex="-1"></a><span class="co"># values &lt;- loo::pareto_k_values(loo_mod)</span></span>
+<span id="cb29-2"><a href="#cb29-2" aria-hidden="true" tabindex="-1"></a><span class="co"># infl_values &lt;- loo::pareto_k_influence_values(loo_mod) # influence of observations on model posterior distribution</span></span>
+<span id="cb29-3"><a href="#cb29-3" aria-hidden="true" tabindex="-1"></a><span class="co"># identical(values, infl_values) # TRUE</span></span>
+<span id="cb29-4"><a href="#cb29-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb29-5"><a href="#cb29-5" aria-hidden="true" tabindex="-1"></a><span class="co">#loo_mod2 &lt;- loo_flocker(multi_colex_all_cl_prior, thin = NULL)</span></span>
+<span id="cb29-6"><a href="#cb29-6" aria-hidden="true" tabindex="-1"></a><span class="co">#save(loo_mod2, file = file.path("data", paste0(gsub(" ", "_", spec), "_cl_loo2_hs.RData")))</span></span>
+<span id="cb29-7"><a href="#cb29-7" aria-hidden="true" tabindex="-1"></a><span class="fu">load</span>(<span class="at">file =</span> <span class="fu">file.path</span>(<span class="st">"data"</span>, <span class="fu">paste0</span>(<span class="fu">gsub</span>(<span class="st">" "</span>, <span class="st">"_"</span>, spec), <span class="st">"_cl_loo2_hs.RData"</span>)))</span>
+<span id="cb29-8"><a href="#cb29-8" aria-hidden="true" tabindex="-1"></a>loo_mod2</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>
+Computed from 3000 by 476 log-likelihood matrix.
+
+         Estimate     SE
+elpd_loo -23985.5  698.3
+p_loo       108.5    6.2
+looic     47970.9 1396.6
+------
+MCSE of elpd_loo is NA.
+MCSE and ESS estimates assume MCMC draws (r_eff in [0.5, 1.5]).
+
+Pareto k diagnostic values:
+                         Count Pct.    Min. ESS
+(-Inf, 0.7]   (good)     475   99.8%   203     
+   (0.7, 1]   (bad)        1    0.2%   &lt;NA&gt;    
+   (1, Inf)   (very bad)   0    0.0%   &lt;NA&gt;    
+See help('pareto-k-diagnostic') for details.</code></pre>
+</div>
+</div>
+<p>What does this mean?</p>
+<p>https://mc-stan.org/loo/reference/loo-glossary.html</p>
+<ul>
+<li><p>elpd = theoretically expected log pointwise predictive density for a new dataset, can be estimated using cross-validation</p></li>
+<li><p>elpd_loo = The Bayesian LOO estimate of out-of-sample predictive fit</p>
+<ul>
+<li>predictive density given the data without the iths data point/series, log transformed and summed over all data points/series</li>
+</ul></li>
+<li><p>p_loo = difference between elpd_loo and non-cross-validated log posterior predictive density, how much more difficult is it to predict future data compared to observed data</p>
+<ul>
+<li><p>can be interpreted as effective number of parameters, if everything is fine: p_loo &lt; N and p_loo &lt; p (=total number of parameters)</p>
+<ul>
+<li>warning: Some Pareto k diagnostic values are too high. See help(‘pareto-k-diagnostic’) for details:</li>
+</ul></li>
+</ul></li>
+<li><p>looic = -2*elpd_loo</p></li>
+<li><p>Pareto k diagnostic estimates how far an individual leave-one-out distribution is from the full distribution</p>
+<ul>
+<li><p>diagnostic threshold for Pareto k depends on sample size S, <code>loo</code> package uses the nominal sample size S when computing the sample size specific threshold</p></li>
+<li><p>Pareto k is also useful as a measure of influence of an observation. Highly influential observations have high k values.</p></li>
+</ul></li>
+</ul>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb31"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb31-1"><a href="#cb31-1" aria-hidden="true" tabindex="-1"></a><span class="co">#loo_comp &lt;- loo_compare_flocker(model_list = list(multi_colex_cl, multi_colex_all_cl_prior), thin = 2)</span></span>
+<span id="cb31-2"><a href="#cb31-2" aria-hidden="true" tabindex="-1"></a><span class="co">#save(loo_comp, file = file.path("data", paste0(gsub(" ", "_", spec), "_cl_loo_comp_def_hs.RData"))) #Warning: Some Pareto k diagnostic values are too high. See help('pareto-k-diagnostic') for details</span></span>
+<span id="cb31-3"><a href="#cb31-3" aria-hidden="true" tabindex="-1"></a><span class="fu">load</span>(<span class="at">file =</span> <span class="fu">file.path</span>(<span class="st">"data"</span>, <span class="fu">paste0</span>(<span class="fu">gsub</span>(<span class="st">" "</span>, <span class="st">"_"</span>, spec), <span class="st">"_cl_loo_comp_def_hs.RData"</span>)))</span>
+<span id="cb31-4"><a href="#cb31-4" aria-hidden="true" tabindex="-1"></a>loo_comp</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>       elpd_diff se_diff
+model2  0.0       0.0   
+model1 -2.1       4.9   </code></pre>
+</div>
+</div>
+<p>This tells me that model2 = model with regularizing priors is better (is this a large difference? what about the warning?)</p>
+<p>Divergent transitions:</p>
+<ul>
+<li>If you get divergence warnings, geometry of posterior density does not allow finding a single suitable step size. Posterior density cannot be sampled well. Clear signal that something went wrong. Increasing target average acceptance probability (delta) may help.</li>
+</ul>
+<p>Notes:</p>
+<ul>
+<li><p>there is nothing like autojags that increases iterations until chains have mixed</p></li>
+<li><p>you can’t explicitly state which parameters to monitor. It looks like only estimates for coefficients are monitored (not the intermediate responses)</p></li>
+</ul>
+</section>
+</section>
+</section>
+
+</main>
+<!-- /main column -->
+<script id="quarto-html-after-body" type="application/javascript">
+window.document.addEventListener("DOMContentLoaded", function (event) {
+  const toggleBodyColorMode = (bsSheetEl) => {
+    const mode = bsSheetEl.getAttribute("data-mode");
+    const bodyEl = window.document.querySelector("body");
+    if (mode === "dark") {
+      bodyEl.classList.add("quarto-dark");
+      bodyEl.classList.remove("quarto-light");
+    } else {
+      bodyEl.classList.add("quarto-light");
+      bodyEl.classList.remove("quarto-dark");
+    }
+  }
+  const toggleBodyColorPrimary = () => {
+    const bsSheetEl = window.document.querySelector("link#quarto-bootstrap");
+    if (bsSheetEl) {
+      toggleBodyColorMode(bsSheetEl);
+    }
+  }
+  toggleBodyColorPrimary();  
+  const icon = "";
+  const anchorJS = new window.AnchorJS();
+  anchorJS.options = {
+    placement: 'right',
+    icon: icon
+  };
+  anchorJS.add('.anchored');
+  const isCodeAnnotation = (el) => {
+    for (const clz of el.classList) {
+      if (clz.startsWith('code-annotation-')) {                     
+        return true;
+      }
+    }
+    return false;
+  }
+  const clipboard = new window.ClipboardJS('.code-copy-button', {
+    text: function(trigger) {
+      const codeEl = trigger.previousElementSibling.cloneNode(true);
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+    }
+  });
+  clipboard.on('success', function(e) {
+    // button target
+    const button = e.trigger;
+    // don't keep focus
+    button.blur();
+    // flash "checked"
+    button.classList.add('code-copy-button-checked');
+    var currentTitle = button.getAttribute("title");
+    button.setAttribute("title", "Copied!");
+    let tooltip;
+    if (window.bootstrap) {
+      button.setAttribute("data-bs-toggle", "tooltip");
+      button.setAttribute("data-bs-placement", "left");
+      button.setAttribute("data-bs-title", "Copied!");
+      tooltip = new bootstrap.Tooltip(button, 
+        { trigger: "manual", 
+          customClass: "code-copy-button-tooltip",
+          offset: [0, -8]});
+      tooltip.show();    
+    }
+    setTimeout(function() {
+      if (tooltip) {
+        tooltip.hide();
+        button.removeAttribute("data-bs-title");
+        button.removeAttribute("data-bs-toggle");
+        button.removeAttribute("data-bs-placement");
+      }
+      button.setAttribute("title", currentTitle);
+      button.classList.remove('code-copy-button-checked');
+    }, 1000);
+    // clear code selection
+    e.clearSelection();
+  });
+  function tippyHover(el, contentFn) {
+    const config = {
+      allowHTML: true,
+      content: contentFn,
+      maxWidth: 500,
+      delay: 100,
+      arrow: false,
+      appendTo: function(el) {
+          return el.parentElement;
+      },
+      interactive: true,
+      interactiveBorder: 10,
+      theme: 'quarto',
+      placement: 'bottom-start'
+    };
+    window.tippy(el, config); 
+  }
+  const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+  for (var i=0; i<noterefs.length; i++) {
+    const ref = noterefs[i];
+    tippyHover(ref, function() {
+      // use id or data attribute instead here
+      let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+      try { href = new URL(href).hash; } catch {}
+      const id = href.replace(/^#\/?/, "");
+      const note = window.document.getElementById(id);
+      return note.innerHTML;
+    });
+  }
+      let selectedAnnoteEl;
+      const selectorForAnnotation = ( cell, annotation) => {
+        let cellAttr = 'data-code-cell="' + cell + '"';
+        let lineAttr = 'data-code-annotation="' +  annotation + '"';
+        const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+        return selector;
+      }
+      const selectCodeLines = (annoteEl) => {
+        const doc = window.document;
+        const targetCell = annoteEl.getAttribute("data-target-cell");
+        const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+        const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+        const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+        const lineIds = lines.map((line) => {
+          return targetCell + "-" + line;
+        })
+        let top = null;
+        let height = null;
+        let parent = null;
+        if (lineIds.length > 0) {
+            //compute the position of the single el (top and bottom and make a div)
+            const el = window.document.getElementById(lineIds[0]);
+            top = el.offsetTop;
+            height = el.offsetHeight;
+            parent = el.parentElement.parentElement;
+          if (lineIds.length > 1) {
+            const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+            const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+            height = bottom - top;
+          }
+          if (top !== null && height !== null && parent !== null) {
+            // cook up a div (if necessary) and position it 
+            let div = window.document.getElementById("code-annotation-line-highlight");
+            if (div === null) {
+              div = window.document.createElement("div");
+              div.setAttribute("id", "code-annotation-line-highlight");
+              div.style.position = 'absolute';
+              parent.appendChild(div);
+            }
+            div.style.top = top - 2 + "px";
+            div.style.height = height + 4 + "px";
+            let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+            if (gutterDiv === null) {
+              gutterDiv = window.document.createElement("div");
+              gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+              gutterDiv.style.position = 'absolute';
+              const codeCell = window.document.getElementById(targetCell);
+              const gutter = codeCell.querySelector('.code-annotation-gutter');
+              gutter.appendChild(gutterDiv);
+            }
+            gutterDiv.style.top = top - 2 + "px";
+            gutterDiv.style.height = height + 4 + "px";
+          }
+          selectedAnnoteEl = annoteEl;
+        }
+      };
+      const unselectCodeLines = () => {
+        const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+        elementsIds.forEach((elId) => {
+          const div = window.document.getElementById(elId);
+          if (div) {
+            div.remove();
+          }
+        });
+        selectedAnnoteEl = undefined;
+      };
+      // Attach click handler to the DT
+      const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+      for (const annoteDlNode of annoteDls) {
+        annoteDlNode.addEventListener('click', (event) => {
+          const clickedEl = event.target;
+          if (clickedEl !== selectedAnnoteEl) {
+            unselectCodeLines();
+            const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+            if (activeEl) {
+              activeEl.classList.remove('code-annotation-active');
+            }
+            selectCodeLines(clickedEl);
+            clickedEl.classList.add('code-annotation-active');
+          } else {
+            // Unselect the line
+            unselectCodeLines();
+            clickedEl.classList.remove('code-annotation-active');
+          }
+        });
+      }
+  const findCites = (el) => {
+    const parentEl = el.parentElement;
+    if (parentEl) {
+      const cites = parentEl.dataset.cites;
+      if (cites) {
+        return {
+          el,
+          cites: cites.split(' ')
+        };
+      } else {
+        return findCites(el.parentElement)
+      }
+    } else {
+      return undefined;
+    }
+  };
+  var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+  for (var i=0; i<bibliorefs.length; i++) {
+    const ref = bibliorefs[i];
+    const citeInfo = findCites(ref);
+    if (citeInfo) {
+      tippyHover(citeInfo.el, function() {
+        var popup = window.document.createElement('div');
+        citeInfo.cites.forEach(function(cite) {
+          var citeDiv = window.document.createElement('div');
+          citeDiv.classList.add('hanging-indent');
+          citeDiv.classList.add('csl-entry');
+          var biblioDiv = window.document.getElementById('ref-' + cite);
+          if (biblioDiv) {
+            citeDiv.innerHTML = biblioDiv.innerHTML;
+          }
+          popup.appendChild(citeDiv);
+        });
+        return popup.innerHTML;
+      });
+    }
+  }
+});
+</script>
+</div> <!-- /content -->
+
+
+
+</body></html>
