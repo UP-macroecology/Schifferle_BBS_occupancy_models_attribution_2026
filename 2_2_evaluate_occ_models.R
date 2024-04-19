@@ -7,6 +7,7 @@ library(dplyr)
 library(precrec)
 library(ggplot2)
 library(stringr)
+
 # load data: ----
 
 # route-year-species information (only surveyed)
@@ -18,187 +19,49 @@ nrow(bbs_dt_occ)
 load(file = file.path("data", "final_species_selection.RData")) # output of 1_2_species_selection.R
 species_selection_final
 
-# selected routes and years:
-load(file = file.path("data", "route_year_env_data.RData"))
-route_sel_env_dt_final
+# # selected routes and years:
+# load(file = file.path("data", "route_year_env_data.RData"))
+# route_sel_env_dt_final
 
 
 
 # output of model fitting: ----
 
-load(file.path("results", "Grasshopper_Sparrow_cl_alt3_quadr_lasso_GoF_inits.RData"))
-BC <- out
-summary(BC)
-pars_no_conv <- names(which(BC$summary[,"Rhat"] > 1.1))
-traceplot(BC, parameters = "beta_eps", Rhat_min =  1.1)
-traceplot(BC, parameters = "beta_gamma", Rhat_min =  1.1)
-sort(unique(as.numeric(str_extract(pars_no_conv, "((?<=\\[).*(?=,))|((?<=\\[).*(?=\\]))"))))
-unique(str_extract(pars_no_conv, ".*(?=\\[)"))
-traceplot(BC, parameters = "beta_gamma", Rhat_min =  1.1)
+## quick checks regarding convergence: ----
 
+#load(file.path("results", "Grasshopper_Sparrow_cl_alt3_quadr_lasso_GoF_inits.RData"))
+#load(file.path("results", "Black-billed_Cuckoo_cl_alt3_quadr_lasso_GoF_inits.RData"))
+#load(file.path("results", "American_Robin_cl_alt3_quadr_lasso_GoF_inits.RData"))
+#load(file.path("results", "Black-capped_Chickadee_cl_alt3_quadr_lasso_GoF_inits.RData"))
+#load(file.path("results", "Eastern_Phoebe_cl_alt3_quadr_lasso_GoF_inits.RData"))
+#load(file.path("results", "Black-capped_Chickadee_cl_alt4_quadr_lasso_GoF_inits.RData"))
+#load(file.path("results", "Black-billed_Cuckoo_cl_alt4_quadr_lasso_GoF_inits.RData"))
+#load(file.path("results", "Eastern_Phoebe_cl_alt4_quadr_lasso_GoF_inits.RData"))
+#load(file.path("results", "American_Goldfinch_cl_alt4_quadr_lasso_GoF_inits.RData"))
+#load(file.path("results", "American_Goldfinch_cl_alt3_quadr_lasso_GoF_inits.RData"))
+#load(file.path("results", "Black-capped_Chickadee_cl_alt4_lu_quadr_p_sect_lasso_GoF_inits_less_pars_butGoF.RData"))
+#load(file.path("results", "American_Goldfinch_cl_alt4_lu_quadr_p_sect_lasso_GoF_inits_less_pars_butGoF.RData"))
+#load(file.path("results", "Eastern_Kingbird_cl_alt4_lu_quadr_p_sect_lasso_GoF_inits_less_pars_butGoF.RData"))
+#load(file.path("results", "Grasshopper_Sparrow_cl_alt4_lu_quadr_p_sect_lasso_GoF_inits_less_pars_butGoF.RData"))
+load(file.path("results", "Black-billed_Cuckoo_cl_alt4_lu_quadr_p_sect_lasso_GoF_inits_less_pars_butGoF.RData"))
 
-load(file.path("results", "Eastern_Phoebe_cl_alt3_quadr_lasso_GoF_inits.RData"))  # model output
-EP_inits <- out
-summary(EP_inits)
-EP_inits$summary %>% View
-traceplot(EP_inits, parameters = "p")
-which(unlist(EP_inits$Rhat) > 1.1)
-traceplot(EP_inits, parameters = "psi")
-traceplot(EP_inits, Rhat_min =  1.1)
-traceplot(EP_inits, parameters = "gamma")
-densityplot(EP_inits, parameters = "gamma")
-traceplot(EP_inits, parameters = "alpha_gamma")
-densityplot(EP_inits, parameters = "alpha_gamma")
-traceplot(EP_inits, parameters = "beta_gamma")
-densityplot(EP_inits, parameters = "beta_gamma")
-densityplot(EP_inits, parameters = "psi1")
-# get RTENOs of routes with convergence problems:
+# psi, gamma, eps:
+chain_range <- apply(X = out$sims.list$psi, MARGIN = 2:3, FUN = range)
+#dim(chain_range) # 2 476 24
+min_df <- as.data.frame(chain_range[1,,])
+max_df <- as.data.frame(chain_range[2,,])
+diff_df <- max_df-min_df
+#dim(diff_df)
+diff_nomix_df <- diff_df[which(out$Rhat$psi > 1.1, arr.ind = TRUE)] # difference only where chains haven't mixed
+sort(diff_nomix_df, decreasing = TRUE)
 
-pars_no_conv <- names(which(EP_inits$summary[,"Rhat"] > 1.1))
-nsites = 476
-nyears = 25
-route_nrs <- matrix(route_sel_env_dt_final$RTENO, nrow = nsites, ncol = nyears, byrow = TRUE)[,1]
-route_nrs
-
-
-# load(file.path("results", "House_Finch_cl_lu_noC3C4_quadr_p_sect_lasso.RData"))  # model output
-# HF_cl_lu_quadr_noC3C4_p_sect <- out
-routes_no_conv <- unique(as.numeric(str_extract(pars_no_conv, "((?<=\\[).*(?=,))|((?<=\\[).*(?=\\]))"))) # (?<=\\[) looks for what's behind [, (?=\\])) looks for what's before ]
-routes_no_conv
-RTENOs_no_conv <- route_nrs[routes_no_conv]
-# load routes:
-library(sf)
-routes_sel_sf <- st_read(file.path("data", "route_selection_1991_2015_surv_beg_end_max_5y_miss_v2_spat_thin_100km_max_30_r_per_BCR_centroids.shp")) # output of 1_1_route_selection.R
-bio_sf <- routes_sel_sf %>% 
-  left_join(route_sel_env_dt_final[, c("RTENO", "bio15_3yrs")], by = c("RTENO_BBS" = "RTENO")) %>% 
-  distinct()
-plot(bio_sf["bio15_3yrs"],reset = FALSE)
-
-routes_sel_sf %>% 
-  filter(RTENO_BBS %in% RTENOs_no_conv) %>% 
-  plot(add = TRUE, col = "black", reset = FALSE, pch = 4)
-
-
-
-summary(out)
-length(which(unlist(HF_quad_res$Rhat) > 1.1)) # 137
-str(HF_quad_res)
-HF_quad_res$mcmc.info$n.samples
-HF_quad_res$mcmc.info$n.iter
-
-load(file.path("results", "House_Finch_quadr_GoF_update.RData")) 
-HF_quad_res_update <- out2
-summary(HF_quad_res_update) # convergence failure -> 3000 iterations not enough
-length(which(unlist(HF_quad_res_update$Rhat) > 1.1)) # 157
-
-load(file.path("results", "House_Finch_quadr_GoF_update5000.RData")) 
-HF_quad_res_update2 <- out3
-summary(HF_quad_res_update2) # convergence failure -> 5000 iterations not enough
-length(which(unlist(HF_quad_res_update2$Rhat) > 1.1)) # 73
-
-load(file.path("results", "House_Finch_quadr_GoF_p_site_re_lasso.RData")) 
-HF_quad_res_6000<- out
-summary(HF_quad_res_6000) 
-length(which(unlist(HF_quad_res_6000$Rhat) > 1.1)) # 866
-
-sort(names(unlist(HF_quad_res_6000$Rhat)[which(unlist(HF_quad_res_6000$Rhat) > 1.1)]), decreasing = TRUE)
-
-# other species:
-load(file.path("results", "Eastern_Meadowlark_quadr_GoF_p_site_re_lasso.RData")) 
-EM_quad_res_6000 <- out
-summary(EM_quad_res_6000) 
-length(which(unlist(EM_quad_res_6000$Rhat) > 1.1)) # 1707
-
-load(file.path("results", "Winter_Wren_quadr_GoF_p_site_re_lasso.RData")) 
-WW_quad_res_6000 <- out
-summary(WW_quad_res_6000) 
-length(which(unlist(WW_quad_res_6000$Rhat) > 1.1)) # 15839
-
-#load(file.path("results", "Brown_headed_Cowbird_test1.RData"))
-
-HF_quad_res_update2$sims.list$Chi2ratioOpen
-HF_quad_res_update2$sims.list$Chi2ratioClosed
-mean(HF_quad_res_update2$sims.list$Chi2ratioOpen)
-mean(HF_quad_res_update2$sims.list$Chi2ratioClosed)
-
-load(file.path("results", "Yellow_Warbler_cl_alt2_quadr_lasso_GoF.RData")) 
-YW_bioalt2 <- out
-
-
-
-# explore output files: ----
-summary(HF_cl_alt_quadr_lasso) # all iterations before the final incremental step are considered burnin
-# 2500 iteration in total (1500+1000)
-# 1000 iteration not discarded
-# thin rate = 5 -> 200 draws from the posterior
-summary(HF_cl_quadr)
-
-print(HF_cl_alt_quadr_lasso)
-HF_cl_alt_quadr_lasso$parameters
-HF_cl_alt_quadr_lasso$mcmc.info
-HF_cl_alt_quadr_lasso$summary %>% View
-
-HF_cl_alt_quadr_lasso$summary[grep("beta_psi", rownames(HF_cl_alt_quadr_lasso$summary)),]
-
-traceplot(x = HF_cl_alt_quadr_lasso, parameters = "psi1")
-traceplot(x = HF_cl_alt_quadr_lasso, parameters = "alpha_psi")
-densityplot(HF_cl_alt_quadr_lasso, parameters = "alpha_psi")
-HF_cl_alt_quadr_lasso$summary[grep("alpha_psi", rownames(HF_cl_alt_quadr_lasso$summary)),]
-densityplot(HF_cl_alt_quadr_lasso, parameters = "beta_psi")
-HF_cl_alt_quadr_lasso$model
-HF_cl_alt_quadr_lasso$sims.list$p # actual draws from posterior for p
-hist(HF_cl_alt_quadr_lasso$sims.list$p, xlab="Value", main = "p posterior")
-densityplot(HF_cl_alt_quadr_lasso, parameters = "p")
-str(HF_cl_alt_quadr_lasso)
-
-whiskerplot(HF_cl_alt_quadr_lasso, parameters = "beta_psi")
-whiskerplot(HF_cl_alt_quadr_lasso, parameters = "beta_eps")
-whiskerplot(HF_cl_alt_quadr_lasso, parameters = "beta_gamma")
-
-var(HF_cl_alt_quadr_lasso$sims.list$deviance)/2 # roughly the same as pD (6340 instead of 6356)
-str(HF_cl_alt_quadr_lasso$samples) # samples per chain; original output object from the rjags package, as class mcmc.list
-str(HF_cl_alt_quadr_lasso$samples[[1]])
-HF_cl_alt_quadr_lasso$samples[[1]][1,1:5]
-HF_cl_alt_quadr_lasso$sims.list$psi1[1, 1:5] # same
-
-# explore goodness-of-fit following Kéry and Royle AHM 2021: -------------------
-
-# Plots of expected versus observed value of fit stats
-# Open part
-res <- YW_bioalt2#HF_cl_alt_quadr_lasso#HF_cl_quadr_unif#HF_cl_quadr_p_sect#HF_cl_quadr#HF_lu_quadr_noC3C4_p_sect#HF_cl_quadr_p_sect#HF_cl_lu_quadr_noC3C4_p_sect#HF_cl_lu_quadr_noC3C4#HF_nm#EM_quad_res_6000# HF_quad_res_6000 #HF_quad_res # HF_lin_res
-
-pl <- range(c(res$sims.list$Chi2Open, res$sims.list$Chi2repOpen))
-plot(res$sims.list$Chi2Open, res$sims.list$Chi2repOpen,
-     xlab = "Chi2 observed data", ylab = "Chi2 expected data",
-     main = "Open part of model ", xlim = pl, ylim = pl, frame.plot = FALSE)
-abline(0, 1, lwd = 2)
-text(200, 500, paste('Bpv = ', round(mean(res$sims.list$Chi2repOpen >
-                                            res$sims.list$Chi2Open), 2)), cex = 1) # Bayesian p-value 0 proportion of points above the line
-
-# Closed part of model: Chi-squared
-pl <- range(c(res$sims.list$Chi2Closed, res$sims.list$Chi2repClosed))
-plot(res$sims.list$Chi2Closed, res$sims.list$Chi2repClosed,
-     xlab = "Chi2 observed data", ylab = "Chi2 expected data",
-     main = "Closed part of model (Chi-squared)", xlim = pl, ylim = pl,
-     frame.plot = FALSE)
-abline(0, 1, lwd = 2)
-text(3500, 5000, paste('Bpv = ', round(mean(res$sims.list$Chi2repClosed >
-                                              res$sims.list$Chi2Closed), 2)), cex = 1)
-
-
-
-
-
-#library(jagshelper)
-#check_Rhat(HF_quad_res_update2) # proportion of Rhats below a threshold of 1.1
-#traceworstRhat(HF_quad_res_update2, parmfrow=c(3,2))  # trace plots for least-converged nodes
-#traceworstRhat(HF_quad_res_update2)[1]  # trace plots for least-converged nodes
-#out_df <- jags_df(HF_quad_res_update2)
-#str(out_df)
-
-
-
-# fit for open part of the model looks better when including quadratic terms (but not converged yet!)
+# psi1:
+chain_range <- apply(X = out$sims.list$psi1, MARGIN = 2, FUN = range)
+min_df <- as.data.frame(chain_range[1,])
+max_df <- as.data.frame(chain_range[2,])
+diff_df <- max_df-min_df
+diff_nomix_df <- diff_df[which(out$Rhat$psi1 > 1.1, arr.ind = TRUE)] # difference only where chains haven't mixed
+sort(diff_nomix_df, decreasing = TRUE)
 
 
 # evaluate spatial predictive ability: -----------------------------------------
@@ -266,6 +129,191 @@ plot(sscurves)
 overall_auc <- auc(sscurves)
 overall_auc
 
+
+
+
+# compare_Jags_Stan_cl_only <- function(jags_output, stan_output){
+#   
+#   stan_estimates <- fixef(stan_output, summary = TRUE, robust = FALSE, probs = c(0.025, 0.975))
+#   jags_estimates <- jags_output$summary[which(grepl("(alpha)|(beta)", rownames(jags_output$summary))), c("mean", "2.5%", "97.5%")]
+#   
+#   jags_estimates
+#   
+#   
+#   jags_reformatted <- rbind(c(NA,NA, NA),
+#                             jags_estimates["alpha_psi", c("mean", "2.5%", "97.5%")],
+#                             jags_estimates["alpha_gamma", c("mean", "2.5%", "97.5%")],
+#                             jags_estimates["alpha_eps", c("mean", "2.5%", "97.5%")],
+#                             jags_estimates["beta_psi[1]", c("mean", "2.5%", "97.5%")],
+#                             jags_estimates["beta_psi[2]", c("mean", "2.5%", "97.5%")],
+#                             jags_estimates["beta_psi[3]", c("mean", "2.5%", "97.5%")],
+#                             jags_estimates["beta_psi[4]", c("mean", "2.5%", "97.5%")],
+#                             jags_estimates["beta_psi[5]", c("mean", "2.5%", "97.5%")],
+#                             jags_estimates["beta_psi[6]", c("mean", "2.5%", "97.5%")],
+#                             jags_estimates["beta_psi[7]", c("mean", "2.5%", "97.5%")],
+#                             jags_estimates["beta_psi[8]", c("mean", "2.5%", "97.5%")],
+#                             jags_estimates["beta_psi[9]", c("mean", "2.5%", "97.5%")],
+#                             jags_estimates["beta_psi[10]", c("mean", "2.5%", "97.5%")],
+#                             jags_estimates["beta_psi[11]", c("mean", "2.5%", "97.5%")],
+#                             jags_estimates["beta_psi[12]", c("mean", "2.5%", "97.5%")],
+#                             jags_estimates["beta_psi[13]", c("mean", "2.5%", "97.5%")],
+#                             jags_estimates["beta_psi[14]", c("mean", "2.5%", "97.5%")],
+#                             jags_estimates["beta_psi[15]", c("mean", "2.5%", "97.5%")],
+#                             jags_estimates["beta_psi[16]", c("mean", "2.5%", "97.5%")],
+#                             jags_estimates["beta_gamma[1]", c("mean", "2.5%", "97.5%")],
+#                             jags_estimates["beta_gamma[2]", c("mean", "2.5%", "97.5%")],
+#                             jags_estimates["beta_gamma[3]", c("mean", "2.5%", "97.5%")],
+#                             jags_estimates["beta_gamma[4]", c("mean", "2.5%", "97.5%")],
+#                             jags_estimates["beta_gamma[5]", c("mean", "2.5%", "97.5%")],
+#                             jags_estimates["beta_gamma[6]", c("mean", "2.5%", "97.5%")],
+#                             jags_estimates["beta_gamma[7]", c("mean", "2.5%", "97.5%")],
+#                             jags_estimates["beta_gamma[8]", c("mean", "2.5%", "97.5%")],
+#                             jags_estimates["beta_gamma[9]", c("mean", "2.5%", "97.5%")],
+#                             jags_estimates["beta_gamma[10]", c("mean", "2.5%", "97.5%")],
+#                             jags_estimates["beta_gamma[11]", c("mean", "2.5%", "97.5%")],
+#                             jags_estimates["beta_gamma[12]", c("mean", "2.5%", "97.5%")],
+#                             jags_estimates["beta_gamma[13]", c("mean", "2.5%", "97.5%")],
+#                             jags_estimates["beta_gamma[14]", c("mean", "2.5%", "97.5%")],
+#                             jags_estimates["beta_gamma[15]", c("mean", "2.5%", "97.5%")],
+#                             jags_estimates["beta_gamma[16]", c("mean", "2.5%", "97.5%")],
+#                             jags_estimates["beta_eps[1]", c("mean", "2.5%", "97.5%")],
+#                             jags_estimates["beta_eps[2]", c("mean", "2.5%", "97.5%")],
+#                             jags_estimates["beta_eps[3]", c("mean", "2.5%", "97.5%")],
+#                             jags_estimates["beta_eps[4]", c("mean", "2.5%", "97.5%")],
+#                             jags_estimates["beta_eps[5]", c("mean", "2.5%", "97.5%")],
+#                             jags_estimates["beta_eps[6]", c("mean", "2.5%", "97.5%")],
+#                             jags_estimates["beta_eps[7]", c("mean", "2.5%", "97.5%")],
+#                             jags_estimates["beta_eps[8]", c("mean", "2.5%", "97.5%")],
+#                             jags_estimates["beta_eps[9]", c("mean", "2.5%", "97.5%")],
+#                             jags_estimates["beta_eps[10]", c("mean", "2.5%", "97.5%")],
+#                             jags_estimates["beta_eps[11]", c("mean", "2.5%", "97.5%")],
+#                             jags_estimates["beta_eps[12]", c("mean", "2.5%", "97.5%")],
+#                             jags_estimates["beta_eps[13]", c("mean", "2.5%", "97.5%")],
+#                             jags_estimates["beta_eps[14]", c("mean", "2.5%", "97.5%")],
+#                             jags_estimates["beta_eps[15]", c("mean", "2.5%", "97.5%")],
+#                             jags_estimates["beta_eps[16]", c("mean", "2.5%", "97.5%")])
+#   
+#   comparison <- cbind(as.data.frame(stan_estimates)[,c(1,3,4)], jags_reformatted)
+#   colnames(comparison) <- c("Stan_mean", "Stan_2.5%", "Stan_97.5%",
+#                             "JAGS_mean", "JAGS_2.5%", "JAGS_97.5%")
+#   comparison <- comparison[,c(1,4,2,5,3,6)]
+#   
+#   comparison$Stan_sign <- ifelse(comparison$`Stan_2.5%` < 0 & comparison$`Stan_97.5%` > 0, 0, 1)
+#   comparison$Jags_sign <- ifelse(comparison$`JAGS_2.5%` < 0 & comparison$`JAGS_97.5%` > 0, 0, 1)
+#   
+#   return(comparison)
+#   
+# }
+
+
+# # function to compare output for full model:
+# 
+# compare_Jags_Stan_fm <- function(jags_output, stan_output){
+#   
+#   stan_estimates <- fixef(stan_output, summary = TRUE, robust = FALSE, probs = c(0.025, 0.975))
+#   jags_estimates <- jags_output$summary[which(grepl("(alpha)|(beta)|(p)", rownames(jags_output$summary))), c("mean", "2.5%", "97.5%")]
+#   
+#   jags_reformatted <- rbind(c(NA,NA, NA),
+#                             jags_estimates["alpha_psi", c("mean", "2.5%", "97.5%")],
+#                             jags_estimates["alpha_gamma", c("mean", "2.5%", "97.5%")],
+#                             jags_estimates["alpha_eps", c("mean", "2.5%", "97.5%")],
+#                             jags_estimates["p[1]", c("mean", "2.5%", "97.5%")],
+#                             jags_estimates["p[2]", c("mean", "2.5%", "97.5%")],
+#                             jags_estimates["p[3]", c("mean", "2.5%", "97.5%")],
+#                             jags_estimates["p[4]", c("mean", "2.5%", "97.5%")],
+#                             jags_estimates["p[5]", c("mean", "2.5%", "97.5%")],
+#                             jags_estimates["beta_psi[1]", c("mean", "2.5%", "97.5%")],
+#                             jags_estimates["beta_psi[2]", c("mean", "2.5%", "97.5%")],
+#                             jags_estimates["beta_psi[3]", c("mean", "2.5%", "97.5%")],
+#                             jags_estimates["beta_psi[4]", c("mean", "2.5%", "97.5%")],
+#                             jags_estimates["beta_psi[5]", c("mean", "2.5%", "97.5%")],
+#                             jags_estimates["beta_psi[6]", c("mean", "2.5%", "97.5%")],
+#                             jags_estimates["beta_psi[7]", c("mean", "2.5%", "97.5%")],
+#                             jags_estimates["beta_psi[8]", c("mean", "2.5%", "97.5%")],
+#                             jags_estimates["beta_psi[9]", c("mean", "2.5%", "97.5%")],
+#                             jags_estimates["beta_psi[10]", c("mean", "2.5%", "97.5%")],
+#                             jags_estimates["beta_psi[11]", c("mean", "2.5%", "97.5%")],
+#                             jags_estimates["beta_psi[12]", c("mean", "2.5%", "97.5%")],
+#                             jags_estimates["beta_psi[13]", c("mean", "2.5%", "97.5%")],
+#                             jags_estimates["beta_psi[14]", c("mean", "2.5%", "97.5%")],
+#                             jags_estimates["beta_psi[15]", c("mean", "2.5%", "97.5%")],
+#                             jags_estimates["beta_psi[16]", c("mean", "2.5%", "97.5%")],
+#                             jags_estimates["beta_psi[17]", c("mean", "2.5%", "97.5%")],
+#                             jags_estimates["beta_psi[19]", c("mean", "2.5%", "97.5%")],
+#                             jags_estimates["beta_psi[20]", c("mean", "2.5%", "97.5%")],
+#                             jags_estimates["beta_psi[21]", c("mean", "2.5%", "97.5%")],
+#                             jags_estimates["beta_psi[18]", c("mean", "2.5%", "97.5%")],
+#                             jags_estimates["beta_psi[22]", c("mean", "2.5%", "97.5%")],
+#                             jags_estimates["beta_psi[24]", c("mean", "2.5%", "97.5%")],
+#                             jags_estimates["beta_psi[25]", c("mean", "2.5%", "97.5%")],
+#                             jags_estimates["beta_psi[26]", c("mean", "2.5%", "97.5%")],
+#                             jags_estimates["beta_psi[23]", c("mean", "2.5%", "97.5%")],
+#                             jags_estimates["beta_gamma[1]", c("mean", "2.5%", "97.5%")],
+#                             jags_estimates["beta_gamma[2]", c("mean", "2.5%", "97.5%")],
+#                             jags_estimates["beta_gamma[3]", c("mean", "2.5%", "97.5%")],
+#                             jags_estimates["beta_gamma[4]", c("mean", "2.5%", "97.5%")],
+#                             jags_estimates["beta_gamma[5]", c("mean", "2.5%", "97.5%")],
+#                             jags_estimates["beta_gamma[6]", c("mean", "2.5%", "97.5%")],
+#                             jags_estimates["beta_gamma[7]", c("mean", "2.5%", "97.5%")],
+#                             jags_estimates["beta_gamma[8]", c("mean", "2.5%", "97.5%")],
+#                             jags_estimates["beta_gamma[9]", c("mean", "2.5%", "97.5%")],
+#                             jags_estimates["beta_gamma[10]", c("mean", "2.5%", "97.5%")],
+#                             jags_estimates["beta_gamma[11]", c("mean", "2.5%", "97.5%")],
+#                             jags_estimates["beta_gamma[12]", c("mean", "2.5%", "97.5%")],
+#                             jags_estimates["beta_gamma[13]", c("mean", "2.5%", "97.5%")],
+#                             jags_estimates["beta_gamma[14]", c("mean", "2.5%", "97.5%")],
+#                             jags_estimates["beta_gamma[15]", c("mean", "2.5%", "97.5%")],
+#                             jags_estimates["beta_gamma[16]", c("mean", "2.5%", "97.5%")],
+#                             jags_estimates["beta_gamma[17]", c("mean", "2.5%", "97.5%")],
+#                             jags_estimates["beta_gamma[19]", c("mean", "2.5%", "97.5%")],
+#                             jags_estimates["beta_gamma[20]", c("mean", "2.5%", "97.5%")],
+#                             jags_estimates["beta_gamma[21]", c("mean", "2.5%", "97.5%")],
+#                             jags_estimates["beta_gamma[18]", c("mean", "2.5%", "97.5%")],
+#                             jags_estimates["beta_gamma[22]", c("mean", "2.5%", "97.5%")],
+#                             jags_estimates["beta_gamma[24]", c("mean", "2.5%", "97.5%")],
+#                             jags_estimates["beta_gamma[25]", c("mean", "2.5%", "97.5%")],
+#                             jags_estimates["beta_gamma[26]", c("mean", "2.5%", "97.5%")],
+#                             jags_estimates["beta_gamma[23]", c("mean", "2.5%", "97.5%")],
+#                             jags_estimates["beta_eps[1]", c("mean", "2.5%", "97.5%")],
+#                             jags_estimates["beta_eps[2]", c("mean", "2.5%", "97.5%")],
+#                             jags_estimates["beta_eps[3]", c("mean", "2.5%", "97.5%")],
+#                             jags_estimates["beta_eps[4]", c("mean", "2.5%", "97.5%")],
+#                             jags_estimates["beta_eps[5]", c("mean", "2.5%", "97.5%")],
+#                             jags_estimates["beta_eps[6]", c("mean", "2.5%", "97.5%")],
+#                             jags_estimates["beta_eps[7]", c("mean", "2.5%", "97.5%")],
+#                             jags_estimates["beta_eps[8]", c("mean", "2.5%", "97.5%")],
+#                             jags_estimates["beta_eps[9]", c("mean", "2.5%", "97.5%")],
+#                             jags_estimates["beta_eps[10]", c("mean", "2.5%", "97.5%")],
+#                             jags_estimates["beta_eps[11]", c("mean", "2.5%", "97.5%")],
+#                             jags_estimates["beta_eps[12]", c("mean", "2.5%", "97.5%")],
+#                             jags_estimates["beta_eps[13]", c("mean", "2.5%", "97.5%")],
+#                             jags_estimates["beta_eps[14]", c("mean", "2.5%", "97.5%")],
+#                             jags_estimates["beta_eps[15]", c("mean", "2.5%", "97.5%")],
+#                             jags_estimates["beta_eps[16]", c("mean", "2.5%", "97.5%")],
+#                             jags_estimates["beta_eps[17]", c("mean", "2.5%", "97.5%")],
+#                             jags_estimates["beta_eps[19]", c("mean", "2.5%", "97.5%")],
+#                             jags_estimates["beta_eps[20]", c("mean", "2.5%", "97.5%")],
+#                             jags_estimates["beta_eps[21]", c("mean", "2.5%", "97.5%")],
+#                             jags_estimates["beta_eps[18]", c("mean", "2.5%", "97.5%")],
+#                             jags_estimates["beta_eps[22]", c("mean", "2.5%", "97.5%")],
+#                             jags_estimates["beta_eps[24]", c("mean", "2.5%", "97.5%")],
+#                             jags_estimates["beta_eps[25]", c("mean", "2.5%", "97.5%")],
+#                             jags_estimates["beta_eps[26]", c("mean", "2.5%", "97.5%")],
+#                             jags_estimates["beta_eps[23]", c("mean", "2.5%", "97.5%")])
+#   
+#   stan_estimates2 <- rbind(stan_estimates[1:4,c(1,3,4)], c(NA, NA, NA), stan_estimates[5:nrow(stan_estimates),c(1,3,4)])
+#   row.names(stan_estimates2)[5] <- "routeSectionSect1"
+#   comparison <- as.data.frame(cbind(stan_estimates2, jags_reformatted))
+#   colnames(comparison) <- c("Stan_mean", "Stan_Q2.5", "Stan_Q97.5",
+#                             "JAGS_mean", "JAGS_Q2.5", "JAGS_Q97.5")
+#   comparison <- comparison[,c(1,4,2,5,3,6)]
+#   
+#   comparison$Stan_sign <- ifelse(comparison$Stan_Q2.5 < 0 & comparison$Stan_Q97.5 > 0, 0, 1)
+#   comparison$Jags_sign <- ifelse(comparison$JAGS_Q2.5 < 0 & comparison$JAGS_Q97.5 > 0, 0, 1)
+#   
+#   return(comparison)
+#   
+# }
 
 
 # AUC per year: ----

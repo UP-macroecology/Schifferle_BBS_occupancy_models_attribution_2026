@@ -117,7 +117,7 @@ plot(jags_out$sims.list$Chi2Open, jags_out$sims.list$Chi2repOpen,
      main = "Open part of model ", xlim = pl, ylim = pl, frame.plot = FALSE)
 abline(0, 1, lwd = 2)
 text(200, 500, paste('Bpv = ', round(mean(jags_out$sims.list$Chi2repOpen >
-                                            jags_out$sims.list$Chi2Open), 2)), cex = 1) # Bayesian p-value 0 proportion of points above the line
+                                            jags_out$sims.list$Chi2Open), 2)), cex = 1) # Bayesian p-value = proportion of points above the line
 
 # Closed part of model = detection submodel:
 pl <- range(c(jags_out$sims.list$Chi2Closed, jags_out$sims.list$Chi2repClosed))
@@ -301,3 +301,471 @@ ggplot(data = all_stan_p_df) +
        color = "Legend") +
   scale_color_manual(values = colors) +
   theme(legend.position="bottom")
+
+
+
+
+
+# explore flocker horseshoe prior settings: ----
+
+# parameter par_ratio:
+
+# load fitted model(s):
+
+## normal priors for comparison:
+load(file.path("results", "American_Goldfinch_cl_lu_p_Stan_no_hs.RData"))
+norm_prior <- multi_colex_cl_lu_p_prior
+
+load(file.path("results", "American_Goldfinch_cl_lu_p_Stan_prior_1000its.RData"))
+parrat_03 <- multi_colex_cl_lu_p_prior
+
+load(file.path("results", "AG_cl_lu_p_flock_horseshoe(df = 1, par_ratio = 0.01, df_global = 1, scale_slab = 2, df_slab = 4).RData"))
+parrat_001 <- multi_colex_cl_lu_p_prior
+
+load(file.path("results", "AG_cl_lu_p_flock_horseshoe(df = 1, par_ratio = 0.1, df_global = 1, scale_slab = 2, df_slab = 4).RData"))
+parrat_01 <- multi_colex_cl_lu_p_prior
+
+load(file.path("results", "AG_cl_lu_p_flock_horseshoe(df = 1, par_ratio = 0.2, df_global = 1, scale_slab = 2, df_slab = 4).RData"))
+parrat_02 <- multi_colex_cl_lu_p_prior
+
+load(file.path("results", "AG_cl_lu_p_flock_horseshoe(df = 1, par_ratio = 1, df_global = 1, scale_slab = 2, df_slab = 4).RData"))
+parrat_1 <- multi_colex_cl_lu_p_prior
+
+load(file.path("results", "AG_cl_lu_p_flock_horseshoe(df = 1, par_ratio = 3, df_global = 1, scale_slab = 2, df_slab = 4).RData"))
+parrat_3 <- multi_colex_cl_lu_p_prior
+
+load(file.path("results", "AG_cl_lu_p_flock_horseshoe(df = 1, par_ratio = 99, df_global = 1, scale_slab = 2, df_slab = 4).RData"))
+parrat_99 <- multi_colex_cl_lu_p_prior
+
+
+# plot posteriors for coefficients:
+
+stan_pars <- rownames(fixef(parrat_01, summary = TRUE))
+
+for(p in 1:length(stan_pars)){
+  
+  print(p)
+  
+  fl_norm_prior_draws <- unlist(lapply(norm_prior$fit@sim$samples, "[", paste0("b_", stan_pars[p]))) # 4000
+  fl_parrat_001_draws <- unlist(lapply(parrat_001$fit@sim$samples, "[", paste0("b_", stan_pars[p]))) # 4000
+  fl_parrat_01_draws <- unlist(lapply(parrat_01$fit@sim$samples, "[", paste0("b_", stan_pars[p]))) # 4000
+  fl_parrat_02_draws <- unlist(lapply(parrat_02$fit@sim$samples, "[", paste0("b_", stan_pars[p]))) # 4000
+  fl_parrat_03_draws <- unlist(lapply(parrat_03$fit@sim$samples, "[", paste0("b_", stan_pars[p]))) # 4000
+  fl_parrat_1_draws <- unlist(lapply(parrat_1$fit@sim$samples, "[", paste0("b_", stan_pars[p]))) # 4000
+  fl_parrat_3_draws <- unlist(lapply(parrat_3$fit@sim$samples, "[", paste0("b_", stan_pars[p]))) # 4000
+  fl_parrat_99_draws <- unlist(lapply(parrat_99$fit@sim$samples, "[", paste0("b_", stan_pars[p]))) # 4000
+  
+  p_df <- tibble(par = stan_pars[p], 
+                 fl_norm_prior_draws,
+                 fl_parrat_001_draws,
+                 fl_parrat_01_draws, 
+                 fl_parrat_02_draws,
+                 fl_parrat_03_draws,
+                 fl_parrat_1_draws,
+                 fl_parrat_3_draws,
+                 fl_parrat_99_draws) 
+  
+  if(p == 1){
+    all_stan_p_df <- p_df
+  } else{
+    all_stan_p_df <- rbind(all_stan_p_df, p_df)
+  }
+}
+
+colors <- c("norm(0, 2)" = "grey", "par.rat 0.01" = "yellow2", "par.rat 0.1" = "orange", "par.rat 0.2" = "red", 
+            "par.rat 0.3" = "green", "par.rat 1" = "darkgreen", "par.rat 3" = "blue", 
+            "par.rat 99" = "darkviolet")
+
+# means:
+means <- all_stan_p_df %>% 
+  group_by(par) %>% 
+  summarise(mean = across(fl_norm_prior_draws:fl_parrat_99_draws, mean))
+
+for(i in 1:8){
+  
+  png(file=file.path("plots", "hs_explorations", paste0("par_ratio_", i, ".png")),
+      width=1200, height=900)
+  
+  p <- ggplot(data = all_stan_p_df) + 
+    geom_density(aes(x = fl_norm_prior_draws, colour = "norm(0, 2)")) +
+    geom_density(aes(x = fl_parrat_001_draws, colour = "par.rat 0.01")) +
+    geom_density(aes(x = fl_parrat_01_draws, colour = "par.rat 0.1")) +
+    geom_density(aes(x = fl_parrat_02_draws, colour = "par.rat 0.2")) +
+    geom_density(aes(x = fl_parrat_03_draws, colour = "par.rat 0.3")) +
+    geom_density(aes(x = fl_parrat_1_draws, colour = "par.rat 1")) +
+    geom_density(aes(x = fl_parrat_3_draws, colour = "par.rat 3")) +
+    geom_density(aes(x = fl_parrat_99_draws, colour = "par.rat 99")) +
+    ggforce::facet_wrap_paginate(facets = ~par, scales = "free", nrow = 3, ncol = 4, page = i) +
+    geom_vline(xintercept = 0) +
+    geom_vline(data = means, aes(xintercept = mean$fl_norm_prior_draws, colour = "norm(0, 2)"), linetype = "dashed") +
+    geom_vline(data = means, aes(xintercept = mean$fl_parrat_001_draws, colour = "par.rat 0.01"), linetype = "dashed") +
+    geom_vline(data = means, aes(xintercept = mean$fl_parrat_01_draws, colour = "par.rat 0.1"), linetype = "dashed") +
+    geom_vline(data = means, aes(xintercept = mean$fl_parrat_02_draws, colour = "par.rat 0.2"), linetype = "dashed") +
+    geom_vline(data = means, aes(xintercept = mean$fl_parrat_03_draws, colour = "par.rat 0.3"), linetype = "dashed") +
+    geom_vline(data = means, aes(xintercept = mean$fl_parrat_1_draws, colour = "par.rat 1"), linetype = "dashed") +
+    geom_vline(data = means, aes(xintercept = mean$fl_parrat_3_draws, colour = "par.rat 3"), linetype = "dashed") +
+    geom_vline(data = means, aes(xintercept = mean$fl_parrat_99_draws, colour = "par.rat 99"), linetype = "dashed") +
+    theme_bw() +
+    labs(x = "estimate",
+         y = "density",
+         color = "Legend") +
+    scale_color_manual(values = colors) +
+    theme(legend.position="bottom", text=element_text(size=21))
+  
+  print(p)
+  
+  dev.off()
+  
+}
+
+
+
+# parameter df_global:
+
+# load fitted models:
+load(file.path("results", "American_Goldfinch_cl_lu_p_Stan_prior_1000its.RData"))
+dfglob_1 <- multi_colex_cl_lu_p_prior
+
+load(file.path("results", "AG_cl_lu_p_flock_horseshoe(df = 1, par_ratio = 0.3, df_global = 0.1, scale_slab = 2, df_slab = 4).RData"))
+dfglob_01 <- multi_colex_cl_lu_p_prior
+
+load(file.path("results", "AG_cl_lu_p_flock_horseshoe(df = 1, par_ratio = 0.3, df_global = 0.5, scale_slab = 2, df_slab = 4).RData"))
+dfglob_05 <- multi_colex_cl_lu_p_prior
+
+load(file.path("results", "AG_cl_lu_p_flock_horseshoe(df = 1, par_ratio = 0.3, df_global = 2, scale_slab = 2, df_slab = 4).RData"))
+dfglob_2 <- multi_colex_cl_lu_p_prior
+
+load(file.path("results", "AG_cl_lu_p_flock_horseshoe(df = 1, par_ratio = 0.3, df_global = 5, scale_slab = 2, df_slab = 4).RData"))
+dfglob_5 <- multi_colex_cl_lu_p_prior
+
+# plot posteriors for coefficients:
+
+stan_pars <- rownames(fixef(dfglob_1, summary = TRUE))
+
+for(p in 1:length(stan_pars)){
+  
+  print(p)
+  
+  fl_norm_prior_draws <- unlist(lapply(norm_prior$fit@sim$samples, "[", paste0("b_", stan_pars[p]))) # 4000
+  fl_dfglob_01_draws <- unlist(lapply(dfglob_01$fit@sim$samples, "[", paste0("b_", stan_pars[p]))) # 4000
+  fl_dfglob_05_draws <- unlist(lapply(dfglob_05$fit@sim$samples, "[", paste0("b_", stan_pars[p]))) # 4000
+  fl_dfglob_1_draws <- unlist(lapply(dfglob_1$fit@sim$samples, "[", paste0("b_", stan_pars[p]))) # 4000
+  fl_dfglob_2_draws <- unlist(lapply(dfglob_2$fit@sim$samples, "[", paste0("b_", stan_pars[p]))) # 4000
+  fl_dfglob_5_draws <- unlist(lapply(dfglob_5$fit@sim$samples, "[", paste0("b_", stan_pars[p]))) # 4000
+
+  p_df <- tibble(par = stan_pars[p], 
+                 fl_norm_prior_draws,
+                 fl_dfglob_01_draws,
+                 fl_dfglob_05_draws,
+                 fl_dfglob_1_draws, 
+                 fl_dfglob_2_draws,
+                 fl_dfglob_5_draws) 
+  
+  if(p == 1){
+    all_stan_p_df <- p_df
+  } else{
+    all_stan_p_df <- rbind(all_stan_p_df, p_df)
+  }
+}
+
+# means:
+means <- all_stan_p_df %>% 
+  group_by(par) %>% 
+  summarise(mean = across(fl_norm_prior_draws:fl_dfglob_5_draws, mean))
+
+colors <- c("norm(0, 2)" = "grey", "df_glob 0.1" = "yellow2","df_glob 0.5" = "orange",
+            "df_glob 1" = "red", "df_glob 2" = "blue", "df_glob 5" = "darkgreen")
+
+for(i in 1:8){
+  
+  png(file=file.path("plots", "hs_explorations", paste0("df_global_", i, ".png")),
+      width=1200, height=900)
+  
+  p <- ggplot(data = all_stan_p_df) + 
+    geom_density(aes(x = fl_norm_prior_draws, colour = "norm(0, 2)")) +
+    geom_density(aes(x = fl_dfglob_01_draws, colour = "df_glob 0.1")) +
+    geom_density(aes(x = fl_dfglob_05_draws, colour = "df_glob 0.5")) +
+    geom_density(aes(x = fl_dfglob_1_draws, colour = "df_glob 1")) +
+    geom_density(aes(x = fl_dfglob_2_draws, colour = "df_glob 2")) +
+    geom_density(aes(x = fl_dfglob_5_draws, colour = "df_glob 5")) +
+    ggforce::facet_wrap_paginate(facets = ~par, scales = "free", nrow = 3, ncol = 4, page = i) +
+    geom_vline(xintercept = 0) +
+    geom_vline(data = means, aes(xintercept = mean$fl_norm_prior_draws, colour = "norm(0, 2)"), linetype = "dashed") +
+    geom_vline(data = means, aes(xintercept = mean$fl_dfglob_01_draws, colour = "df_glob 0.1"), linetype = "dashed") +
+    geom_vline(data = means, aes(xintercept = mean$fl_dfglob_05_draws, colour = "df_glob 0.5"), linetype = "dashed") +
+    geom_vline(data = means, aes(xintercept = mean$fl_dfglob_1_draws, colour = "df_glob 1"), linetype = "dashed") +
+    geom_vline(data = means, aes(xintercept = mean$fl_dfglob_2_draws, colour = "df_glob 2"), linetype = "dashed") +
+    geom_vline(data = means, aes(xintercept = mean$fl_dfglob_5_draws, colour = "df_glob 5"), linetype = "dashed") +
+    theme_bw() +
+    labs(x = "estimate",
+         y = "density",
+         color = "Legend") +
+    scale_color_manual(values = colors) +
+    theme(legend.position="bottom", text=element_text(size=21))
+  
+  print(p)
+  
+  dev.off()
+  
+}
+
+# parameter scale_slab:
+
+# load fitted models:
+load(file.path("results", "American_Goldfinch_cl_lu_p_Stan_prior_1000its.RData"))
+scaleslab_2 <- multi_colex_cl_lu_p_prior
+
+load(file.path("results", "AG_cl_lu_p_flock_horseshoe(df = 1, par_ratio = 0.3, df_global = 1, scale_slab = 0.5, df_slab = 4).RData"))
+scaleslab_05 <- multi_colex_cl_lu_p_prior
+
+load(file.path("results", "AG_cl_lu_p_flock_horseshoe(df = 1, par_ratio = 0.3, df_global = 1, scale_slab = 1, df_slab = 4).RData"))
+scaleslab_1 <- multi_colex_cl_lu_p_prior
+
+load(file.path("results", "AG_cl_lu_p_flock_horseshoe(df = 1, par_ratio = 0.3, df_global = 1, scale_slab = 3, df_slab = 4).RData"))
+scaleslab_3 <- multi_colex_cl_lu_p_prior
+
+
+# plot posteriors for coefficients:
+
+stan_pars <- rownames(fixef(dfglob_1, summary = TRUE))
+
+for(p in 1:length(stan_pars)){
+  
+  print(p)
+  
+  fl_norm_prior_draws <- unlist(lapply(norm_prior$fit@sim$samples, "[", paste0("b_", stan_pars[p]))) # 4000
+  fl_scaleslab_2_draws <- unlist(lapply(scaleslab_2$fit@sim$samples, "[", paste0("b_", stan_pars[p]))) # 4000
+  fl_scaleslab_05_draws <- unlist(lapply(scaleslab_05$fit@sim$samples, "[", paste0("b_", stan_pars[p]))) # 4000
+  fl_scaleslab_1_draws <- unlist(lapply(scaleslab_1$fit@sim$samples, "[", paste0("b_", stan_pars[p]))) # 4000
+  fl_scaleslab_3_draws <- unlist(lapply(scaleslab_3$fit@sim$samples, "[", paste0("b_", stan_pars[p]))) # 4000
+  
+  p_df <- tibble(par = stan_pars[p], 
+                 fl_norm_prior_draws,
+                 fl_scaleslab_2_draws, 
+                 fl_scaleslab_05_draws,
+                 fl_scaleslab_1_draws,
+                 fl_scaleslab_3_draws) 
+  
+  if(p == 1){
+    all_stan_p_df <- p_df
+  } else{
+    all_stan_p_df <- rbind(all_stan_p_df, p_df)
+  }
+}
+
+# means:
+means <- all_stan_p_df %>% 
+  group_by(par) %>% 
+  summarise(mean = across(fl_norm_prior_draws:fl_scaleslab_3_draws, mean))
+
+colors <- c("norm(0, 2)" = "grey", "scale_slab 0.5" = "orange", "scale_slab 1" = "red", 
+            "scale_slab 2" = "blue", "scale_slab 3" = "darkgreen")
+
+for(i in 1:8){
+  
+  png(file=file.path("plots", "hs_explorations", paste0("scale_slab_", i, ".png")),
+      width=1200, height=900)
+  
+  p <- ggplot(data = all_stan_p_df) + 
+    geom_density(aes(x = fl_norm_prior_draws, colour = "norm(0, 2)")) +
+    geom_density(aes(x = fl_scaleslab_2_draws, colour = "scale_slab 2")) +
+    geom_density(aes(x = fl_scaleslab_05_draws, colour = "scale_slab 0.5")) +
+    geom_density(aes(x = fl_scaleslab_1_draws, colour = "scale_slab 1")) +
+    geom_density(aes(x = fl_scaleslab_3_draws, colour = "scale_slab 3")) +
+    ggforce::facet_wrap_paginate(facets = ~par, scales = "free", nrow = 3, ncol = 4, page = i) +
+    geom_vline(xintercept = 0) +
+    geom_vline(data = means, aes(xintercept = mean$fl_norm_prior_draws, colour = "norm(0, 2)"), linetype = "dashed") +
+    geom_vline(data = means, aes(xintercept = mean$fl_scaleslab_2_draws, colour = "scale_slab 2"), linetype = "dashed") +
+    geom_vline(data = means, aes(xintercept = mean$fl_scaleslab_05_draws, colour = "scale_slab 0.5"), linetype = "dashed") +
+    geom_vline(data = means, aes(xintercept = mean$fl_scaleslab_1_draws, colour = "scale_slab 1"), linetype = "dashed") +
+    geom_vline(data = means, aes(xintercept = mean$fl_scaleslab_3_draws, colour = "scale_slab 3"), linetype = "dashed") +
+    theme_bw() +
+    labs(x = "estimate",
+         y = "density",
+         color = "Legend") +
+    scale_color_manual(values = colors) +
+    theme(legend.position="bottom", text=element_text(size=21))
+  
+  print(p)
+  
+  dev.off()
+
+}
+
+# parameter df_slab:
+
+# load fitted models:
+load(file.path("results", "American_Goldfinch_cl_lu_p_Stan_prior_1000its.RData"))
+dfslab_4 <- multi_colex_cl_lu_p_prior
+
+load(file.path("results", "AG_cl_lu_p_flock_horseshoe(df = 1, par_ratio = 0.3, df_global = 1, scale_slab = 2, df_slab = 2).RData"))
+dfslab_2 <- multi_colex_cl_lu_p_prior
+
+# plot posteriors for coefficients:
+
+stan_pars <- rownames(fixef(dfglob_1, summary = TRUE))
+
+for(p in 1:length(stan_pars)){
+  
+  print(p)
+  
+  fl_norm_prior_draws <- unlist(lapply(norm_prior$fit@sim$samples, "[", paste0("b_", stan_pars[p]))) # 4000
+  fl_dfslab_2_draws <- unlist(lapply(dfslab_2$fit@sim$samples, "[", paste0("b_", stan_pars[p]))) # 4000
+  fl_dfslab_4_draws <- unlist(lapply(dfslab_4$fit@sim$samples, "[", paste0("b_", stan_pars[p]))) # 4000
+
+  p_df <- tibble(par = stan_pars[p], 
+                 fl_norm_prior_draws,
+                 fl_dfslab_2_draws, 
+                 fl_dfslab_4_draws) 
+  
+  if(p == 1){
+    all_stan_p_df <- p_df
+  } else{
+    all_stan_p_df <- rbind(all_stan_p_df, p_df)
+  }
+}
+
+# means:
+means <- all_stan_p_df %>% 
+  group_by(par) %>% 
+  summarise(mean = across(fl_norm_prior_draws:fl_dfslab_4_draws, mean))
+
+colors <- c("norm(0, 2)" = "grey", "df_slab 2" = "blue", "df_slab 4" = "red")
+
+for(i in 1:8){
+  
+  png(file=file.path("plots", "hs_explorations", paste0("df_slab_", i, ".png")),
+      width=1200, height=900)
+
+  p <- ggplot(data = all_stan_p_df) + 
+    geom_density(aes(x = fl_norm_prior_draws, colour = "norm(0, 2)")) +
+    geom_density(aes(x = fl_dfslab_2_draws, colour = "df_slab 2")) +
+    geom_density(aes(x = fl_dfslab_4_draws, colour = "df_slab 4")) +
+    ggforce::facet_wrap_paginate(facets = ~par, scales = "free", nrow = 3, ncol = 4, page = i) +
+    geom_vline(xintercept = 0) +
+    geom_vline(data = means, aes(xintercept = mean$fl_norm_prior_draws, colour = "norm(0, 2)"), linetype = "dashed") +
+    geom_vline(data = means, aes(xintercept = mean$fl_dfslab_2_draws, colour = "df_slab 2"), linetype = "dashed") +
+    geom_vline(data = means, aes(xintercept = mean$fl_dfslab_4_draws, colour = "df_slab 4"), linetype = "dashed") +
+    theme_bw() +
+    labs(x = "estimate",
+         y = "density",
+         color = "Legend") +
+    scale_color_manual(values = colors) +
+    theme(legend.position="bottom", text=element_text(size=21))
+  
+  print(p)
+  
+  dev.off()
+
+}
+
+
+# parameter df:
+
+# load fitted models:
+load(file.path("results", "American_Goldfinch_cl_lu_p_Stan_prior_1000its.RData"))
+df_1 <- multi_colex_cl_lu_p_prior
+
+load(file.path("results", "AG_cl_lu_p_flock_horseshoe(df = 0.5, par_ratio = 0.3, df_global = 1, scale_slab = 2, df_slab = 4).RData"))
+df_05 <- multi_colex_cl_lu_p_prior
+
+load(file.path("results", "AG_cl_lu_p_flock_horseshoe(df = 2, par_ratio = 0.3, df_global = 1, scale_slab = 2, df_slab = 4).RData"))
+df_2 <- multi_colex_cl_lu_p_prior
+
+load(file.path("results", "AG_cl_lu_p_flock_horseshoe(df = 3, par_ratio = 0.3, df_global = 1, scale_slab = 2, df_slab = 4).RData"))
+df_3 <- multi_colex_cl_lu_p_prior
+
+# plot posteriors for coefficients:
+
+stan_pars <- rownames(fixef(df_1, summary = TRUE))
+
+for(p in 1:length(stan_pars)){
+  
+  print(p)
+  
+  fl_norm_prior_draws <- unlist(lapply(norm_prior$fit@sim$samples, "[", paste0("b_", stan_pars[p]))) # 4000
+  fl_df_1_draws <- unlist(lapply(df_1$fit@sim$samples, "[", paste0("b_", stan_pars[p]))) # 4000
+  fl_df_05_draws <- unlist(lapply(df_05$fit@sim$samples, "[", paste0("b_", stan_pars[p]))) # 4000
+  fl_df_2_draws <- unlist(lapply(df_2$fit@sim$samples, "[", paste0("b_", stan_pars[p]))) # 4000
+  fl_df_3_draws <- unlist(lapply(df_3$fit@sim$samples, "[", paste0("b_", stan_pars[p]))) # 4000
+  
+  p_df <- tibble(par = stan_pars[p], 
+                 fl_norm_prior_draws,
+                 fl_df_1_draws, 
+                 fl_df_05_draws,
+                 fl_df_2_draws,
+                 fl_df_3_draws) 
+  
+  if(p == 1){
+    all_stan_p_df <- p_df
+  } else{
+    all_stan_p_df <- rbind(all_stan_p_df, p_df)
+  }
+}
+
+# means:
+means <- all_stan_p_df %>% 
+  group_by(par) %>% 
+  summarise(mean = across(fl_norm_prior_draws:fl_df_3_draws, mean))
+
+colors <- c("norm(0, 2)" = "grey", "df 0.5" = "yellow2", "df 1" = "red",
+            "df 2" = "blue", "df 3" = "darkgreen")
+
+for(i in 1:8){
+  
+  png(file=file.path("plots", "hs_explorations", paste0("df_", i, ".png")),
+      width=1200, height=900)
+  
+  p <- ggplot(data = all_stan_p_df) + 
+    geom_density(aes(x = fl_norm_prior_draws, colour = "norm(0, 2)")) +
+    geom_density(aes(x = fl_df_05_draws, colour = "df 0.5")) +
+    geom_density(aes(x = fl_df_1_draws, colour = "df 1")) +
+    geom_density(aes(x = fl_df_2_draws, colour = "df 2")) +
+    geom_density(aes(x = fl_df_3_draws, colour = "df 3")) +
+    ggforce::facet_wrap_paginate(facets = ~par, scales = "free", nrow = 3, ncol = 4, page = 1) +
+    geom_vline(xintercept = 0) +
+    geom_vline(data = means, aes(xintercept = mean$fl_norm_prior_draws, colour = "norm(0, 2)"), linetype = "dashed") +
+    geom_vline(data = means, aes(xintercept = mean$fl_df_05_draws, colour = "df 0.5"), linetype = "dashed") +
+    geom_vline(data = means, aes(xintercept = mean$fl_df_1_draws, colour = "df 1"), linetype = "dashed") +
+    geom_vline(data = means, aes(xintercept = mean$fl_df_2_draws, colour = "df 2"), linetype = "dashed") +
+    geom_vline(data = means, aes(xintercept = mean$fl_df_3_draws, colour = "df 3"), linetype = "dashed") +
+    theme_bw() +
+    labs(x = "estimate",
+         y = "density",
+         color = "Legend") +
+    scale_color_manual(values = colors) +
+    theme(legend.position="bottom", text=element_text(size=21))
+  
+  print(p)
+  
+  dev.off()
+  
+}
+
+# check whether which variable is significant changes depending on parameter values:
+
+# models to compare:
+model_fits <- list(norm_prior, parrat_03, parrat_001, parrat_01, parrat_02, parrat_1, parrat_3, parrat_99, 
+                dfglob_1, dfglob_01, dfglob_05, dfglob_2, dfglob_5, 
+                scaleslab_2, scaleslab_05, scaleslab_1, scaleslab_3, 
+                dfslab_4, dfslab_2, 
+                df_1, df_05, df_2, df_3)
+names(model_fits) <- c("norm_prior", "parrat_03", "parrat_001", "parrat_01", "parrat_02", "parrat_1", "parrat_3", "parrat_99", 
+                      "dfglob_1", "dfglob_01", "dfglob_05", "dfglob_2", "dfglob_5", 
+                      "scaleslab_2", "scaleslab_05", "scaleslab_1", "scaleslab_3", 
+                      "dfslab_4", "dfslab_2", 
+                      "df_1", "df_05", "df_2", "df_3")
+
+get_sign_pars <- function(x){
+  
+  sign_pars_df <- as_tibble(fixef(model_fits[[1]], summary = TRUE), rownames = "par") %>% 
+    mutate(sign = if_else(Q2.5 * Q97.5 > 0, 1, 0)) %>% 
+    select(par, sign)
+}
+
+as.data.frame(lapply(model_fits, FUN = get_sign_pars)) %>% 
+  select(c(1, seq(2, ncol(.), by = 2))) %>% 
+  mutate(total = rowSums(across(where(is.numeric)))) %>% 
+  distinct(total)
+# all 23 models agree
+

@@ -1,6 +1,6 @@
 ---
 title: "DOMS_with_flocker"
-format:
+format: #pdf
   html:
     grid:
       body-width: 1100px
@@ -239,7 +239,7 @@ For now, I defined par_ratio instead of scale_global. I assumed that roughly 1/4
 #   backend = "cmdstanr",
 #   cores = 3,
 #   chains = 3
-# )# 11 of 3000 transitions divergent, 12000s = 3.3 hrs
+# )# 11 of 3000 transitions divergent, 12000s = 3
 # save(multi_colex_all_cl_prior, file = file.path("data", paste0(gsub(" ", "_", spec), "_cl4_quadr_Stan_prior.RData")))
 load(file = file.path("data", paste0(gsub(" ", "_", spec), "_cl4_quadr_Stan_prior.RData")))
 multi_colex_all_cl_prior
@@ -359,6 +359,20 @@ loo::pareto_k_ids(loo_mod) # 419, 422 = sites above threshold, highly influentia
 #save(loo_mod2, file = file.path("data", paste0(gsub(" ", "_", spec), "_cl_loo2_hs.RData")))
 load(file = file.path("data", paste0(gsub(" ", "_", spec), "_cl_loo2_hs.RData")))
 loo_mod2
+loo_mod2$estimates
+loo_mod2$pointwise 
+loo_mod2$diagnostics
+loo::pareto_k_table(loo_mod2)
+loo::pareto_k_ids(loo_mod2) # which observations have Pareto k estimates above threshold
+k1 <- loo::pareto_k_values(loo_mod2) # estimated Pareto k parameters, represent the reliability of sampling
+k2 <- loo::pareto_k_influence_values(loo_mod2) # estimated shape parameter k for each observation
+identical(k1, k2) # same
+loo::psis_n_eff_values(loo_mod2) # estimated PSIS effective sample sizes
+loo::mcse_loo(loo_mod2) # Monte Carlo standard error (MCSE) estimate for PSIS-LOO. MCSE will be NA if any Pareto k values are above threshold
+# plots:...
+#log_lik1 <- log_lik_flocker(multi_colex_all_cl_prior) # takes a while, rows = iterations, columns = series
+#save(log_lik1, file = file.path("data", paste0(gsub(" ", "_", spec), "_cl_loo2_loglik.RData")))
+loo::waic(log_lik1)
 ```
 
 What does this mean?
