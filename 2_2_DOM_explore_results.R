@@ -722,7 +722,7 @@ for(i in 1:8){
     geom_density(aes(x = fl_df_1_draws, colour = "df 1")) +
     geom_density(aes(x = fl_df_2_draws, colour = "df 2")) +
     geom_density(aes(x = fl_df_3_draws, colour = "df 3")) +
-    ggforce::facet_wrap_paginate(facets = ~par, scales = "free", nrow = 3, ncol = 4, page = 1) +
+    ggforce::facet_wrap_paginate(facets = ~par, scales = "free", nrow = 3, ncol = 4, page = i) +
     geom_vline(xintercept = 0) +
     geom_vline(data = means, aes(xintercept = mean$fl_norm_prior_draws, colour = "norm(0, 2)"), linetype = "dashed") +
     geom_vline(data = means, aes(xintercept = mean$fl_df_05_draws, colour = "df 0.5"), linetype = "dashed") +
@@ -769,3 +769,369 @@ as.data.frame(lapply(model_fits, FUN = get_sign_pars)) %>%
   distinct(total)
 # all 23 models agree
 
+# explore divergent transitions: ----
+
+# following Gabry et al. 2019:
+library(bayesplot)
+post <- brms::as_draws(dfglob_01) # df_1
+hmc_diagnostics <- nuts_params(dfglob_01) # df_1
+
+color_scheme_set("darkgray")
+div_style <- parcoord_style_np(div_color = "green", div_size = 0.15, div_alpha = 0.4)
+
+mcmc_parcoord(post, 
+              regex_pars = c("b_occ"),
+              np = hmc_diagnostics,
+              np_style = div_style)
+
+mcmc_parcoord(post, 
+              regex_pars = c("b_col"),
+              np = hmc_diagnostics,
+              np_style = div_style)
+
+mcmc_parcoord(post, 
+              regex_pars = c("b_ex"),
+              np = hmc_diagnostics,
+              np_style = div_style)
+
+mcmc_parcoord(post, 
+              regex_pars = c("b_route"),
+              np = hmc_diagnostics,
+              np_style = div_style)
+
+# according to Gabry 2019 this pattern of divergences may indicate that they are false positives
+
+div_style <- scatter_style_np(div_color = "green", div_size = 2.5, div_alpha = 0.75)
+mcmc_scatter(
+  post,
+  size = 1.5,
+  alpha = 2/3,
+  pars = c("b_occ_Ipr_spring_3yrsE2", "b_ex_Intercept"), 
+  np = hmc_diagnostics,
+  np_style = div_style
+  )
+
+
+## compare flocker normal priors vs. horsehoe priors: ----
+
+load(file.path("results", "AG_cl_lu_p_flock_logistic(0,1)_normal(0,1).RData"))
+log01_norm01 <- out
+load(file.path("results", "AG_cl_lu_p_flock_logistic(0,1)_normal(0,3).RData"))
+log01_norm03 <- out
+load(file.path("results", "AG_cl_lu_p_flock_logistic(0,2)_normal(0,2).RData"))
+log02_norm02 <- out
+load(file.path("results", "AG_cl_lu_p_flock_logistic(0,3)_normal(0,2).RData"))
+log03_norm02 <- out
+load(file.path("results", "AG_cl_lu_p_flock_logistic(0,2)_horseshoe(df = 3, par_ratio = 0.3, df_global = 1, scale_slab = 2, df_slab = 4).RData"))
+log02_hs3 <- out # 3 divergent transitions
+
+stan_pars <- rownames(fixef(log01_norm01, summary = TRUE))
+
+for(p in 1:length(stan_pars)){
+  
+  print(p)
+  
+  l01n01_draws <- unlist(lapply(log01_norm01$fit@sim$samples, "[", paste0("b_", stan_pars[p]))) # 4000
+  l01n03_draws <- unlist(lapply(log01_norm03$fit@sim$samples, "[", paste0("b_", stan_pars[p]))) # 4000
+  l02n02_draws <- unlist(lapply(log02_norm02$fit@sim$samples, "[", paste0("b_", stan_pars[p]))) # 4000
+  l03n02_draws <- unlist(lapply(log03_norm02$fit@sim$samples, "[", paste0("b_", stan_pars[p]))) # 4000
+  l02hs3_draws <- unlist(lapply(log02_hs3$fit@sim$samples, "[", paste0("b_", stan_pars[p]))) # 4000
+  
+  p_df <- tibble(par = stan_pars[p], 
+                 l01n01_draws, 
+                 l01n03_draws,
+                 l02n02_draws,
+                 l03n02_draws,
+                 l02hs3_draws) 
+  
+  if(p == 1){
+    all_stan_p_df <- p_df
+  } else{
+    all_stan_p_df <- rbind(all_stan_p_df, p_df)
+  }
+}
+
+colors <- c("logistic(0,1)_normal(0,1)" = "yellow2", 
+            "logistic(0,1)_normal(0,3)" = "orange",
+            "logistic(0,2)_normal(0,2)" = "red",
+            "logistic(0,3)_normal(0,2)" = "purple",
+            "logistic(0,2)_horseshoe(3)" = "blue"
+            )
+
+ggplot(data = all_stan_p_df) + 
+  geom_density(aes(x = l01n01_draws, colour = "logistic(0,1)_normal(0,1)")) +
+  geom_density(aes(x = l01n03_draws, colour = "logistic(0,1)_normal(0,3)")) +
+  geom_density(aes(x = l02n02_draws, colour = "logistic(0,2)_normal(0,2)")) +
+  geom_density(aes(x = l03n02_draws, colour = "logistic(0,3)_normal(0,2)")) +
+  geom_density(aes(x = l02hs3_draws, colour = "logistic(0,2)_horseshoe(3)")) +
+  ggforce::facet_wrap_paginate(facets = ~par, scales = "free", nrow = 3, ncol = 4, page = 8) +
+  geom_vline(xintercept = 0) +
+  theme_bw() +
+  labs(x = "estimate",
+       y = "density",
+       color = "Legend") +
+  scale_color_manual(values = colors) +
+  theme(legend.position="bottom")
+
+
+# compare prior and posterior distribution: ------------------------------------
+
+# "fit" model again using only prior (not data):
+
+
+# load data:
+load(file = file.path("data", "route_year_env_data.RData"))
+# scale covariates:
+route_sel_env_dt_scaled <- route_sel_env_dt_final %>% 
+  mutate(across(bio2:pr_winter_3yrs, ~ (scale(.)) %>% as.vector()))
+# route-year-species information (only surveyed)
+load(file = file.path("data", "BBS_for_occ_spec_records.RData")) # output of 1_0_reformat_BBS_data.R
+
+# assemble data:
+spec <- "American Goldfinch"
+nyears <- length(unique(route_sel_env_dt_final$Year)) # 25
+nsurveys <- 5
+nsites <- length(unique(route_sel_env_dt_final$RTENO)) # 476
+
+# species presences:
+presences_spec <- bbs_dt_occ %>% 
+  select(c(English_Common_Name, RTENO, Year, paste0("Count", seq(10, 50, 10)))) %>% 
+  filter(English_Common_Name == spec)
+
+# match to routes-year-env:
+occ_dt_spec <- route_sel_env_dt_scaled %>% 
+  # add observations:
+  collapse::join(presences_spec, on = c("RTENO", "Year"), how = "left") %>% 
+  # if route was surveyed but species not observed, replace NA with 0:
+  mutate(across(Count10:Count50, ~ 
+                  case_when(Surveyed == 1 & is.na(.) ~ 0,
+                            .default = .))) %>%
+  # convert bird counts to presence / absence:
+  mutate(across(Count10:Count50, ~ 
+                  case_when(. > 1 ~ 1,
+                            .default = .)))
+
+# reformat obs. as array sites x surveys x years (same as for JAGS):
+years <- seq(min(occ_dt_spec$Year), max(occ_dt_spec$Year))
+y_array <- array(NA, dim = c(nsites, nsurveys, nyears))
+for (t in 1:nyears){
+  y_array[1:nsites, 1:nsurveys, t] <- as.matrix(occ_dt_spec[which(occ_dt_spec$Year == years[t]), c(paste0("Count", seq(10, 50, 10)))])
+}
+
+# reformat environmental covariates:
+route_sel_env_dt_scaled
+env_cov <- vector("list", length = nyears)
+for (t in 1:nyears){
+  env_cov[[t]] <- route_sel_env_dt_scaled[which(route_sel_env_dt_scaled$Year == years[t]), 
+                                          c("bio1", "bio2", "bio3", "pr_spring", "pr_summer","pr_autumn", 
+                                            "pr_winter", "bio15","bio1_3yrs", "bio2_3yrs", "bio3_3yrs", 
+                                            "pr_spring_3yrs", "pr_summer_3yrs", "pr_autumn_3yrs", "pr_winter_3yrs", 
+                                            "bio15_3yrs",
+                                            "sum_annual_crops", "secdn","pastr", "urban", "primn",
+                                            "sum_annual_crops_3yrs", "secdn_3yrs", "pastr_3yrs", "urban_3yrs", "primn_3yrs")]
+}
+
+# covariate for detection probability:
+det_cov <- vector("list", length = 1)
+names(det_cov) <- "route_section"
+det_cov$route_section <- array(NA, dim = c(nsites, nsurveys, nyears))
+det_cov$route_section[ , , 1:nyears] <- matrix(rep(c("Sect1", "Sect2", "Sect3", "Sect4", "Sect5"), nsites), nsites, byrow = TRUE)
+
+# make flocker data:
+fd <- make_flocker_data_dynamic(
+  obs = y_array,
+  unit_covs = env_cov, 
+  event_covs = det_cov, 
+  quiet = FALSE
+)
+
+# fit model with prior only:
+out_prior <- flock(
+  f_occ = ~ bio1_3yrs + bio2_3yrs + bio3_3yrs + pr_spring_3yrs + pr_summer_3yrs + pr_autumn_3yrs + 
+    pr_winter_3yrs + bio15_3yrs + I(bio1_3yrs^2) + I(bio2_3yrs^2) + I(bio3_3yrs^2) + 
+    I(pr_spring_3yrs^2) + I(pr_summer_3yrs^2) + I(pr_autumn_3yrs^2) + I(pr_winter_3yrs^2) + I(bio15_3yrs^2) +
+    sum_annual_crops_3yrs + secdn_3yrs + pastr_3yrs + urban_3yrs + primn_3yrs +
+    I(sum_annual_crops_3yrs^2) + I(secdn_3yrs^2) + I(pastr_3yrs^2) + I(urban_3yrs^2) + I(primn_3yrs^2),
+  f_det = ~ route_section,
+  f_col = ~ bio1 + bio2 + bio3 + pr_spring + pr_summer + pr_autumn + pr_winter + bio15 +
+    I(bio1^2) + I(bio2^2) + I(bio3^2) + I(pr_spring^2) + I(pr_summer^2) + I(pr_autumn^2) + 
+    I(pr_winter^2) + I(bio15^2) + sum_annual_crops + secdn + pastr + urban + primn +
+    I(sum_annual_crops^2) + I(secdn^2) + I(pastr^2) + I(urban^2) + I(primn^2),
+  f_ex = ~ bio1 + bio2 + bio3 + pr_spring + pr_summer + pr_autumn + pr_winter + bio15 +
+    I(bio1^2) + I(bio2^2) + I(bio3^2) + I(pr_spring^2) + I(pr_summer^2) + I(pr_autumn^2) + 
+    I(pr_winter^2) + I(bio15^2) + sum_annual_crops + secdn + pastr + urban + primn +
+    I(sum_annual_crops^2) + I(secdn^2) + I(pastr^2) + I(urban^2) + I(primn^2),
+  flocker_data = fd,
+  prior = c(brms::set_prior("logistic(0,3)", class = "Intercept") + 
+              brms::set_prior("logistic(0,3)", class = "Intercept", dpar = "occ"),
+            brms::set_prior("logistic(0,3)", class = "Intercept", dpar = "colo"),
+            brms::set_prior("logistic(0,3)", class = "Intercept", dpar = "ex"),
+            brms::set_prior("normal(0,2)", class = "b"),
+            brms::set_prior("normal(0,2)", dpar = "occ", class = "b"),
+            brms::set_prior("normal(0,2)", dpar = "colo", class = "b"),
+            brms::set_prior("normal(0,2)", dpar = "ex", class = "b")),
+  multiseason = "colex",
+  multi_init = "explicit",
+  backend = "cmdstanr",
+  cores = 4,
+  chains = 4,
+  warmup = 250,
+  iter = 250 + 1000,
+  sample_prior = "only"
+)
+out_prior
+
+# load model fitted with data:
+
+load(file.path("results", "AG_cl_lu_p_flock_logistic(0,3)_normal(0,2).RData"))
+log03_norm02 <- out
+
+# compare prior and posterior distributions:
+
+stan_pars <- rownames(fixef(out_prior, summary = TRUE))
+
+for(p in 1:length(stan_pars)){
+  
+  print(p)
+  
+  posterior_draws <- unlist(lapply(log03_norm02$fit@sim$samples, "[", paste0("b_", stan_pars[p]))) # 4000
+  prior_draws <- unlist(lapply(out_prior$fit@sim$samples, "[", paste0("b_", stan_pars[p]))) # 4000
+
+  p_df <- tibble(par = stan_pars[p], 
+                 posterior_draws, 
+                 prior_draws) 
+  
+  if(p == 1){
+    all_stan_p_df <- p_df
+  } else{
+    all_stan_p_df <- rbind(all_stan_p_df, p_df)
+  }
+}
+all_stan_p_df
+
+colors <- c("prior" = "cornflowerblue", 
+            "posterior" = "red3")
+
+
+
+
+for(i in 1:8){
+  
+  png(file=file.path("plots", "prior_post_comparison", paste0("logistic(0,3)_normal(0,2)_", i, ".png")),
+      width=1200, height=900)
+  
+  p <- ggplot(data = all_stan_p_df) + 
+    geom_density(aes(x = prior_draws, fill = "prior"), alpha = 0.6, colour = "transparent") +
+    geom_density(aes(x = posterior_draws, fill = "posterior"), alpha = 0.6, colour = "transparent") +
+    ggforce::facet_wrap_paginate(facets = ~par, scales = "free", nrow = 3, ncol = 4, page = i) +
+    geom_vline(xintercept = 0) +
+    theme_bw() +
+    labs(x = "estimate",
+         y = "density",
+         color = "Legend") +
+    scale_fill_manual(values = colors) +
+    theme(legend.position="bottom") +
+    theme(legend.position="bottom", text=element_text(size=21))
+  
+  print(p)
+  
+  dev.off()
+  
+}
+
+## same for horseshoe prior: ----
+
+# fit model with prior only:
+out_prior_hs <- flock(
+  f_occ = ~ bio1_3yrs + bio2_3yrs + bio3_3yrs + pr_spring_3yrs + pr_summer_3yrs + pr_autumn_3yrs + 
+    pr_winter_3yrs + bio15_3yrs + I(bio1_3yrs^2) + I(bio2_3yrs^2) + I(bio3_3yrs^2) + 
+    I(pr_spring_3yrs^2) + I(pr_summer_3yrs^2) + I(pr_autumn_3yrs^2) + I(pr_winter_3yrs^2) + I(bio15_3yrs^2) +
+    sum_annual_crops_3yrs + secdn_3yrs + pastr_3yrs + urban_3yrs + primn_3yrs +
+    I(sum_annual_crops_3yrs^2) + I(secdn_3yrs^2) + I(pastr_3yrs^2) + I(urban_3yrs^2) + I(primn_3yrs^2),
+  f_det = ~ route_section,
+  f_col = ~ bio1 + bio2 + bio3 + pr_spring + pr_summer + pr_autumn + pr_winter + bio15 +
+    I(bio1^2) + I(bio2^2) + I(bio3^2) + I(pr_spring^2) + I(pr_summer^2) + I(pr_autumn^2) + 
+    I(pr_winter^2) + I(bio15^2) + sum_annual_crops + secdn + pastr + urban + primn +
+    I(sum_annual_crops^2) + I(secdn^2) + I(pastr^2) + I(urban^2) + I(primn^2),
+  f_ex = ~ bio1 + bio2 + bio3 + pr_spring + pr_summer + pr_autumn + pr_winter + bio15 +
+    I(bio1^2) + I(bio2^2) + I(bio3^2) + I(pr_spring^2) + I(pr_summer^2) + I(pr_autumn^2) + 
+    I(pr_winter^2) + I(bio15^2) + sum_annual_crops + secdn + pastr + urban + primn +
+    I(sum_annual_crops^2) + I(secdn^2) + I(pastr^2) + I(urban^2) + I(primn^2),
+  flocker_data = fd,
+  prior = c(brms::set_prior("logistic(0,2)", class = "Intercept") + 
+              brms::set_prior("logistic(0,2)", class = "Intercept", dpar = "occ"),
+            brms::set_prior("logistic(0,2)", class = "Intercept", dpar = "colo"),
+            brms::set_prior("logistic(0,2)", class = "Intercept", dpar = "ex"),
+            brms::set_prior("horseshoe(df = 3, par_ratio = 0.3, df_global = 1, scale_slab = 2, df_slab = 4)", class = "b"),
+            brms::set_prior("horseshoe(df = 3, par_ratio = 0.3, df_global = 1, scale_slab = 2, df_slab = 4)", dpar = "occ", class = "b"),
+            brms::set_prior("horseshoe(df = 3, par_ratio = 0.3, df_global = 1, scale_slab = 2, df_slab = 4)", dpar = "colo", class = "b"),
+            brms::set_prior("horseshoe(df = 3, par_ratio = 0.3, df_global = 1, scale_slab = 2, df_slab = 4)", dpar = "ex", class = "b")),
+  multiseason = "colex",
+  multi_init = "explicit",
+  backend = "cmdstanr",
+  cores = 4,
+  chains = 4,
+  warmup = 250,
+  iter = 250 + 1000,
+  sample_prior = "only"
+)
+out_prior_hs
+
+# load model fitted with data:
+
+load(file.path("results", "AG_cl_lu_p_flock_logistic(0,2)_horseshoe(df = 3, par_ratio = 0.3, df_global = 1, scale_slab = 2, df_slab = 4).RData"))
+log02_hs3 <- out
+
+# compare prior and posterior distributions:
+
+stan_pars <- rownames(fixef(out_prior_hs, summary = TRUE))
+
+for(p in 1:length(stan_pars)){
+  
+  print(p)
+  
+  posterior_draws <- unlist(lapply(log02_hs3$fit@sim$samples, "[", paste0("b_", stan_pars[p]))) # 4000
+  prior_draws <- unlist(lapply(out_prior_hs$fit@sim$samples, "[", paste0("b_", stan_pars[p]))) # 4000
+  
+  p_df <- tibble(par = stan_pars[p], 
+                 posterior_draws, 
+                 prior_draws) 
+  
+  if(p == 1){
+    all_stan_p_df <- p_df
+  } else{
+    all_stan_p_df <- rbind(all_stan_p_df, p_df)
+  }
+}
+all_stan_p_df
+
+colors <- c("prior" = "cornflowerblue", 
+            "posterior" = "red3")
+
+
+
+
+for(i in 1:8){
+  
+  png(file=file.path("plots", "prior_post_comparison", paste0("logistic(0,2)_hs(3)", i, ".png")),
+      width=1200, height=900)
+  
+  p <- ggplot(data = all_stan_p_df) + 
+    geom_density(aes(x = prior_draws, fill = "prior"), alpha = 0.6, colour = "transparent") +
+    geom_density(aes(x = posterior_draws, fill = "posterior"), alpha = 0.6, colour = "transparent") +
+    ggforce::facet_wrap_paginate(facets = ~par, scales = "free", nrow = 3, ncol = 4, page = i) +
+    geom_vline(xintercept = 0) +
+    theme_bw() +
+    labs(x = "estimate",
+         y = "density",
+         color = "Legend") +
+    scale_fill_manual(values = colors) +
+    theme(legend.position="bottom") +
+    theme(legend.position="bottom", text=element_text(size=21)) +
+    ylim(c(0, 10))
+  
+  print(p)
+  
+  dev.off()
+  
+}
