@@ -1,6 +1,6 @@
-# Fit occupancy models including goodness-of-fit measure as following Kéry and Royle 2021 AHM:
+# Fit occupancy models including goodness-of-fit measure following Kéry and Royle 2021 AHM:
 
-# quadratic effects of bioclim covariates: bio1, bio2, bio3, bio12, bio15,  lasso prior, p intercept only
+# quadratic effects of bioclim covariates: bio1, bio2, bio3, spring, summer, autumn, winter prec., bio15;lasso prior, p intercept only
 
 # packages: ----
 
@@ -296,25 +296,17 @@ nsites <- length(unique(route_sel_env_dt_final$RTENO)) # 476
 
 # check whether species has already run: xx
 
-testspecs <- c("American Goldfinch",
-               "Black-capped Chickadee", 
-               "Eastern Phoebe",
-               "Yellow Warbler",
-               "Eastern Kingbird",
-               "American Robin",
-               "Black-billed Cuckoo",
-               "House Finch",
-               "Warbling Vireo")
+testspecs <- c("Black-billed Cuckoo")
 
 # register cores for parallel computation:
-ncores <- 27 # n species * 3 chains? 
+ncores <- 3 # n species * 3 chains? 
 cl <- makeCluster(ncores, setup_timeout = 0.5)
 registerDoParallel(cl)
 
 
 foreach(spec = testspecs,
         .packages = c("dplyr", "collapse", "jagsUI"),
-        .errorhandling = "remove",
+        .errorhandling = "pass", #"remove",
         .verbose = TRUE) %dopar% {
           
           
@@ -415,9 +407,12 @@ foreach(spec = testspecs,
                                        max = min(1, mean(raw_ext)+2*sd(raw_ext))),
                  gamma_intercept = runif(n = 1,min = max(0, mean(raw_col)-2*sd(raw_col)), 
                                          max = min(1, mean(raw_col)+2*sd(raw_col))),
-                 p_intercept = runif(n = 1, 
-                                     min = max(0, mean(raw_p)-2*sd(raw_p)), 
-                                     max = min(1, mean(raw_p)+2*sd(raw_p)))
+                 p = runif(n = 1,
+                           min = max(0, mean(raw_p)-2*sd(raw_p)), 
+                           max = min(1, mean(raw_p)+2*sd(raw_p))),
+                 beta_psi = runif(n = 16, min = -0.2, max = 0.2),
+                 beta_eps = runif(n = 16, min = -0.2, max = 0.2),
+                 beta_gamma = runif(n = 16, min = -0.2, max = 0.2)
             )  
           }
           
@@ -442,13 +437,15 @@ foreach(spec = testspecs,
                           model.file = model_file,
                           #n.adapt = 1000, # default is NULL, which will result in the function running groups of 100 adaptation iterations (to a max of 10,000) until JAGS reports adaptation is sufficient
                           n.chains = 3, 
-                          n.thin = 2, 
-                          iter.increment = 1000, 
-                          n.burnin = 500,
+                          n.thin = 50, 
+                          save.all.iter = TRUE,
+                          store.data = TRUE,
+                          iter.increment = 2000, 
+                          n.burnin = 1000,
                           parallel = TRUE,
                           n.cores = 3,
                           Rhat.limit = 1.1,
-                          max.iter = 40000) # Rushing: 50000, Mingjian: 20000
+                          max.iter = 60000) # Rushing: 50000, Mingjian: 20000
           
           save(out, file = file.path(dir, "data", paste0(gsub(" ", "_", spec), "_cl_alt4_quadr_lasso_GoF_inits.RData")))
           

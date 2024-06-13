@@ -11,8 +11,11 @@ library(brms)
 
 # load fitted model(s):
 
-load(file.path("results", "American_Goldfinch_cl_alt4_lu_quadr_p_sect_lasso_GoF_inits_less_pars.RData"))
+# load(file.path("results", "American_Goldfinch_cl_alt4_lu_quadr_p_sect_lasso_GoF_inits_less_pars.RData"))
+# out
+load(file.path("results", "American_Goldfinch_cl_alt4_quadr_lasso_GoF_inits.RData"))
 out
+
 
 # general explorations: ------
 
@@ -52,6 +55,7 @@ pars_conv_issue <- function(jags_output){
   return(par_names_no_conv)
 }
 
+pars_conv_issue(jags_output = out)
 
 # routes with JAGS mixing issues:
 
@@ -73,7 +77,7 @@ sites_conv_issue <- function(jags_output){
   return(RTENOs_no_conv)
 }
 
-RTENOs_no_conv <- sites_conv_issue(jags_output)
+RTENOs_no_conv <- sites_conv_issue(jags_output = out)
   
 # load routes:
 routes_sel_sf <- sf::st_read(file.path("data", "route_selection_1991_2015_surv_beg_end_max_5y_miss_v2_spat_thin_100km_max_30_r_per_BCR_centroids.shp")) # output of 1_1_route_selection.R
@@ -979,7 +983,6 @@ out_prior <- flock(
   iter = 250 + 1000,
   sample_prior = "only"
 )
-out_prior
 
 # load model fitted with data:
 
