@@ -23,6 +23,7 @@ load(file = file.path("data", "BBS_for_occ_spec_records.RData")) # output of 1_0
 # merged route, year, environment data:
 load(file = file.path("data", "route_year_env_data.RData"))
 
+
 # plot routes on which species was detected at least once or never: ------------
 
 plot_list <- vector(mode = "list", length = length(species_selection_final))
@@ -121,7 +122,8 @@ hist(route_sel_env_dt_final$c4per)
 hist(route_sel_env_dt_final$c3per)
 
 length(unique(route_sel_env_dt_final$primf))
-
+load(file = file.path("data", "selected_variables_seasonal.RData"))
+selvar_seasonal
 # compare values for species presences and absences:
 spec <- "American Goldfinch"
 

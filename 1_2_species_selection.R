@@ -107,10 +107,10 @@ setdiff(seabirdsET_BBS, excl_orders) # all pelagic specialists are water-related
 
 # at how many different routes is each species detected from 1991-2015:
 
-n_routes_pres <- bbs_dt_occ_sel %>% 
+n_routes_pres <- bbs_dt_occ_sel %>% # presences only
   #filter(!English_Common_Name %in% excl_orders) %>% 
   select(English_Common_Name, Family, Scientific_Name, ORDER, RTENO) %>%
-  distinct %>% 
+  distinct %>% # one row per species ever recorded on a route
   group_by(English_Common_Name,  Family, Scientific_Name, ORDER) %>% 
   summarise(n_routes = n())
 
@@ -141,12 +141,15 @@ N_species_routes <- n_routes_pres %>%
   mutate(spec_with_more = length(unique(bbs_dt_occ_sel$English_Common_Name)) - spec_with_equal_or_less)
 N_species_routes
 
-# exclude species that are detected at less than 50 (40) different routes across the whole time period:
+# exclude very rare and very common species:
+# exclude species that are detected at less than 50 different routes across the whole time period
+# and species that have less than 50 routes where they were never detected:
 
 excl_data_av <- n_routes_pres %>% 
-  filter(n_routes < 50) %>%
+  filter(n_routes < 50 | n_routes > (476-50)) %>%
   pull(English_Common_Name)
-sort(excl_data_av) # 280
+sort(excl_data_av) # 291
+
 
 ## final species selection: ----
 
@@ -154,13 +157,13 @@ species_selection_final <- bbs_dt_occ_sel %>%
   filter(!English_Common_Name %in% excl_orders) %>% # exclude nocturnal and water-related species (136)
   filter(!English_Common_Name %in% excl_data_av) %>% # 280 in total, 188 that are neither nocturnal nor water-related
   pull(English_Common_Name) %>% 
-  unique
-sort(species_selection_final)
-length(species_selection_final) # 184
+  unique %>% 
+  sort
+
+length(species_selection_final) # 174
 
 # save:
 save(species_selection_final, file = file.path("data", "final_species_selection.RData"))
-
 
 # plots to explore data availability for different species groups: -------------
 
@@ -172,6 +175,7 @@ jpeg(file = file.path("plots", "spec_sel", "excl_total_routes.jpg"),
 n_routes_pres %>% 
   mutate(exclude = ifelse(!English_Common_Name %in% excl_orders, 0, 1)) %>% 
   mutate(exclude = ifelse(n_routes < 50, 2, exclude)) %>% 
+  mutate(exclude = ifelse(n_routes > (476-50), 2, exclude)) %>% 
   mutate(exclude = factor(exclude, levels = c(0, 1, 2))) %>% 
   ggplot(aes(x = reorder(English_Common_Name, n_routes, mean, decreasing = TRUE), y = n_routes, colour = exclude)) +
   geom_linerange(aes(ymin = 0, ymax = n_routes, colour = exclude), 

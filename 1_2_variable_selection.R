@@ -27,9 +27,18 @@ library(factoextra) # for PCA related plots
 
 # mask:
 
-mask <- rast(file.path("data", "Env_data", "ISIMIP_CHELSA-W5E5v1.0", "monthly_albers_proj", "pr_199001_ESRI102003.tif"))
-values(mask)[!is.na(values(mask))] <- 1
-plot(mask)
+# outline conterminous US:
+# library(spData)
+# if (requireNamespace("sf", quietly = TRUE)) {
+#   data(us_states)
+# }
+# US_albers_sf <- us_states %>% 
+#   st_union() %>% 
+#   st_transform(crs = "ESRI:102003")
+# # save as shp:
+# write_sf(US_albers_sf, file.path("data", "US_outline_ESRI102003.shp"))
+US_albers_sf <- read_sf(file.path("data", "US_outline_ESRI102003.shp"))
+
 
 # load bioclimatic and land use rasters:
 
@@ -49,11 +58,13 @@ for(i in 1:length(years)){
   
   # bioclims:
   bioclim_year_files <- bioclim_files[which(grepl(paste0("bio.{1,2}_", years[i], ".tif"), bioclim_files))]
-  bioclim_year_rast <- rast(bioclim_year_files) %>% terra::mask(mask)
+  bioclim_year_rast <- rast(bioclim_year_files) %>% 
+    terra::mask(US_albers_sf)
   bioclim_lst[[i]] <- values(bioclim_year_rast, dataframe = TRUE) # each row = one cell
   
   # land use:
-  lu_year_rast <- rast(lu_files[which(grepl(paste0(years[i], "_ESRI102003_ave.tif$"), lu_files))]) %>% terra::mask(mask)
+  lu_year_rast <- rast(lu_files[which(grepl(paste0(years[i], "_ESRI102003_ave.tif$"), lu_files))]) %>% 
+    terra::mask(US_albers_sf)
   landuse_lst[[i]] <- values(lu_year_rast, dataframe = TRUE) 
 }
 
@@ -289,13 +300,14 @@ for(i in 1:length(years)){
   print(years[i])
   
   # seasonal clims:
-  sclim_year_files <- sclim_files[which(grepl(paste0(years[i], ".tif"), sclim_files))]
-  sclim_year_rast <- rast(sclim_year_files) %>% terra::mask(mask)
+  sclim_year_files <- sclim_files[which(grepl(paste0("(spring|summer|autumn|winter)", "_", years[i], ".tif"), sclim_files))]
+  sclim_year_rast <- rast(sclim_year_files) %>% 
+    terra::mask(US_albers_sf)
   sclim_lst[[i]] <- values(sclim_year_rast, dataframe = TRUE) # each row = one cell
   
 }
 
-sclim_dt <- bind_rows(sclim_lst)
+sclim_dt <- dplyr::bind_rows(sclim_lst)
 
 # which variables to inspect:
 # all bioclims except bio8, 9, 18, 19
@@ -353,7 +365,7 @@ save(selvar_seasonal, file = file.path("data", "selected_variables_seasonal.RDat
 
 M <- cor(bioclim_lu_sclim_dt_cc_ss, method = "s")
 
-corrplot(M, method = "square", order = "hclust",
+corrplot::corrplot(M, method = "square", order = "hclust",
          addCoef.col = "black",
          diag = FALSE,
          tl.cex = 0.6,#1

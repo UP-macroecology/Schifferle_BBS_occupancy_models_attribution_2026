@@ -24,16 +24,7 @@ selvar_seasonal2 <- unique(c(selvar_seasonal, selvar)) # xx
 selvar <- selvar_seasonal2
 
 # outline conterminous US:
-# library(spData)
-# if (requireNamespace("sf", quietly = TRUE)) {
-#   data(us_states)
-# }
-# US_albers_sf <- us_states %>% 
-#   st_union() %>% 
-#   st_transform(crs = "ESRI:102003")
-# # save as shp:
-# write_sf(US_albers_sf, file.path("data", "US_outline_ESRI102003.shp"))
-US_albers_sf <- read_sf(file.path("data", "US_outline_ESRI102003.shp"))
+US_albers_sf <- read_sf(file.path("data", "US_outline_ESRI102003.shp")) # output of 1_2_variable_selection.R
 
 # env. data files:
 bioclim_files <- list.files(file.path("data", "Env_data", "ISIMIP_CHELSA-W5E5v1.0", "bioclim"), full.names = TRUE)
