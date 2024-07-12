@@ -151,12 +151,12 @@ for(i in 1:length(spec_blocks_list)){
             env_cov <- vector("list", length = nyears)
             for (t in 1:nyears){
               env_cov[[t]] <- route_sel_env_dt_scaled[which(route_sel_env_dt_scaled$Year == years[t] & occ_dt_spec$RTENO %in% routes_within$RTENO_BBS), 
-                                                      c("bio1", "bio2", "bio3", "pr_spring", "pr_summer","pr_autumn", 
-                                                        "pr_winter", "bio15","bio1_3yrs", "bio2_3yrs", "bio3_3yrs", 
+                                                      c("bio1", "bio2", "bio3", "bio7", "bio14", "bio15", 
+                                                        "pr_spring", "pr_summer","pr_autumn", "pr_winter",
+                                                        "bio1_3yrs", "bio2_3yrs", "bio3_3yrs", "bio7_3yrs", "bio14_3yrs", "bio15_3yrs",
                                                         "pr_spring_3yrs", "pr_summer_3yrs", "pr_autumn_3yrs", "pr_winter_3yrs", 
-                                                        "bio15_3yrs",
-                                                        "sum_annual_crops", "secdn","pastr", "urban", "primn",
-                                                        "sum_annual_crops_3yrs", "secdn_3yrs", "pastr_3yrs", "urban_3yrs", "primn_3yrs")]
+                                                        "sum_annual_crops", "secdf","pastr", "urban",
+                                                        "sum_annual_crops_3yrs", "secdf_3yrs", "pastr_3yrs", "urban_3yrs")]
             }
             
             # covariate for detection probability:
@@ -171,6 +171,11 @@ for(i in 1:length(spec_blocks_list)){
             
             round <- 1
             
+            sink(paste0("out_fl_fm_buffer750_", spec, "_round_", round, ".txt")) # write console output here
+            sink(type = "message")
+            
+            print(spec)
+            
             print(paste("iteration round", round))
             
             # make flocker data:
@@ -184,28 +189,28 @@ for(i in 1:length(spec_blocks_list)){
             
             # fit model: 
             
-            sink(paste0("out_fl_fm_buffer750_", spec, "_round_", round, ".txt")) # write console output here
-            sink(type = "message")
-            
-            print(spec)
-            
             start.time <- Sys.time()
             
             out <- flock(
-              f_occ = ~ bio1_3yrs + bio2_3yrs + bio3_3yrs + pr_spring_3yrs + pr_summer_3yrs + pr_autumn_3yrs + 
-                pr_winter_3yrs + bio15_3yrs + I(bio1_3yrs^2) + I(bio2_3yrs^2) + I(bio3_3yrs^2) + 
-                I(pr_spring_3yrs^2) + I(pr_summer_3yrs^2) + I(pr_autumn_3yrs^2) + I(pr_winter_3yrs^2) + I(bio15_3yrs^2) +
-                sum_annual_crops_3yrs + secdn_3yrs + pastr_3yrs + urban_3yrs + primn_3yrs +
-                I(sum_annual_crops_3yrs^2) + I(secdn_3yrs^2) + I(pastr_3yrs^2) + I(urban_3yrs^2) + I(primn_3yrs^2),
+              f_occ = ~ bio1_3yrs + bio2_3yrs + bio3_3yrs + bio7_3yrs + bio14_3yrs + bio15_3yrs +
+                pr_spring_3yrs + pr_summer_3yrs + pr_autumn_3yrs + pr_winter_3yrs  + 
+                I(bio1_3yrs^2) + I(bio2_3yrs^2) + I(bio3_3yrs^2) + I(bio7_3yrs^2) + I(bio14_3yrs^2) + I(bio15_3yrs^2) + 
+                I(pr_spring_3yrs^2) + I(pr_summer_3yrs^2) + I(pr_autumn_3yrs^2) + I(pr_winter_3yrs^2)  +
+                sum_annual_crops_3yrs + secdf_3yrs + pastr_3yrs + urban_3yrs +
+                I(sum_annual_crops_3yrs^2) + I(secdf_3yrs^2) + I(pastr_3yrs^2) + I(urban_3yrs^2),
               f_det = ~ route_section,
-              f_col = ~ bio1 + bio2 + bio3 + pr_spring + pr_summer + pr_autumn + pr_winter + bio15 +
-                I(bio1^2) + I(bio2^2) + I(bio3^2) + I(pr_spring^2) + I(pr_summer^2) + I(pr_autumn^2) + 
-                I(pr_winter^2) + I(bio15^2) + sum_annual_crops + secdn + pastr + urban + primn +
-                I(sum_annual_crops^2) + I(secdn^2) + I(pastr^2) + I(urban^2) + I(primn^2),
-              f_ex = ~ bio1 + bio2 + bio3 + pr_spring + pr_summer + pr_autumn + pr_winter + bio15 +
-                I(bio1^2) + I(bio2^2) + I(bio3^2) + I(pr_spring^2) + I(pr_summer^2) + I(pr_autumn^2) + 
-                I(pr_winter^2) + I(bio15^2) + sum_annual_crops + secdn + pastr + urban + primn +
-                I(sum_annual_crops^2) + I(secdn^2) + I(pastr^2) + I(urban^2) + I(primn^2),
+              f_col = ~ bio1 + bio2 + bio3 + bio7 + bio14 + bio15 +
+                pr_spring + pr_summer + pr_autumn + pr_winter +
+                I(bio1^2) + I(bio2^2) + I(bio3^2) + I(bio7^2)+ I(bio14^2)+ I(bio15^2) +
+                I(pr_spring^2) + I(pr_summer^2) + I(pr_autumn^2) + I(pr_winter^2)  + 
+                sum_annual_crops + secdf + pastr + urban +
+                I(sum_annual_crops^2) + I(secdf^2) + I(pastr^2) + I(urban^2),
+              f_ex = ~ bio1 + bio2 + bio3 + bio7 + bio14 + bio15 +
+                pr_spring + pr_summer + pr_autumn + pr_winter +
+                I(bio1^2) + I(bio2^2) + I(bio3^2) + I(bio7^2)+ I(bio14^2)+ I(bio15^2) +
+                I(pr_spring^2) + I(pr_summer^2) + I(pr_autumn^2) + I(pr_winter^2)  + 
+                sum_annual_crops + secdf + pastr + urban +
+                I(sum_annual_crops^2) + I(secdf^2) + I(pastr^2) + I(urban^2),
               flocker_data = fd,
               prior = c(brms::set_prior("logistic(0,1)", class = "Intercept") + # flat on probability scale (https://cran.r-project.org/web/packages/flocker/vignettes/flocker_tutorial.html)
                           brms::set_prior("logistic(0,1)", class = "Intercept", dpar = "occ"),
@@ -223,6 +228,8 @@ for(i in 1:length(spec_blocks_list)){
               warmup = 250,
               iter = 250 + 1000
             )
+            
+            rm(fd)
             
             print(out)
             
@@ -269,6 +276,11 @@ for(i in 1:length(spec_blocks_list)){
             
             for(round in 2:30){
               
+              sink(paste0("out_fl_fm_buffer750_", spec, "_round_", round, ".txt")) # write console output here
+              sink(type = "message")
+              
+              print(spec)
+              
               print(paste("iteration round", round))
               
               load(file.path(dir, "data", paste0("out_fl_fm_", spec, "_postproc_buffer750_round_", round-1, ".RData")))
@@ -279,10 +291,6 @@ for(i in 1:length(spec_blocks_list)){
               #RTENOs_still_in <- route_RTENOs_all[which(!route_RTENOs_all %in% res_list$high_k_RTENOs)]
               RTENOs_still_in <- route_RTENOs_buff[which(!route_RTENOs_buff %in% res_list$high_k_RTENOs)] # which routes that are in the buffer have not been previously identified as having to high k values
               
-              sink(paste0("out_fl_fm_buffer750_", spec, "_round_", round, ".txt")) # write console output here
-              sink(type = "message")
-              
-              print(spec)
               
               # check whether any routes are left:
               if(length(RTENOs_still_in) == 0){
@@ -294,6 +302,8 @@ for(i in 1:length(spec_blocks_list)){
               
               # now we don't need RTENO (route identifier), but consecutive number again:
               low_k_routes <- which(route_RTENOs_buff %in% RTENOs_still_in)
+              
+              print(low_k_routes)
               
               y_array2 <- y_array[low_k_routes, ,]
               env_cov2 <- lapply(env_cov, function(x) x[low_k_routes,])
@@ -321,23 +331,28 @@ for(i in 1:length(spec_blocks_list)){
               start.time <- Sys.time()
               
               out <- flock(
-                f_occ = ~ bio1_3yrs + bio2_3yrs + bio3_3yrs + pr_spring_3yrs + pr_summer_3yrs + pr_autumn_3yrs + 
-                  pr_winter_3yrs + bio15_3yrs + I(bio1_3yrs^2) + I(bio2_3yrs^2) + I(bio3_3yrs^2) + 
-                  I(pr_spring_3yrs^2) + I(pr_summer_3yrs^2) + I(pr_autumn_3yrs^2) + I(pr_winter_3yrs^2) + I(bio15_3yrs^2) +
-                  sum_annual_crops_3yrs + secdn_3yrs + pastr_3yrs + urban_3yrs + primn_3yrs +
-                  I(sum_annual_crops_3yrs^2) + I(secdn_3yrs^2) + I(pastr_3yrs^2) + I(urban_3yrs^2) + I(primn_3yrs^2),
+                f_occ = ~ bio1_3yrs + bio2_3yrs + bio3_3yrs + bio7_3yrs + bio14_3yrs + bio15_3yrs +
+                  pr_spring_3yrs + pr_summer_3yrs + pr_autumn_3yrs + pr_winter_3yrs  + 
+                  I(bio1_3yrs^2) + I(bio2_3yrs^2) + I(bio3_3yrs^2) + I(bio7_3yrs^2) + I(bio14_3yrs^2) + I(bio15_3yrs^2) + 
+                  I(pr_spring_3yrs^2) + I(pr_summer_3yrs^2) + I(pr_autumn_3yrs^2) + I(pr_winter_3yrs^2)  +
+                  sum_annual_crops_3yrs + secdf_3yrs + pastr_3yrs + urban_3yrs +
+                  I(sum_annual_crops_3yrs^2) + I(secdf_3yrs^2) + I(pastr_3yrs^2) + I(urban_3yrs^2),
                 f_det = ~ route_section,
-                f_col = ~ bio1 + bio2 + bio3 + pr_spring + pr_summer + pr_autumn + pr_winter + bio15 +
-                  I(bio1^2) + I(bio2^2) + I(bio3^2) + I(pr_spring^2) + I(pr_summer^2) + I(pr_autumn^2) + 
-                  I(pr_winter^2) + I(bio15^2) + sum_annual_crops + secdn + pastr + urban + primn +
-                  I(sum_annual_crops^2) + I(secdn^2) + I(pastr^2) + I(urban^2) + I(primn^2),
-                f_ex = ~ bio1 + bio2 + bio3 + pr_spring + pr_summer + pr_autumn + pr_winter + bio15 +
-                  I(bio1^2) + I(bio2^2) + I(bio3^2) + I(pr_spring^2) + I(pr_summer^2) + I(pr_autumn^2) + 
-                  I(pr_winter^2) + I(bio15^2) + sum_annual_crops + secdn + pastr + urban + primn +
-                  I(sum_annual_crops^2) + I(secdn^2) + I(pastr^2) + I(urban^2) + I(primn^2),
+                f_col = ~ bio1 + bio2 + bio3 + bio7 + bio14 + bio15 +
+                  pr_spring + pr_summer + pr_autumn + pr_winter +
+                  I(bio1^2) + I(bio2^2) + I(bio3^2) + I(bio7^2)+ I(bio14^2)+ I(bio15^2) +
+                  I(pr_spring^2) + I(pr_summer^2) + I(pr_autumn^2) + I(pr_winter^2)  + 
+                  sum_annual_crops + secdf + pastr + urban +
+                  I(sum_annual_crops^2) + I(secdf^2) + I(pastr^2) + I(urban^2),
+                f_ex = ~ bio1 + bio2 + bio3 + bio7 + bio14 + bio15 +
+                  pr_spring + pr_summer + pr_autumn + pr_winter +
+                  I(bio1^2) + I(bio2^2) + I(bio3^2) + I(bio7^2)+ I(bio14^2)+ I(bio15^2) +
+                  I(pr_spring^2) + I(pr_summer^2) + I(pr_autumn^2) + I(pr_winter^2)  + 
+                  sum_annual_crops + secdf + pastr + urban +
+                  I(sum_annual_crops^2) + I(secdf^2) + I(pastr^2) + I(urban^2),
                 flocker_data = fd,
                 prior = c(brms::set_prior("logistic(0,1)", class = "Intercept") + # flat on probability scale (https://cran.r-project.org/web/packages/flocker/vignettes/flocker_tutorial.html)
-                            brms::set_prior("logistic(0,1)", class = "Intercept", dpar = "occ"),
+                          brms::set_prior("logistic(0,1)", class = "Intercept", dpar = "occ"),
                           brms::set_prior("logistic(0,1)", class = "Intercept", dpar = "colo"),
                           brms::set_prior("logistic(0,1)", class = "Intercept", dpar = "ex"),
                           brms::set_prior("normal(0,2)", class = "b"),
@@ -353,6 +368,7 @@ for(i in 1:length(spec_blocks_list)){
                 iter = 250 + 1000
               )
               
+              rm(fd)
               print(out)
               
               save(out, file = file.path(dir, "data", paste0("out_fl_fm_buffer750_", spec, "_round_", round, ".RData")))
@@ -395,8 +411,10 @@ for(i in 1:length(spec_blocks_list)){
               print(res_list$high_k_RTENOs)
               
               rm(fitted_occ_col_ex, occupancy_uncond, prediction_sites_uncond, loo_cv)
+              rm(out)
               
               save(res_list, file = file.path(dir, "data", paste0("out_fl_fm_", spec, "_postproc_buffer750_round_", round, ".RData")))
+              rm(res_list)
               
               end.time <- Sys.time()
               print(round(end.time - start.time, 2))

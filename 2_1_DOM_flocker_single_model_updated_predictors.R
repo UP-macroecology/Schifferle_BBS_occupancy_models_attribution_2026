@@ -199,10 +199,11 @@ for(i in 1:length(spec_blocks_list)){
             det_cov$route_section <- array(NA, dim = c(nsites, nsurveys, nyears))
             det_cov$route_section[ , , 1:nyears] <- matrix(rep(c("Sect1", "Sect2", "Sect3", "Sect4", "Sect5"), nsites), nsites, byrow = TRUE)
             
-            det_cov$year <- array(NA, dim = c(nsites, nsurveys, nyears))
-            for (t in 1:nyears){
-              det_cov$year[ , , t] <- matrix(as.character(years[t]), nrow = nsites, ncol = nsurveys)
-            }
+            # det_cov$year <- array(NA, dim = c(nsites, nsurveys, nyears))
+            # for (t in 1:nyears){
+            #   det_cov$year[ , , t] <- matrix(as.character(years[t]), nrow = nsites, ncol = nsurveys)
+            # }
+            
             # make flocker data:
             
             fd <- make_flocker_data_dynamic(

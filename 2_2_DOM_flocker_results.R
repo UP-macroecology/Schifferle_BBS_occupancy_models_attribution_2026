@@ -21,6 +21,15 @@ library(terra)
 
 # load model outputs: ----
 
+load(file.path("results", "out_fl_fm_buffer750_Acadian Flycatcher_round_2.RData"))
+out2 <- out
+out2$fit
+out2
+out2$fit
+
+load(file.path("results", "out_fl_fm_buffer750_Acadian Flycatcher_round_1.RData"))
+out1 <- out
+
 load(file.path("results", "AG_cl_lu_p_flock_logistic(0,1)_normal(0,3).RData"))
 #model <- "AG_cl_lu_p_flocker_normprior"
 out <- multi_colex_cl_lu_p_prior
@@ -179,7 +188,7 @@ print(out)
 
 # traceplots:
 
-plot(out)
+plot(out2)
 brms::mcmc_plot(out, type = "trace")
 brms::mcmc_plot(out, type = "trace", variable = "^b_" , regex = TRUE) # same
 brms::mcmc_plot(out, type = "trace", variable = "^b_occ" , regex = TRUE)
