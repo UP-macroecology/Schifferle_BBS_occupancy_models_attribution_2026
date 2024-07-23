@@ -161,3 +161,84 @@ subsample2 <- function(x, cols, npoints){
   }
   return(x[inds,])
 }
+
+
+
+# species specific presence-absence data as input for occupancy models, based on BBS data:
+
+BBS_pres_abs_spec <- function(species, 
+                              BBS_spec_data = bbs_dt_occ, 
+                              BBS_route_data = route_sel_dt){
+  
+
+  # presences only:
+  presences_spec <- BBS_spec_data %>% 
+    select(c(English_Common_Name, RTENO, Year, paste0("Count", seq(10, 50, 10)))) %>% 
+    filter(English_Common_Name == species)
+
+  if(nrow(presences_spec) == 0) stop("Species name not found.")
+  
+  # presences-absences:
+  occ_dt_spec <- BBS_route_data %>%  #route_sel_env_dt_scaled %>% 
+    # add observations:
+    collapse::join(presences_spec, on = c("RTENO", "Year"), how = "left") %>% 
+    mutate(English_Common_Name = species) %>% 
+    # if route was surveyed but species not observed, replace NA with 0:
+    mutate(across(Count10:Count50, ~ 
+                    case_when(Surveyed == 1 & is.na(.) ~ 0,
+                              .default = .))) %>%
+    # convert bird counts to presence / absence:
+    mutate(across(Count10:Count50, ~ 
+                    case_when(. > 1 ~ 1,
+                              .default = .))) %>% 
+    # presence on route across all sections:
+    mutate(presence = rowSums(across(paste0("Count", seq(10, 50, 10))))) %>%
+    mutate(presence = ifelse(presence >= 1, 1, 0))
+  
+  return(occ_dt_spec)
+}
+
+
+# returns BBS routes that are within a certain buffer distance around the routes where
+# a species was recorded; these are considered to fit dynamic occupancy models:
+
+
+training_routes <- function(species, buffer_km, BBS_spec_data = bbs_dt_occ,
+                            routes_sf = routes_sel_sf,
+                            output = c("RTENOs", "buffer")){
+  
+  # presences only:
+  presences_spec <- BBS_spec_data %>% 
+    select(c(English_Common_Name, RTENO, Year, paste0("Count", seq(10, 50, 10)))) %>% 
+    filter(English_Common_Name == species)
+  
+  if(nrow(presences_spec) == 0) stop("Species name not found.")
+  
+  # presence - absences:
+  occ_dt_spec <- BBS_pres_abs_spec(species = species)
+  
+  # routes with presences (sf):
+  occ_spec_sf <- routes_sf %>%
+    left_join(occ_dt_spec, by = c("RTENO_BBS" = "RTENO")) %>%
+    # summarise presence on route across all years:
+    group_by(RTENO_BBS) %>%
+    summarise(presence_summarised = max(presence, na.rm=TRUE)) %>%
+    mutate(presence_summarised = factor(presence_summarised, levels = c(1,0)))
+  
+  # buffer presences:
+  pres_buffer <- occ_spec_sf %>% 
+    filter(presence_summarised == 1) %>%
+    st_buffer(dist = buffer_km*1000) %>% # 750000
+    st_union
+  
+  if(output == "buffer"){
+    return(pres_buffer)
+  } else {
+    # routes within buffer:
+    routes_within <- occ_spec_sf %>% 
+      st_filter(., y = pres_buffer, join = st_within)
+    return(routes_within$RTENO_BBS)
+  }
+  
+}
+

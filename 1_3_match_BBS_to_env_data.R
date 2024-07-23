@@ -26,6 +26,9 @@ route_sel_dt <- route_dt %>%
   filter(RTENO %in% routes_sel_sf$RTENO_BBS) %>%
   filter(Year >= 1991 & Year <= 2015)
 nrow(route_sel_dt) # 11900
+save(route_sel_dt, file = file.path("data", "BBS_for_occ_selection.RData"))
+
+
 
 # selected variables (output of 1_2_variable_selection.R):
 load(file = file.path("data", "selected_variables.RData"))
