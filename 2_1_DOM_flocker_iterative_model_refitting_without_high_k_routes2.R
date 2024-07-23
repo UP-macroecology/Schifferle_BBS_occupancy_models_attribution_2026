@@ -392,12 +392,7 @@ for(i in 1:length(spec_blocks_list)){
               high_k_routes <- which(loo::pareto_k_values(loo_cv) >= 1) # xx
               high_k_RTENOs <- RTENOs_still_in[high_k_routes]
               
-              # check whether there are still too high k values:
-              if(length(high_k_routes) == 0){
-                print("no routes with pareto k values > 1 left")
-                break
-              }
-              
+
               print(paste("routes with k >= 1 in current round:", paste(high_k_RTENOs, collapse = ",")))
               
               res_list <- list("fitted" = fitted_occ_col_ex,
@@ -415,6 +410,12 @@ for(i in 1:length(spec_blocks_list)){
               
               save(res_list, file = file.path(dir, "data", paste0("out_fl_fm_", spec, "_postproc_buffer750_round_", round, ".RData")))
               rm(res_list)
+              
+              # check whether there are still too high k values:
+              if(length(high_k_routes) == 0){
+                print("no routes with pareto k values > 1 left")
+                break
+              }
               
               end.time <- Sys.time()
               print(round(end.time - start.time, 2))

@@ -5,6 +5,7 @@
 # with flocker, normal priors
 
 # with 750 km buffer
+# compare with 250 km buffer
 # updated predictors (June 2024)
 
 # packages: ----
@@ -34,6 +35,8 @@ load(file = file.path("data", "route_year_env_data.RData"))
 route_sel_env_dt_scaled <- route_sel_env_dt_final %>% 
   mutate(across(bio2:pr_winter_3yrs, ~ (scale(.)) %>% as.vector()))
 
+rm(route_sel_env_dt_final)
+
 # route-year-species information (only surveyed)
 load(file = file.path("data", "BBS_for_occ_spec_records.RData")) # output of 1_0_reformat_BBS_data.R
 
@@ -46,7 +49,7 @@ routes_sel_sf <- st_read(file.path("data", "route_selection_1991_2015_surv_beg_e
 
 # assemble data: ----
 
-nyears <- length(unique(route_sel_env_dt_final$Year)) # 25
+nyears <- length(unique(route_sel_env_dt_scaled$Year)) # 25
 nsurveys <- 5
 
 # register cores for parallel computation:
@@ -65,39 +68,39 @@ testspecs0 <- c("Black-billed Cuckoo",
                 "Greater Roadrunner",
                 "Eurasian Collared-Dove"
 )
-
-testspecs1 <- c("Mourning Dove",
-                "Red-winged Blackbird",
-                "Brown-headed Cowbird",
-                "Barn Swallow",
-                "American Robin",
-                "European Starling",
-                "American Crow",
-                "House Sparrow",
-                "Common Grackle",
-                "Common Yellowthroat")
-
-testspecs2 <- c("Northern Flicker",
-                "Blue Jay",
-                "Eastern Meadowlark",
-                "Indigo Bunting",
-                "American Kestrel",
-                "American Goldfinch",
-                "Cedar Waxwing",
-                "Northern Mockingbird",
-                "Yellow Warbler",
-                "Song Sparrow")
-
-testspecs3 <- c("Black-capped Chickadee",
-                "House Wren",
-                "Eastern Towhee",
-                "Eastern Kingbird",
-                "Gray Catbird",
-                "Northern Cardinal",
-                "Horned Lark",
-                "Dickcissel",
-                "White-breasted Nuthatch",
-                "Tufted Titmouse")
+# 
+# testspecs1 <- c("Mourning Dove",
+#                 "Red-winged Blackbird",
+#                 "Brown-headed Cowbird",
+#                 "Barn Swallow",
+#                 "American Robin",
+#                 "European Starling",
+#                 "American Crow",
+#                 "House Sparrow",
+#                 "Common Grackle",
+#                 "Common Yellowthroat")
+# 
+# testspecs2 <- c("Northern Flicker",
+#                 "Blue Jay",
+#                 "Eastern Meadowlark",
+#                 "Indigo Bunting",
+#                 "American Kestrel",
+#                 "American Goldfinch",
+#                 "Cedar Waxwing",
+#                 "Northern Mockingbird",
+#                 "Yellow Warbler",
+#                 "Song Sparrow")
+# 
+# testspecs3 <- c("Black-capped Chickadee",
+#                 "House Wren",
+#                 "Eastern Towhee",
+#                 "Eastern Kingbird",
+#                 "Gray Catbird",
+#                 "Northern Cardinal",
+#                 "Horned Lark",
+#                 "Dickcissel",
+#                 "White-breasted Nuthatch",
+#                 "Tufted Titmouse")
 
 testspecs <- species_selection_final[which(!species_selection_final %in% testspecs0)]
 
@@ -107,7 +110,8 @@ testspecs <- species_selection_final[which(!species_selection_final %in% testspe
 spec_blocks_list <- split(testspecs, rep(1:55, each = 3))
 names(spec_blocks_list) <- NULL
 
-for(i in 1:length(spec_blocks_list)){
+#for(i in 1:length(spec_blocks_list)){
+for(i in 1:4){
   
   print(paste("block", i, "of", length(spec_blocks_list)))
   
@@ -153,7 +157,7 @@ for(i in 1:length(spec_blocks_list)){
             # buffer presences:
             pres_buffer <- occ_spec_sf %>% 
               filter(presence_summarised == 1) %>%
-              st_buffer(dist = 750000) %>% 
+              st_buffer(dist = 250000) %>% # 750000
               st_union
             
             # routes within buffer:
@@ -199,11 +203,6 @@ for(i in 1:length(spec_blocks_list)){
             det_cov$route_section <- array(NA, dim = c(nsites, nsurveys, nyears))
             det_cov$route_section[ , , 1:nyears] <- matrix(rep(c("Sect1", "Sect2", "Sect3", "Sect4", "Sect5"), nsites), nsites, byrow = TRUE)
             
-            # det_cov$year <- array(NA, dim = c(nsites, nsurveys, nyears))
-            # for (t in 1:nyears){
-            #   det_cov$year[ , , t] <- matrix(as.character(years[t]), nrow = nsites, ncol = nsurveys)
-            # }
-            
             # make flocker data:
             
             fd <- make_flocker_data_dynamic(
@@ -216,7 +215,7 @@ for(i in 1:length(spec_blocks_list)){
             
             # fit model: ----
             
-            sink(paste0("out_fl_fm_buffer750_", spec, "_update_preds.txt")) # write console output here
+            sink(paste0("out_fl_fm_buffer250_", spec, "_update_preds.txt")) # write console output here
             sink(type = "message")
             
             print(spec)
@@ -263,7 +262,7 @@ for(i in 1:length(spec_blocks_list)){
             
             print(out)
             
-            save(out, file = file.path(dir, "data", paste0("out_fl_fm_buffer750_", spec, "_update_preds.RData")))
+            save(out, file = file.path(dir, "data", paste0("out_fl_fm_buffer250_", spec, "_update_preds.RData")))
             
             end.time <- Sys.time()
             print(round(end.time - start.time, 2))
@@ -273,7 +272,7 @@ for(i in 1:length(spec_blocks_list)){
             start.time <- Sys.time()
             
             # calculate further results:
-            fitted_occ_col_ex <- fitted_flocker(out)
+            fitted_occ_col_ex <- fitted_flocker(out) 
             occupancy_uncond <- get_Z(out, history_condition = FALSE) # default
             prediction_sites_uncond <- predict_flocker(out, history_condition = FALSE) # default, necessary for validation?
             loo_cv <- loo_flocker(out, thin = NULL)
@@ -287,7 +286,7 @@ for(i in 1:length(spec_blocks_list)){
             
             rm(fitted_occ_col_ex, occupancy_uncond, prediction_sites_uncond, loo_cv)
             
-            save(res_list, file = file.path(dir, "data", paste0("out_fl_fm_", spec, "_postproc_buffer750_update_preds.RData")))
+            save(res_list, file = file.path(dir, "data", paste0("out_fl_fm_", spec, "_postproc_buffer250_update_preds.RData")))
             
             end.time <- Sys.time()
             print(round(end.time - start.time, 2))
@@ -296,7 +295,6 @@ for(i in 1:length(spec_blocks_list)){
             
           }
 }
-
 
 stopCluster(cl)
 
