@@ -1,12 +1,15 @@
 # fit DOM with
-# - quadratic effects of bioclim covariates: bio1, bio2, bio3, spring, summer, autumn, winter prec., bio15
-# - quadratic effect of land use (without perennial crops): sum annual crops, primn, secdn, pastr, urban
+# - quadratic effects of bioclim covariates: bio1, bio2, bio3, bio7, bio14, bio15, spring, summer, autumn, winter prec.
+# - quadratic effect of land use (without perennial crops): sum annual crops, secdf, pastr, urban
 # - p: different intercepts for route sections
 # with flocker, normal priors
 
 # with 750 km buffer
 # compare with 250 km buffer
-# updated predictors (June 2024)
+
+buffer_km <- 750 # 250
+
+# CHECK AGAIN WHETHER IT WORKS!
 
 # packages: ----
 
@@ -18,11 +21,16 @@ library(flocker)
 library(cmdstanr)
 set_cmdstan_path(path = NULL)#set_cmdstan_path("C:/Users/schifferle1/Documents/cmdstan-2.34.1") # xx
 
+
 # directories: ----
 
 print(tempdir())
 dir <- file.path("/import", "ecoc9z", "data-zurell", "schifferle", "BBS_occupancy_models_2023")
 #dir <- getwd()
+
+# functions: -----
+
+source("0_functions.R")
 
 
 # load data: ----
@@ -33,18 +41,28 @@ load(file = file.path("data", "route_year_env_data.RData"))
 
 # scale covariates:
 route_sel_env_dt_scaled <- route_sel_env_dt_final %>% 
-  mutate(across(bio2:pr_winter_3yrs, ~ (scale(.)) %>% as.vector()))
+  mutate(across(bio2:pr_winter_3yrs, ~ (scale(.)) %>% as.vector())) %>% 
+  # only selected variables:
+  select(c("RTENO", "Year", "bio1", "bio2", "bio3", "bio7", "bio14", "bio15", 
+           "pr_spring", "pr_summer","pr_autumn", "pr_winter",
+           "bio1_3yrs", "bio2_3yrs", "bio3_3yrs", "bio7_3yrs", "bio14_3yrs", "bio15_3yrs",
+           "pr_spring_3yrs", "pr_summer_3yrs", "pr_autumn_3yrs", "pr_winter_3yrs", 
+           "sum_annual_crops", "secdf","pastr", "urban",
+           "sum_annual_crops_3yrs", "secdf_3yrs", "pastr_3yrs", "urban_3yrs"))
 
 rm(route_sel_env_dt_final)
 
-# route-year-species information (only surveyed)
-load(file = file.path("data", "BBS_for_occ_spec_records.RData")) # output of 1_0_reformat_BBS_data.R
-
-# selected species:
-load(file = file.path("data", "final_species_selection.RData")) # output of 1_2_species_selection.R
+# routes-years:
+load(file = file.path("data", "BBS_for_occ_selection.RData")) # route_sel_dt; output of 1_3_match_BBS_to_env_data.R 
 
 # selected routes spatial data (to buffer presences):
 routes_sel_sf <- st_read(file.path("data", "route_selection_1991_2015_surv_beg_end_max_5y_miss_v2_spat_thin_100km_max_30_r_per_BCR_centroids.shp")) # output of 1_1_route_selection.R
+
+# route-year-species information (only surveyed)
+load(file = file.path("data", "BBS_for_occ_spec_records.RData")) # bbs_dt_occ; output of 1_0_reformat_BBS_data.R
+
+# selected species:
+load(file = file.path("data", "final_species_selection.RData")) # species_selection_final; output of 1_2_species_selection.R
 
 
 # assemble data: ----
@@ -122,63 +140,62 @@ for(i in 1:4){
             
             # assemble data: ----
             
-            # species presences:
+            # species presences-absences:
             
-            presences_spec <- bbs_dt_occ %>% 
-              select(c(English_Common_Name, RTENO, Year, paste0("Count", seq(10, 50, 10)))) %>% 
-              filter(English_Common_Name == spec)
+            occ_dt_spec <- BBS_pres_abs_spec(species = spec)
             
-            # match to routes-year-env:
+            # presences_spec <- bbs_dt_occ %>% 
+            #   select(c(English_Common_Name, RTENO, Year, paste0("Count", seq(10, 50, 10)))) %>% 
+            #   filter(English_Common_Name == spec)
+            # 
+            # # match to routes-year-env:
+            # 
+            # occ_dt_spec <- route_sel_env_dt_scaled %>% 
+            #   # add observations:
+            #   collapse::join(presences_spec, on = c("RTENO", "Year"), how = "left") %>% 
+            #   # if route was surveyed but species not observed, replace NA with 0:
+            #   mutate(across(Count10:Count50, ~ 
+            #                   case_when(Surveyed == 1 & is.na(.) ~ 0,
+            #                             .default = .))) %>%
+            #   # convert bird counts to presence / absence:
+            #   mutate(across(Count10:Count50, ~ 
+            #                   case_when(. > 1 ~ 1,
+            #                             .default = .)))
             
-            occ_dt_spec <- route_sel_env_dt_scaled %>% 
-              # add observations:
-              collapse::join(presences_spec, on = c("RTENO", "Year"), how = "left") %>% 
-              # if route was surveyed but species not observed, replace NA with 0:
-              mutate(across(Count10:Count50, ~ 
-                              case_when(Surveyed == 1 & is.na(.) ~ 0,
-                                        .default = .))) %>%
-              # convert bird counts to presence / absence:
-              mutate(across(Count10:Count50, ~ 
-                              case_when(. > 1 ~ 1,
-                                        .default = .)))
+            # # routes with presences (sf):
+            # 
+            # occ_spec_sf <- routes_sel_sf %>%
+            #   left_join(occ_dt_spec, by = c("RTENO_BBS" = "RTENO")) %>%
+            #   # presence on route across all sections:
+            #   mutate(presence = rowSums(across(paste0("Count", seq(10, 50, 10))))) %>%
+            #   mutate(presence = ifelse(presence >= 1, 1, 0)) %>% 
+            #   # presence on route across all years:
+            #   group_by(RTENO_BBS) %>%
+            #   summarise(presence_summarised = max(presence, na.rm=TRUE)) %>%
+            #   mutate(presence_summarised = factor(presence_summarised, levels = c(1,0)))
+            # 
+            # # buffer presences:
+            # pres_buffer <- occ_spec_sf %>% 
+            #   filter(presence_summarised == 1) %>%
+            #   st_buffer(dist = 250000) %>% # 750000
+            #   st_union
+            # 
+            # # routes within buffer:
+            # routes_within <- occ_spec_sf %>% 
+            #   st_filter(., y = pres_buffer, join = st_within)
             
-            # routes with presences (sf):
-            
-            occ_spec_sf <- routes_sel_sf %>%
-              left_join(occ_dt_spec, by = c("RTENO_BBS" = "RTENO")) %>%
-              # presence on route across all sections:
-              mutate(presence = rowSums(across(paste0("Count", seq(10, 50, 10))))) %>%
-              mutate(presence = ifelse(presence >= 1, 1, 0)) %>% 
-              # presence on route across all years:
-              group_by(RTENO_BBS) %>%
-              summarise(presence_summarised = max(presence, na.rm=TRUE)) %>%
-              mutate(presence_summarised = factor(presence_summarised, levels = c(1,0)))
-            
-            # buffer presences:
-            pres_buffer <- occ_spec_sf %>% 
-              filter(presence_summarised == 1) %>%
-              st_buffer(dist = 250000) %>% # 750000
-              st_union
-            
-            # routes within buffer:
-            routes_within <- occ_spec_sf %>% 
-              st_filter(., y = pres_buffer, join = st_within)
-            
-            # library(ggplot2)
-            # ggplot(occ_spec_sf) +
-            #   geom_sf(data = pres_buffer) +
-            #   geom_sf(aes(colour = presence_summarised), size = 0.7) +
-            #   geom_sf(data = routes_within, colour = "yellow", size = 0.5)
+            # relevant routes, within distance of 750 km of species records:
+            rel_routes <- training_routes(species = spec, buffer_km = buffer_km, output = "RTENOs")
             
             
             # reformat obs. as array sites x surveys x years:
             
             years <- seq(min(occ_dt_spec$Year), max(occ_dt_spec$Year))
-            nsites <- length(unique(routes_within$RTENO_BBS))
+            nsites <- length(rel_routes)
             
             y_array <- array(NA, dim = c(nsites, nsurveys, nyears))
             for (t in 1:nyears){
-              y_array[1:nsites, 1:nsurveys, t] <- as.matrix(occ_dt_spec[which(occ_dt_spec$Year == years[t] & occ_dt_spec$RTENO %in% routes_within$RTENO_BBS), 
+              y_array[1:nsites, 1:nsurveys, t] <- as.matrix(occ_dt_spec[which(occ_dt_spec$Year == years[t] & occ_dt_spec$RTENO %in% rel_routes), 
                                                                         c(paste0("Count", seq(10, 50, 10)))])
             }
             
@@ -186,14 +203,13 @@ for(i in 1:4){
             
             env_cov <- vector("list", length = nyears)
             for (t in 1:nyears){
-              env_cov[[t]] <- route_sel_env_dt_scaled[which(route_sel_env_dt_scaled$Year == years[t] & occ_dt_spec$RTENO %in% routes_within$RTENO_BBS), 
+              env_cov[[t]] <- route_sel_env_dt_scaled[which(route_sel_env_dt_scaled$Year == years[t] & occ_dt_spec$RTENO %in% rel_routes), 
                                                       c("bio1", "bio2", "bio3", "bio7", "bio14", "bio15", 
                                                         "pr_spring", "pr_summer","pr_autumn", "pr_winter",
                                                         "bio1_3yrs", "bio2_3yrs", "bio3_3yrs", "bio7_3yrs", "bio14_3yrs", "bio15_3yrs",
                                                         "pr_spring_3yrs", "pr_summer_3yrs", "pr_autumn_3yrs", "pr_winter_3yrs", 
                                                         "sum_annual_crops", "secdf","pastr", "urban",
                                                         "sum_annual_crops_3yrs", "secdf_3yrs", "pastr_3yrs", "urban_3yrs")]
-              env_cov[[t]]$year <- as.character(years[t]) # factor
             }
             
             # covariate for detection probability:
@@ -215,7 +231,7 @@ for(i in 1:4){
             
             # fit model: ----
             
-            sink(paste0("out_fl_fm_buffer250_", spec, "_update_preds.txt")) # write console output here
+            sink(paste0("out_", spec, "_fm_buffer", buffer_km, ".txt")) # write console output here
             sink(type = "message")
             
             print(spec)
@@ -262,7 +278,7 @@ for(i in 1:4){
             
             print(out)
             
-            save(out, file = file.path(dir, "data", paste0("out_fl_fm_buffer250_", spec, "_update_preds.RData")))
+            save(out, file = file.path(dir, "data", paste0("out_", spec, "_fm_buffer", buffer_km, ".RData")))
             
             end.time <- Sys.time()
             print(round(end.time - start.time, 2))
@@ -272,21 +288,21 @@ for(i in 1:4){
             start.time <- Sys.time()
             
             # calculate further results:
-            fitted_occ_col_ex <- fitted_flocker(out) 
-            occupancy_uncond <- get_Z(out, history_condition = FALSE) # default
-            prediction_sites_uncond <- predict_flocker(out, history_condition = FALSE) # default, necessary for validation?
+            fitted_initocc_col_ex <- fitted_flocker(out) 
+            occ_posterior <- get_Z(out, history_condition = FALSE) # default
+            y_predictions <- predict_flocker(out, history_condition = FALSE) # default, necessary for validation?
             loo_cv <- loo_flocker(out, thin = NULL)
             
-            res_list <- list("fitted" = fitted_occ_col_ex,
-                             "Zs" = occupancy_uncond,
-                             "preds_occ_uncond" = prediction_sites_uncond,
+            res_list <- list("fitted" = fitted_initocc_col_ex,
+                             "occ_posterior" = occ_posterior,
+                             "y_preds" = y_predictions,
                              "loo_cv" = loo_cv)
             
             print(res_list$loo_cv)
             
-            rm(fitted_occ_col_ex, occupancy_uncond, prediction_sites_uncond, loo_cv)
+            rm(fitted_initocc_col_ex, occ_posterior, y_predictions, loo_cv)
             
-            save(res_list, file = file.path(dir, "data", paste0("out_fl_fm_", spec, "_postproc_buffer250_update_preds.RData")))
+            save(res_list, file = file.path(dir, "data", paste0("postproc_", spec, "_fm_buffer", buffer_km, ".RData")))
             
             end.time <- Sys.time()
             print(round(end.time - start.time, 2))

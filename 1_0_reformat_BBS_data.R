@@ -21,7 +21,8 @@ bbs_dt_occ <- bbs_dt %>%
   # add column on whether route was surveyed (needed later):
   mutate(Surveyed = 1) %>% 
   # site needs to be numeric:
-  mutate(RTENO = as.numeric(RTENO))
+  mutate(RTENO = as.numeric(RTENO)) %>% 
+  arrange(RTENO)
 
 save(bbs_dt_occ, file = file.path("data", "BBS_for_occ_spec_records.RData"))
 
@@ -34,14 +35,15 @@ route_dt <- tidyr::expand_grid(RTENO = unique(bbs_dt_occ$RTENO),
   # add observer and date when route was surveyed:
   collapse::join(bbs_dt_occ[, c("RTENO", "Year", "ObsN", "doy")], on = c("RTENO", "Year"), how = "left") %>%
   # all route-year combinations without date / observer haven't been surveyed:
-  mutate(Surveyed = if_else(is.na(doy), 0, 1))
+  mutate(Surveyed = if_else(is.na(doy), 0, 1)) %>% 
+  arrange(RTENO)
 
 save(route_dt, file = file.path("data", "BBS_for_occ.RData"))
 
 
 # save shapefile of route centroids: -------------------------------------------
 
-datashare_BBS <- file.path("//ibb-fs01.ibb.uni-potsdam.de", "daten$", "AG26", "Arbeit", "datashare", "data", "biodat", "distribution", "BBS")
+datashare_BBS <- file.path("//NAS-2-P-SN-01.ibb.uni-potsdam.de", "daten$", "AG26", "Arbeit", "datashare", "data", "biodat", "distribution", "BBS")
 
 routes_sf <- read_sf(file.path(datashare_BBS, "bbs_routes", "bbsrtsl020.shp")) %>% 
   st_transform(crs = "ESRI:102003") %>% # Albers Equal Area projection

@@ -24,7 +24,8 @@ plot(st_geometry(routes_sel_sf))
 # BBS data, only selected routes and focal time period:
 route_sel_dt <- route_dt %>%
   filter(RTENO %in% routes_sel_sf$RTENO_BBS) %>%
-  filter(Year >= 1991 & Year <= 2015)
+  filter(Year >= 1991 & Year <= 2015) %>% 
+  arrange(RTENO)
 nrow(route_sel_dt) # 11900
 save(route_sel_dt, file = file.path("data", "BBS_for_occ_selection.RData"))
 
@@ -82,7 +83,7 @@ for(i in 1:length(years)){
   lu_year <- rast(lu_files[which(grepl(paste0(years[i], "_ESRI102003_ave.tif$"), lu_files))])
   
   # reduce to selected variables:
-  lu_year_sel <- lu_year[[selvar[!grepl(pattern = "bio|pr_", x = selvar)]]] # xx
+  lu_year_sel <- lu_year[[selvar[!grepl(pattern = "bio|pr_|mean", x = selvar)]]] # xx
   
   # extract values of each land use class at each relevant route location:
   for(luvar in names(lu_year_sel)){
@@ -140,7 +141,7 @@ lu_3yrs_sp <- rast(lu_files[which(grepl("1988_1990", lu_files))])
 lu_3yrs_sp
 
 # reduce to selected variables:
-lu_3yrs_sp_sel <- lu_3yrs_sp[[selvar[!grepl(pattern = "bio|pr_", x = selvar)]]] # xx
+lu_3yrs_sp_sel <- lu_3yrs_sp[[selvar[!grepl(pattern = "bio|pr_|mean", x = selvar)]]] # xx
 
 # extract value of each lu variable at each route centroid:
 for(luvar in names(lu_3yrs_sp_sel)){
@@ -169,7 +170,8 @@ for(sclimvar in names(sclim_3yrs_sp_sel)){
 # match to BBS data:
 route_sel_env_dt_final <- route_sel_env_dt1 %>% 
   left_join(routes_sel_sf, by = c(RTENO = "RTENO_BBS")) %>% 
-  select(-geometry)
+  select(-geometry) %>% 
+  arrange(RTENO)
 
 # write to file:
 save(route_sel_env_dt_final, file = file.path("data", "route_year_env_data.RData"))

@@ -16,7 +16,7 @@ load(file = file.path("data", "BBS_for_occ.RData")) # output of 1_0_reformat_BBS
 route_dt
 
 # spatial data on routes:
-datashare_BBS <- file.path("//ibb-fs01.ibb.uni-potsdam.de", "daten$", "AG26", "Arbeit", "datashare", "data", "biodat", "distribution", "BBS")
+datashare_BBS <- file.path("//NAS-2-P-SN-01.ibb.uni-potsdam.de", "daten$", "AG26", "Arbeit", "datashare", "data", "biodat", "distribution", "BBS")
 routes_sf <- read_sf(file.path(datashare_BBS, "bbs_routes", "bbsrtsl020.shp")) %>% 
   st_transform(crs = "ESRI:102003") %>% # Albers Equal Area projection
   mutate(RTENO_BBS = as.integer(paste0("840", stringr::str_pad(RTENO, width = 5, side = "left", pad = "0")))) # reformat RTENO to match RTENO from BBS data imported with the bbsAssistant package
@@ -314,7 +314,8 @@ length(unique(route_dt_spat_temp_ss2$RTENO)) # 1995-2019: 539; 1991-2015: 476
 # save output:
 sel_routes_final <- route_dt_spat_temp_ss2 %>% 
   pull(RTENO) %>% 
-  unique
+  unique %>% 
+  sort
 save(sel_routes_final, 
      file = file.path("data", "route_selection_1991_2015_surv_beg_end_max_5y_miss_v2_spat_thin_100km_max_30_r_per_BCR.RData"))
 

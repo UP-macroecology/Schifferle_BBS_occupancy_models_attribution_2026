@@ -179,7 +179,7 @@ BBS_pres_abs_spec <- function(species,
   if(nrow(presences_spec) == 0) stop("Species name not found.")
   
   # presences-absences:
-  occ_dt_spec <- BBS_route_data %>%  #route_sel_env_dt_scaled %>% 
+  occ_dt_spec <- BBS_route_data %>%  
     # add observations:
     collapse::join(presences_spec, on = c("RTENO", "Year"), how = "left") %>% 
     mutate(English_Common_Name = species) %>% 
@@ -193,7 +193,8 @@ BBS_pres_abs_spec <- function(species,
                               .default = .))) %>% 
     # presence on route across all sections:
     mutate(presence = rowSums(across(paste0("Count", seq(10, 50, 10))))) %>%
-    mutate(presence = ifelse(presence >= 1, 1, 0))
+    mutate(presence = ifelse(presence >= 1, 1, 0)) %>% 
+    arrange(RTENO)
   
   return(occ_dt_spec)
 }
@@ -236,8 +237,11 @@ training_routes <- function(species, buffer_km, BBS_spec_data = bbs_dt_occ,
   } else {
     # routes within buffer:
     routes_within <- occ_spec_sf %>% 
-      st_filter(., y = pres_buffer, join = st_within)
-    return(routes_within$RTENO_BBS)
+      st_filter(., y = pres_buffer, join = st_within) %>% 
+      pull(RTENO_BBS) %>% 
+      sort()
+
+    return(routes_within)
   }
   
 }

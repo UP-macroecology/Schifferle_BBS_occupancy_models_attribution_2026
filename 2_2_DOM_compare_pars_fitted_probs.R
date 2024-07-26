@@ -1,5 +1,5 @@
 
-# compare output for same dynamic occupancy model but different underlying data:
+# compare output for same dynamic occupancy model but different underlying data (buffer sizes):
 
 # packages: --------------------------------------------------------------------
 
