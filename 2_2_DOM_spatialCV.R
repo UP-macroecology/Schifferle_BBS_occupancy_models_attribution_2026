@@ -2,6 +2,10 @@
 # assigns BBS routes to 5 folds for spatially blocked cross validation:
 # + plots and tests
 
+
+# repeat for buffer size 250, insert new functions to shorten!
+
+
 # packages: ----
 
 library(blockCV)
@@ -10,6 +14,10 @@ library(terra) # working with spatial raster data
 library(tmap) # plotting maps
 library(dplyr)
 library(ggplot2)
+
+# functions: ----
+
+source("0_functions.R")
 
 # can response be binary or continuous? (it said so somewhere)
 
@@ -25,6 +33,13 @@ routes_sel_sf <- st_read(file.path("data", "route_selection_1991_2015_surv_beg_e
 
 # merged route, year, environment data:
 load(file = file.path("data", "route_year_env_data.RData"))
+
+# selected species:
+load(file = file.path("data", "final_species_selection.RData")) # output of 1_2_species_selection.R
+
+# routes-years:
+load(file = file.path("data", "BBS_for_occ_selection.RData")) # route_sel_dt; output of 1_3_match_BBS_to_env_data.R 
+
 
 # load env. data as raster stack to check environmental similarity between training and test folds:
 
@@ -67,8 +82,6 @@ hexagon_size_m <- 500000
 # since I use a buffer around the presence points of each species to determine the
 # data used for each model, I also generate folds for each species separately:
 
-# selected species:
-load(file = file.path("data", "final_species_selection.RData")) # output of 1_2_species_selection.R
 
 # iterate over species:
 for(spec in species_selection_final){
@@ -77,44 +90,30 @@ for(spec in species_selection_final){
   
   # species data:
   
-  ## presences:
-  presences_spec <- bbs_dt_occ %>% 
-    select(c(English_Common_Name, RTENO, Year, paste0("Count", seq(10, 50, 10)))) %>% 
-    filter(English_Common_Name == spec)
-  
-  # match to routes-year-env to get presence-absence data:
-  occ_dt_spec <- route_sel_env_dt_final %>% 
-    # add observations:
-    collapse::join(presences_spec, on = c("RTENO", "Year"), how = "left") %>% 
-    # if route was surveyed but species not observed, replace NA with 0:
-    mutate(across(Count10:Count50, ~ 
-                    case_when(Surveyed == 1 & is.na(.) ~ 0,
-                              .default = .))) %>%
-    # convert bird counts to presence / absence:
-    mutate(across(Count10:Count50, ~ 
-                    case_when(. > 1 ~ 1,
-                              .default = .)))
-  
+  occ_dt_spec <- BBS_pres_abs_spec(species = spec) # from 0_functions.R
+
   # match with routes, summarise presences over time:
   occ_spec_sf <- routes_sel_sf %>%
     left_join(occ_dt_spec, by = c("RTENO_BBS" = "RTENO")) %>%
     # presence on route across all sections:
     mutate(presence = rowSums(across(paste0("Count", seq(10, 50, 10))))) %>%
-    mutate(presence = ifelse(presence >= 1, 1, 0)) %>% 
+    mutate(presence = ifelse(presence >= 1, 1, 0)) %>%
     # presence on route across all years:
     group_by(RTENO_BBS) %>%
     summarise(presence_summarised = max(presence, na.rm=TRUE)) %>%
-    mutate(presence_summarised = factor(presence_summarised, levels = c(1,0)))
+    mutate(presence_summarised = factor(presence_summarised, levels = c(1,0))) %>% 
+    arrange(RTENO_BBS)
   
   # buffer presences:
-  pres_buffer <- occ_spec_sf %>% 
+  pres_buffer <- occ_spec_sf %>%
     filter(presence_summarised == 1) %>%
     st_buffer(dist = 750000) %>% # 750000
     st_union
   
   # routes within buffer:
-  occ_spec_sf_buffered <- occ_spec_sf %>% 
-    st_filter(., y = pres_buffer, join = st_within)
+  occ_spec_sf_buffered <- occ_spec_sf %>%
+    st_filter(., y = pres_buffer, join = st_within) %>% 
+    arrange(RTENO_BBS)
   
   # create blocks and assign routes to folds:
   sb_US <- cv_spatial(x = occ_spec_sf_buffered,
@@ -197,51 +196,13 @@ for(spec in species_selection_final){
   
   n_species_without_enough_presences <- 0
   
-  ## presences:
-  presences_spec <- bbs_dt_occ %>% 
-    select(c(English_Common_Name, RTENO, Year, paste0("Count", seq(10, 50, 10)))) %>% 
-    filter(English_Common_Name == spec)
-  
-  # match to routes-year-env to get presence-absence data:
-  occ_dt_spec <- route_sel_env_dt_final %>% 
-    # add observations:
-    collapse::join(presences_spec, on = c("RTENO", "Year"), how = "left", verbose = 0) %>% 
-    # if route was surveyed but species not observed, replace NA with 0:
-    mutate(across(Count10:Count50, ~ 
-                    case_when(Surveyed == 1 & is.na(.) ~ 0,
-                              .default = .))) %>%
-    # convert bird counts to presence / absence:
-    mutate(across(Count10:Count50, ~ 
-                    case_when(. > 1 ~ 1,
-                              .default = .))) %>% 
-    # presence on route across all sections:
-    mutate(presence = rowSums(across(paste0("Count", seq(10, 50, 10))))) %>%
-    mutate(presence = ifelse(presence >= 1, 1, 0)) # save that somewhere!
-  
-  # match with routes, summarise presences over time:
-  occ_spec_sf <- routes_sel_sf %>%
-    left_join(occ_dt_spec, by = c("RTENO_BBS" = "RTENO")) %>%
-    # presence on route across all sections:
-    mutate(presence = rowSums(across(paste0("Count", seq(10, 50, 10))))) %>%
-    mutate(presence = ifelse(presence >= 1, 1, 0)) %>% 
-    # presence on route across all years:
-    group_by(RTENO_BBS) %>%
-    summarise(presence_summarised = max(presence, na.rm=TRUE)) %>%
-    mutate(presence_summarised = factor(presence_summarised, levels = c(1,0)))
-  
-  # buffer presences:
-  pres_buffer <- occ_spec_sf %>% 
-    filter(presence_summarised == 1) %>%
-    st_buffer(dist = 750000) %>% # 750000
-    st_union
-  
-  # routes within buffer:
-  occ_spec_sf_buffered <- occ_spec_sf %>% 
-    st_filter(., y = pres_buffer, join = st_within)
-  
   # data within buffer:
+  
+  rel_routes <- training_routes(species = spec, buffer_km = 750, output = "RTENOs")
+  
   occ_dt_spec_buff <- occ_dt_spec %>% 
-    filter(RTENO %in% occ_spec_sf_buffered$RTENO_BBS)
+    filter(RTENO %in% rel_routes) %>% 
+    arrange(RTENO)
   
   # assigned routes to folds:
   load(file.path("data", "CV_route_block_allocation", "block_size_500km", paste0(spec, ".RData")))
