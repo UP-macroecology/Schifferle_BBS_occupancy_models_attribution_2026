@@ -397,3 +397,91 @@ bbs_dt_occ_sel %>%
 # Ringed Kingfisher mainly distributed in South America
 
 
+
+# assign ecoregions to species: ----
+
+library(sf)
+source("0_functions.R")
+
+# load data:
+
+# selected species:
+load(file = file.path("data", "final_species_selection.RData")) # species_selection_final; output of 1_2_species_selection.R
+
+# selected routes spatial data (to buffer presences):
+routes_sel_sf <- st_read(file.path("data", "route_selection_1991_2015_surv_beg_end_max_5y_miss_v2_spat_thin_100km_max_30_r_per_BCR_centroids.shp")) # output of 1_1_route_selection.R
+
+# routes-years:
+load(file = file.path("data", "BBS_for_occ_selection.RData")) # route_sel_dt; output of 1_3_match_BBS_to_env_data.R 
+
+# route-year-species information (only surveyed)
+load(file = file.path("data", "BBS_for_occ_spec_records.RData")) # bbs_dt_occ; output of 1_0_reformat_BBS_data.R
+
+
+# ecoregions level 1:
+# https://www.epa.gov/eco-research/ecoregions-north-america
+eco_sf <- read_sf(file.path("data", "na_cec_eco_l1", "NA_CEC_Eco_Level1.shp"))
+
+eco_sf_proj <- eco_sf %>% 
+  st_transform(crs = "ESRI:102003") %>% 
+  select(NA_L1NAME)
+
+# iterate over species:
+
+spec_eco_df <- data.frame(species = species_selection_final, eco = NA)
+
+for(i in 1:length(species_selection_final)){
+  
+  print(i)
+  
+  spec <- species_selection_final[i]
+  
+  print(spec)
+  
+  # species presences:
+  
+  pres_spec <- BBS_pres_abs_spec(species = spec)
+  
+  pres_routes <- pres_spec %>% 
+    filter(presence == 1) %>% 
+    pull(RTENO) %>% 
+    unique
+  
+  pres_routes_sf <- routes_sel_sf %>% 
+    filter(RTENO_BBS %in% pres_routes) # 159
+  
+  # count presence per ecoregion:
+  inters <- st_intersection(pres_routes_sf, eco_sf_proj) %>% 
+    st_drop_geometry() %>% 
+    group_by(NA_L1NAME) %>% 
+    summarise(n_routes = n())
+  
+  print(inters)
+  
+  # in which ecoregion are most presences?
+  
+  # are > 50% of presences in one ecoregion?
+  eco_spec <- inters %>% 
+    filter(n_routes > nrow(pres_routes_sf) * 0.5) %>% 
+    pull(NA_L1NAME)
+  
+  print(eco_spec)
+  
+  spec_eco_df$eco[i] <- ifelse(length(eco_spec) == 0, NA, eco_spec)
+  
+}
+spec_eco_df
+summary(spec_eco_df$eco)
+save(spec_eco_df, file = file.path("data", "species_ecoregions.RData"))
+
+
+table(spec_eco_df$eco)
+# sort: Eastern temperate forests - Northern forests - great plains - Northwestern forested mountains:
+
+final_species_eco_sorted <- c(spec_eco_df %>% filter(eco == "EASTERN TEMPERATE FORESTS") %>% pull(species),
+  spec_eco_df %>% filter(eco == "NORTHERN FORESTS") %>% pull(species),
+  spec_eco_df %>% filter(eco == "GREAT PLAINS") %>% pull(species),
+  spec_eco_df %>% filter(eco == "NORTHWESTERN FORESTED MOUNTAINS") %>% pull(species),
+  spec_eco_df %>% filter(is.na(eco)) %>% pull(species))
+
+save(final_species_eco_sorted, file = file.path("data", "final_species_selection_eco_sorted.RData"))
