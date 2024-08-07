@@ -11,7 +11,9 @@ library(dplyr)
 library(flocker)
 library(sf)
 library(ggplot2)
-
+library(cmdstanr)
+#set_cmdstan_path(path = NULL)#set_cmdstan_path("C:/Users/schifferle1/Documents/cmdstan-2.34.1") # xx
+set_cmdstan_path("C:/Users/schifferle1/Documents/cmdstan-2.34.1")
 
 # functions: ----
 
@@ -23,13 +25,14 @@ source("0_functions.R")
 print(tempdir())
 #dir <- file.path("/import", "ecoc9z", "data-zurell", "schifferle", "BBS_occupancy_models_2023")
 #dir <- getwd()
-results_dir <- file.path("M:", "Documents", "DEBTs", "analysis", "Schifferle_BBS_occupancy_models_2023", "results") 
+#results_dir <- file.path("M:", "Documents", "DEBTs", "analysis", "Schifferle_BBS_occupancy_models_2023", "results") 
+results_dir <- "results/CV_cluster"
 
 
 # load data: ----
 
-# selected species:
-load(file = file.path("data", "final_species_selection.RData")) # species_selection_final; output of 1_2_species_selection.R
+# selected species, sorted by ecoregion:
+load(file = file.path("data", "final_species_selection_eco_sorted.RData")) # final_species_eco_sorted; output of 1_2_species_selection.R
 
 # selected routes spatial data (to buffer presences):
 routes_sel_sf <- st_read(file.path("data", "route_selection_1991_2015_surv_beg_end_max_5y_miss_v2_spat_thin_100km_max_30_r_per_BCR_centroids.shp")) # output of 1_1_route_selection.R
@@ -46,8 +49,7 @@ years <- 1991:2015
 # data prep.: ----
 
 # species:
-spec <- species_selection_final[1]
-
+spec <- final_species_eco_sorted[2] # 1
 
 # load model predictions of each test fold:
 
@@ -85,227 +87,176 @@ test_RTENOs <- c(sort(rel_routes[sb_US$folds_list[[1]][[2]]]), # test data fold 
 # observations can be compared either to the predicted occupancy probability or to predictions of y, in the latter 
 # case, imperfect detection is taken into account
 
-
-# # plot map comparing mean predictions and observations for single year: ---
-# 
-# # mean y predictions
-# mean_y_preds <- apply(y_preds_routes, MAR = c(1,2), FUN = mean)
-# 
-# # observations:
-# occ_dt_spec <- BBS_pres_abs_spec(species = spec)
-# 
-# obs_test <- occ_dt_spec %>% # RTENOs ordered
-#   filter(RTENO %in% test_RTENOs) %>% 
-#   filter(Year == years[2]) %>% 
-#   arrange(RTENO) %>% 
-#   mutate(mean_y_preds = mean_y_preds[,2]) %>% 
-#   left_join(routes_sel_sf, by = c(RTENO = "RTENO_BBS")) %>% 
-#   st_as_sf()
-# 
-# ggplot(obs_test) +
-#   geom_sf(aes(fill = as.factor(presence)), pch = 21, size = 3) +
-#   scale_fill_viridis_d(name = "observation") +
-#   geom_sf(aes(color = mean_y_preds), size = 1) +
-#   scale_color_viridis_c(name = "mean prediction") +
-#   theme_bw() +
-#   ggtitle(spec)
-
+# observations:
+occ_dt_spec <- BBS_pres_abs_spec(species = spec)
 
 
 # spatial C index: ---
 
+
 # do we get differences between sites right?
 
-# for each year separately, calculate Harrel's C index for each MCMC jump (-> distribution of C values)
-
+# for each year separately, calculate Harrel's C index
 # C index near 1 -> good
 # C index = 0.5 -> model as good as random guessing of which of two routes has a higher probability of being occupied
 
 
-# 1) based on predictions of y (= occupancy prob. * detection prob.):
+# 1) based on predictions of y (= occupancy (0/1) * detection prob.):
 
-# predictions of y for each route section, sum across routes:
+# proportion of draws where species is detected on a route:
+y_preds_all_routes <- rbind(res_lists_folds[[1]]$y_preds_mean,
+                            res_lists_folds[[2]]$y_preds_mean,
+                            res_lists_folds[[3]]$y_preds_mean,
+                            res_lists_folds[[4]]$y_preds_mean,
+                            res_lists_folds[[5]]$y_preds_mean)
 
-# bind predictions for all folds:
-y_preds_all_routes <- abind::abind(res_lists_folds[[1]]$y_preds,
-                                   res_lists_folds[[2]]$y_preds,
-                                   res_lists_folds[[3]]$y_preds,
-                                   res_lists_folds[[4]]$y_preds,
-                                   res_lists_folds[[5]]$y_preds,
-                                   along = 1)
-dim(y_preds_all_routes) # routes - sections - years - draws
+y_preds_obs_df <- as.data.frame(y_preds_all_routes) %>% 
+  cbind(test_RTENOs)
+colnames(y_preds_obs_df) <- c(years, "RTENO")
 
-# sum over route sections:
-y_preds_routes <- apply(y_preds_all_routes, MAR = c(1,3,4), FUN = sum)
-y_preds_routes[which(y_preds_routes != 0)] <- 1 # convert detection sum across route sections to presence / absence
-dim(y_preds_routes) # for each site and year 4000 draws
+y_preds_obs_df <- y_preds_obs_df %>% 
+  tidyr::pivot_longer(cols = !RTENO, names_to = "Year", values_to = "pred_y_mean") %>% 
+  mutate(Year = as.integer(Year)) %>% 
+  left_join(occ_dt_spec, by = c("RTENO", "Year")) %>% 
+  select(c(RTENO, Year, pred_y_mean, Count10:Count50, presence))
 
+# C-index per year:
 
-# for all years:
-rcorr_ypreds_list <- vector(mode = "list", length = length(years))
-
-for(i in 1:length(years)){
+for(y in unique(y_preds_obs_df$Year)){
   
-  print(i)
+  dt <- y_preds_obs_df %>% 
+    filter(Year == y)
   
-  # observations:
-  obs_i <- occ_dt_spec %>% 
-    filter(RTENO %in% test_RTENOs) %>% 
-    # order same as RTENOs in test data:
-    arrange(factor(RTENO, levels = test_RTENOs)) %>%
-    filter(Year == years[i]) %>% 
-    pull(presence) 
+  y_rank_corr <- c("Year" = y, Hmisc::rcorr.cens(x = dt$presence, S = dt$pred_y_mean, outx=FALSE)) # xx
   
-  # C index, predictions:
-  C_distr_year_i <- apply(X = y_preds_routes[,i,], MARGIN = 2, FUN = Hmisc::rcorr.cens, x = obs_i, outx=FALSE) # TRUE? xx
-  
-  # reformat:
-  rcorr_ypreds_list[[i]] <-  C_distr_year_i %>% 
-    as_tibble(rownames = "metric") %>% 
-    tidyr::pivot_longer(cols = V1:V4000, values_to = "draws", names_to = NULL) %>% 
-    mutate(Year = years[i])
+  if(y == unique(y_preds_obs_df$Year)[1]) {
+    y_rank_corr_spat <- y_rank_corr} else{
+      y_rank_corr_spat <- rbind(y_rank_corr_spat, y_rank_corr)
+    }
 }
-
-# bind all years:
-rcorr_ypreds <- bind_rows(rcorr_ypreds_list) # C-index draws (and other output) for each year
-
-
-# plot:
-library(ggplot2)
-rcorr_ypreds %>% 
-  filter(metric == "C Index") %>% 
-  ggplot() + 
-  geom_density(aes(x = draws, group = Year, col = as.factor(Year))) +
-  scale_color_viridis_d() +
-  xlab("C-index") +
-  theme_bw() +
-  theme(text = element_text(size = 18)) +
-  ggtitle(paste0(spec, ", spatial C-index (y preds based, each line = 1 year)")) +
-  xlim(c(0, 1))
-# NAs if there is no observation (?)
+rownames(y_rank_corr_spat) <- NULL
+y_rank_corr_spat
 
 
 # 2) based on predictions of occupancy probability:
 
-# bind predictions for all folds:
-occ_all_routes <- abind::abind(res_lists_folds[[1]]$occ_posterior,
-                               res_lists_folds[[2]]$occ_posterior,
-                               res_lists_folds[[3]]$occ_posterior,
-                               res_lists_folds[[4]]$occ_posterior,
-                               res_lists_folds[[5]]$occ_posterior,
-                               along = 1)
-dim(occ_all_routes)
+# proportion of draws where species is detected on a route:
+occ_preds_all_routes <- rbind(res_lists_folds[[1]]$occ_posterior_mean,
+                            res_lists_folds[[2]]$occ_posterior_mean,
+                            res_lists_folds[[3]]$occ_posterior_mean,
+                            res_lists_folds[[4]]$occ_posterior_mean,
+                            res_lists_folds[[5]]$occ_posterior_mean)
 
+# occ_preds_all_routes <- rbind(res_lists_folds[[1]]$occ_posterior_median,
+#                               res_lists_folds[[2]]$occ_posterior_median,
+#                               res_lists_folds[[3]]$occ_posterior_median,
+#                               res_lists_folds[[4]]$occ_posterior_median,
+#                               res_lists_folds[[5]]$occ_posterior_median)
 
-# for all years:
-rcorr_occprob_list <- vector(mode = "list", length = length(years))
+occ_preds_obs_df <- as.data.frame(occ_preds_all_routes) %>% 
+  cbind(test_RTENOs)
+colnames(occ_preds_obs_df) <- c(years, "RTENO")
 
-for(i in 1:length(years)){
+occ_preds_obs_df <- occ_preds_obs_df %>% 
+  tidyr::pivot_longer(cols = !RTENO, names_to = "Year", values_to = "pred_occ_mean") %>% 
+  mutate(Year = as.integer(Year)) %>% 
+  left_join(occ_dt_spec, by = c("RTENO", "Year")) %>% 
+  select(c(RTENO, Year, pred_occ_mean, Count10:Count50, presence))
+
+# C-index per year:
+
+for(y in unique(occ_preds_obs_df$Year)){
   
-  print(i)
+  dt <- occ_preds_obs_df %>% 
+    filter(Year == y)
   
-  # observations:
-  obs_i <- occ_dt_spec %>% 
-    filter(RTENO %in% test_RTENOs) %>% 
-    # order same as RTENOs in test data:
-    arrange(factor(RTENO, levels = test_RTENOs)) %>% # IS ORDER RIGHT?
-    filter(Year == years[i]) %>% 
-    pull(presence)
+  occ_rank_corr <- c("Year" = y, Hmisc::rcorr.cens(x = dt$presence, S = dt$pred_occ_mean, outx=FALSE)) # xx
   
-  # C index, predictions:
-  C_distr_year_i <- apply(X = occ_all_routes[,i,], MARGIN = 2, FUN = Hmisc::rcorr.cens, x = obs_i, outx=FALSE)
-  
-  # reformat:
-  rcorr_occprob_list[[i]] <-  C_distr_year_i %>% 
-    as_tibble(rownames = "metric") %>% 
-    tidyr::pivot_longer(cols = V1:V4000, values_to = "draws", names_to = NULL) %>% 
-    mutate(Year = years[i])
+  if(y == unique(occ_preds_obs_df$Year)[1]) {
+    occ_rank_corr_spat <- occ_rank_corr} else{
+      occ_rank_corr_spat <- rbind(occ_rank_corr_spat, occ_rank_corr)
+    }
 }
-
-# bind all years:
-rcorr_occprob <- bind_rows(rcorr_occprob_list)
-
-# plot:
-rcorr_occprob %>% 
-  filter(metric == "C Index") %>% 
-  ggplot() + 
-  geom_density(aes(x = draws, group = Year, col = as.factor(Year))) +
-  scale_color_viridis_d() +
-  xlab("C-index") +
-  theme_bw() +
-  theme(text = element_text(size = 18), legend.position = "bottom") +
-  ggtitle(paste0(spec, ", spatial C-index (occ. prob. based, each line = 1 year)")) +
-  xlim(c(0, 1))
+rownames(occ_rank_corr_spat) <- NULL
+occ_rank_corr_spat
 
 
 # temporal C indices: ---
 
+
 # do we get trends right?
 
-# sum predicted occupancy across all routes at each MCMC jump for each year
+# sum predicted detections across all routes for each year
 # vs.
 # sum observations across all routes for each year
 
-# observations:
-sum_obs_year <- occ_dt_spec %>% 
-  filter(RTENO %in% test_RTENOs) %>% 
-  # order same as RTENOs in test data:
-  arrange(factor(RTENO, levels = test_RTENOs)) %>%
+y_preds_obs_df_temp <- y_preds_obs_df %>% 
   group_by(Year) %>% 
-  summarise(sum_obs_year = sum(presence, na.rm = TRUE)) %>% 
-  pull(sum_obs_year)
+  summarise(sum_obs = sum(presence, na.rm = TRUE),
+            sum_preds = sum(pred_y_mean))
 
-# predicted y:
-sum_ypreds_year <- apply(X = y_preds_routes, MARGIN = c(2,3), FUN = sum)
-dim(sum_ypreds_year)
-
-# C index, y:
-C_distr_temp_y <- apply(X = sum_ypreds_year, MARGIN = 2, FUN = Hmisc::rcorr.cens, x = sum_obs_year, outx=FALSE) # TRUE? xx
-
-# reformat:
-rcorr_temp_y_preds <-  C_distr_temp_y %>% 
-  as_tibble(rownames = "metric") %>% 
-  tidyr::pivot_longer(cols = V1:V4000, values_to = "draws", names_to = NULL)
-
-# plot:
-rcorr_temp_y_preds %>% 
-  filter(metric == "C Index") %>% 
-  ggplot() + 
-  geom_density(aes(x = draws)) +
-  xlab("C-index") +
-  theme_bw() +
-  theme(text = element_text(size = 18)) +
-  ggtitle(paste0(spec, ", temp. C-index (y preds based)")) +
-  xlim(c(0, 1))
+C_Ind_y_temp <- Hmisc::rcorr.cens(x = y_preds_obs_df_temp$sum_preds,
+                                  S = y_preds_obs_df_temp$sum_obs, outx=FALSE)
 
 
-# same for comparing observations with occuupancy probability:
+# same for comparing observations with occupancy probability:
 
-# predicted occ. prob.:
-sum_occprob_year <- apply(X = occ_all_routes, MARGIN = c(2,3), FUN = sum)
+occ_preds_obs_df_temp <- occ_preds_obs_df %>% 
+  group_by(Year) %>% 
+  summarise(sum_obs = sum(presence, na.rm = TRUE),
+            sum_preds = sum(pred_occ_mean))
 
-# C index, occ. prob.:
-C_distr_temp_occ <- apply(X = sum_occprob_year, MARGIN = 2, FUN = Hmisc::rcorr.cens, x = sum_obs_year, outx=FALSE) # TRUE? xx
 
-# reformat:
-rcorr_temp_occprob <-  C_distr_temp_occ %>% 
-  as_tibble(rownames = "metric") %>% 
-  tidyr::pivot_longer(cols = V1:V4000, values_to = "draws", names_to = NULL)
 
-# plot:
-rcorr_temp_occprob %>% 
-  filter(metric == "C Index") %>% 
-  ggplot() + 
-  geom_density(aes(x = draws)) +
-  xlab("C-index") +
-  theme_bw() +
-  theme(text = element_text(size = 18)) +
-  ggtitle(paste0(spec, ", temp. C-index (occ. based)")) +
-  xlim(c(0, 1))
+
+C_Ind_occ_temp <- Hmisc::rcorr.cens(x = occ_preds_obs_df_temp$sum_preds,
+                  S = occ_preds_obs_df_temp$sum_obs, outx=FALSE)
+
 
 # save evaluation outputs:
-save(list(rcorr_ypreds, rcorr_occprob, rcorr_temp_y_preds, rcorr_temp_occprob), 
-     file = file.path(dir, "data", paste0("CV_eval_", spec, ".RData")))
+CV_eval <- list(y_rank_corr_spat, occ_rank_corr_spat, C_Ind_y_temp, C_Ind_occ_temp)
+names(CV_eval) <- c("C_spat_y", "C_spat_occ", "C_temp_y", "C_temp_occ")
+
+save(CV_eval, file = file.path(dir, "results", "CV_cluster", "CV_eval", paste0("CV_eval_", spec, ".RData")))
 
 
 # Briscoe metrics: ---
+# xx
+
+# plots: ----
+
+# boxplots:
+y_preds_obs_df %>% 
+  filter(!is.na(presence)) %>% 
+  ggplot() + 
+  facet_wrap(~Year) +
+  geom_boxplot(aes(group = as.factor(presence), y = pred_y_mean, x = as.factor(presence)))
+
+# plot map comparing mean predictions and observations for single year: ---
+
+obs_preds_sf <- y_preds_obs_df %>% 
+  left_join(occ_preds_obs_df[c("RTENO", "Year", "pred_occ_mean")]) %>% 
+  left_join(routes_sel_sf, by = c(RTENO = "RTENO_BBS")) %>%
+  st_as_sf()
+
+# the more similar the colours of observation and prediction dots, the better:
+ggplot(obs_preds_sf) +
+  geom_sf(aes(fill = as.factor(presence)), pch = 21, size = 3) +
+  scale_fill_viridis_d(name = "observation") +
+  geom_sf(aes(color = pred_y_mean), size = 1) +
+  scale_color_viridis_c(name = "mean y. prediction") +
+  theme_bw() +
+  ggtitle(spec)
+
+ggplot(obs_preds_sf) +
+  geom_sf(aes(fill = as.factor(presence)), pch = 21, size = 3) +
+  scale_fill_viridis_d(name = "observation") +
+  geom_sf(aes(color = pred_occ_mean), size = 1) +
+  scale_color_viridis_c(name = "mean occ. prediction") +
+  theme_bw() +
+  ggtitle(spec)
+
+
+ggplot(occ_preds_obs_df_temp, aes(x = Year)) +
+  geom_line(aes(y = scale(sum_preds))) +
+  geom_line(aes(y = scale(sum_obs)), color = "blue")
