@@ -60,7 +60,7 @@ for(i in 1:length(species_selection_final)){
   spec_pres_abs_cum <- occ_spec_sf %>%
     group_by(RTENO_BBS) %>%
     summarise(presence_summarised = max(presence, na.rm=TRUE)) %>%
-    mutate(presence_summarised = factor(presence_summarised, levels = c(1,0))) %>%
+    mutate(presence_summarised = factor(presence_summarised, levels = c(1,0))) %>% 
     select(presence_summarised)
   
   plot_list[[i]] <- ggplot(spec_pres_abs_cum) +
@@ -187,3 +187,27 @@ corrplot::corrplot(M, method = "square", order = "hclust",
                    number.cex = 0.8,
                    number.digits= 2)
 # bio1 and bio10, bio12 and bio16 are highly correlated taking only route locations in account
+
+
+# shapefile with occupancy data: ----
+
+# routes-years:
+load(file = file.path("data", "BBS_for_occ_selection.RData")) # route_sel_dt; output of 1_3_match_BBS_to_env_data.R 
+
+# route-year-species information (only surveyed)
+load(file = file.path("data", "BBS_for_occ_spec_records.RData")) # bbs_dt_occ; output of 1_0_reformat_BBS_data.R
+
+
+# presences only:
+presences <- bbs_dt_occ %>% 
+  select(c(English_Common_Name, RTENO, Year)) %>% 
+  arrange(RTENO)
+
+# merge with route spatial data:
+pres_sf <- routes_sel_sf %>% 
+  #collapse::join(presences, on = c("RTENO_BBS" = "RTENO"), how = "right") %>% # something goes wrong in writing shapefile when using this
+  right_join(presences, by = c("RTENO_BBS" = "RTENO")) %>% 
+  select(c("RTENO" = RTENO_BBS, Year, "species" = English_Common_Name))
+
+st_write(pres_sf, file.path("data", "spec_presences.shp"), append = FALSE)
+

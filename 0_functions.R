@@ -196,6 +196,21 @@ BBS_pres_abs_spec <- function(species,
     mutate(presence = ifelse(presence >= 1, 1, 0)) %>% 
     arrange(RTENO)
   
+  # for three species there are reported presences on routes far outside the breeding range
+  # these are considered absences (not used for models):
+  if(species %in% c("Northern Parula", "Yellow-bellied Sapsucker", "Yellow-throated Warbler")){
+    
+    if(species == "Northern Parula"){
+      occ_dt_spec$presence[which(occ_dt_spec$RTENO == 84014071)] <- 0
+    }
+    if(species == "Yellow-bellied Sapsucker"){
+      occ_dt_spec$presence[which(occ_dt_spec$RTENO == 84060004)] <- 0
+    }
+    if(species == "Yellow-throated Warbler"){
+      occ_dt_spec$presence[which(occ_dt_spec$RTENO == 84069052)] <- 0
+    }
+    
+  }
   return(occ_dt_spec)
 }
 

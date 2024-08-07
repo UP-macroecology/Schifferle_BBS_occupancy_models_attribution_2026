@@ -21,6 +21,14 @@ library(terra)
 
 # load model outputs: ----
 
+#load(file.path("results", "CV_cluster", "out_Acadian Flycatcher_CV_fold2.RData"))
+load(file.path("tests", "out_Acadian Flycatcher_CV_fold5.RData"))
+out
+brms::mcmc_plot(out, type = "rhat")
+brms::mcmc_plot(out, type = "trace", variable = "^b_ex" , regex = TRUE)
+bayesplot::color_scheme_set("viridis")
+bayesplot::mcmc_trace(out, regex_pars = "ex")
+# looks like longer warmup (or using only last 1000 its would help)
 load(file.path("results", "out_fl_fm_buffer750_Acadian Flycatcher_round_2.RData"))
 out2 <- out
 out2$fit
@@ -811,6 +819,57 @@ which(low_n_eff %in% high_k)
 which(high_k %in% low_n_eff)
 plot(cv_it2000, diagnostic = "k")
 
+## map routes with high k values: ----
+
+
+for(s in 1:12){
+  load(file = file.path("M:/Documents/DEBTs/analysis/Schifferle_BBS_occupancy_models_2023", 
+                        "results", paste0("out_fl_fm_", testspecs[s], "_postproc_buffer750_update_preds.RData")))
+  print(plot(res_list$loo_cv))
+  print(s)
+  print(summary(loo::pareto_k_influence_values(res_list$loo_cv)))
+}
+# summary(c(1.2, 1.5, 1.1, 1.2, 1.1, 1.7, 0.9, 1, 1.4, 1.6, 1.4, 2.5))
+probl_routes <- c()
+for(s in 1:12){
+  print(s)
+  load(file = file.path("M:/Documents/DEBTs/analysis/Schifferle_BBS_occupancy_models_2023", 
+                        "results", paste0("out_fl_fm_", testspecs[s], "_postproc_buffer750_update_preds.RData")))
+  k_values <- loo::pareto_k_influence_values(res_list$loo_cv)
+  
+  RTENO <- training_routes(species = testspecs[s], buffer_km = 750, output = "RTENOs")
+  buffer <- training_routes(species = testspecs[s], buffer_km = 750, output = "buffer")
+  
+  maps_dt <-as_tibble(cbind(RTENO, k_values)) %>% 
+    filter(k_values >= 0.7) %>% 
+    left_join(routes_sel_sf, by = c("RTENO" = "RTENO_BBS")) %>% 
+    st_as_sf()
+  
+  p <- maps_dt %>% 
+    ggplot()  +
+    geom_sf(data = routes_sel_sf, size = 2, col = "grey70") +
+    geom_sf(aes(col = k_values), size = 3) +
+    geom_sf(data = buffer, fill = "transparent") +
+    ggtitle(testspecs[s]) +
+    theme(text = element_text(size = 18))
+  print(p)
+  jpeg(file = file.path("plots", "high_k_maps", paste0(testspecs[s], "_buffer_750.jpg")), 
+       width = 1000, height = 800, quality = 100)
+  print(p)
+  dev.off()
+  probl_routes <- c(probl_routes, maps_dt$RTENO)
+}
+
+sort(table(probl_routes), decreasing = TRUE)
+
+length(unique(probl_routes))
+# of 143 problematic routes, 95 problematic only for one species, 1 route üroblematic for 8 species
+length(which(table(probl_routes) == 1))
+ggplot(routes_sel_sf) + 
+  geom_sf() +
+  geom_sf(data = routes_sel_sf %>%
+            filter(RTENO_BBS %in% names(which(table(probl_routes) >= 4))),
+          col = "yellow")
 
 
 # fitted values for initial occ, col., ext., occ. prob: ------------------------

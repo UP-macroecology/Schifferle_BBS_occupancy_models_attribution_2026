@@ -32,8 +32,8 @@ library(factoextra) # for PCA related plots
 # if (requireNamespace("sf", quietly = TRUE)) {
 #   data(us_states)
 # }
-# US_albers_sf <- us_states %>% 
-#   st_union() %>% 
+# US_albers_sf <- us_states %>%
+#   st_union() %>%
 #   st_transform(crs = "ESRI:102003")
 # # save as shp:
 # write_sf(US_albers_sf, file.path("data", "US_outline_ESRI102003.shp"))

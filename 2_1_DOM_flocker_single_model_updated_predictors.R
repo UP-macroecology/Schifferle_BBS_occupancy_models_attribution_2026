@@ -9,7 +9,6 @@
 
 buffer_km <- 750 # 250
 
-# CHECK AGAIN WHETHER IT WORKS!
 
 # packages: ----
 
@@ -62,7 +61,9 @@ routes_sel_sf <- st_read(file.path("data", "route_selection_1991_2015_surv_beg_e
 load(file = file.path("data", "BBS_for_occ_spec_records.RData")) # bbs_dt_occ; output of 1_0_reformat_BBS_data.R
 
 # selected species:
-load(file = file.path("data", "final_species_selection.RData")) # species_selection_final; output of 1_2_species_selection.R
+#load(file = file.path("data", "final_species_selection.RData")) # species_selection_final; output of 1_2_species_selection.R
+# sorted by ecoregion:
+load(file = file.path("data", "final_species_selection_eco_sorted.RData")) # final_species_eco_sorted; output of 1_2_species_selection.R
 
 
 # assemble data: ----
@@ -71,65 +72,21 @@ nyears <- length(unique(route_sel_env_dt_scaled$Year)) # 25
 nsurveys <- 5
 
 # register cores for parallel computation:
-ncores <- 12 # models * 4 chains? 
+ncores <- 40 # models * 4 chains? 
 cl <- makeCluster(ncores, setup_timeout = 0.5)
 registerDoParallel(cl)
-
-testspecs0 <- c("Black-billed Cuckoo",
-                "Great-tailed Grackle",
-                "Scissor-tailed Flycatcher",
-                "Common Raven",
-                "Wild Turkey",
-                "Bald Eagle",
-                "Black-chinned Hummingbird",
-                "Broad-winged Hawk",
-                "Greater Roadrunner",
-                "Eurasian Collared-Dove"
-)
-# 
-# testspecs1 <- c("Mourning Dove",
-#                 "Red-winged Blackbird",
-#                 "Brown-headed Cowbird",
-#                 "Barn Swallow",
-#                 "American Robin",
-#                 "European Starling",
-#                 "American Crow",
-#                 "House Sparrow",
-#                 "Common Grackle",
-#                 "Common Yellowthroat")
-# 
-# testspecs2 <- c("Northern Flicker",
-#                 "Blue Jay",
-#                 "Eastern Meadowlark",
-#                 "Indigo Bunting",
-#                 "American Kestrel",
-#                 "American Goldfinch",
-#                 "Cedar Waxwing",
-#                 "Northern Mockingbird",
-#                 "Yellow Warbler",
-#                 "Song Sparrow")
-# 
-# testspecs3 <- c("Black-capped Chickadee",
-#                 "House Wren",
-#                 "Eastern Towhee",
-#                 "Eastern Kingbird",
-#                 "Gray Catbird",
-#                 "Northern Cardinal",
-#                 "Horned Lark",
-#                 "Dickcissel",
-#                 "White-breasted Nuthatch",
-#                 "Tufted Titmouse")
-
-testspecs <- species_selection_final[which(!species_selection_final %in% testspecs0)]
 
 
 # make blocks:
 # 3 species per block:
-spec_blocks_list <- split(testspecs, rep(1:55, each = 3))
+spec_blocks_list <- split(final_species_eco_sorted, c(rep(1:17, each = 10), rep(18, 4)))
 names(spec_blocks_list) <- NULL
 
-#for(i in 1:length(spec_blocks_list)){
-for(i in 1:4){
+prog_log_file <- file("fm_buffer_750_progress.txt", open = "wt") # write console output here
+sink(prog_log_file, type = "message")
+sink(prog_log_file, type = "output")
+
+for(i in 1:length(spec_blocks_list)){
   
   print(paste("block", i, "of", length(spec_blocks_list)))
   
@@ -139,54 +96,21 @@ for(i in 1:4){
           .verbose = TRUE) %dopar% {
             
             # assemble data: ----
+
+            spec_fm_log_file <- file(paste0("out_", spec, "_fm_buffer", buffer_km, ".txt"), open = "wt") # write console output here
+            sink(spec_fm_log_file, type = "message")
+            sink(spec_fm_log_file, type = "output")
+            
+            print(spec)
             
             # species presences-absences:
             
             occ_dt_spec <- BBS_pres_abs_spec(species = spec)
             
-            # presences_spec <- bbs_dt_occ %>% 
-            #   select(c(English_Common_Name, RTENO, Year, paste0("Count", seq(10, 50, 10)))) %>% 
-            #   filter(English_Common_Name == spec)
-            # 
-            # # match to routes-year-env:
-            # 
-            # occ_dt_spec <- route_sel_env_dt_scaled %>% 
-            #   # add observations:
-            #   collapse::join(presences_spec, on = c("RTENO", "Year"), how = "left") %>% 
-            #   # if route was surveyed but species not observed, replace NA with 0:
-            #   mutate(across(Count10:Count50, ~ 
-            #                   case_when(Surveyed == 1 & is.na(.) ~ 0,
-            #                             .default = .))) %>%
-            #   # convert bird counts to presence / absence:
-            #   mutate(across(Count10:Count50, ~ 
-            #                   case_when(. > 1 ~ 1,
-            #                             .default = .)))
-            
-            # # routes with presences (sf):
-            # 
-            # occ_spec_sf <- routes_sel_sf %>%
-            #   left_join(occ_dt_spec, by = c("RTENO_BBS" = "RTENO")) %>%
-            #   # presence on route across all sections:
-            #   mutate(presence = rowSums(across(paste0("Count", seq(10, 50, 10))))) %>%
-            #   mutate(presence = ifelse(presence >= 1, 1, 0)) %>% 
-            #   # presence on route across all years:
-            #   group_by(RTENO_BBS) %>%
-            #   summarise(presence_summarised = max(presence, na.rm=TRUE)) %>%
-            #   mutate(presence_summarised = factor(presence_summarised, levels = c(1,0)))
-            # 
-            # # buffer presences:
-            # pres_buffer <- occ_spec_sf %>% 
-            #   filter(presence_summarised == 1) %>%
-            #   st_buffer(dist = 250000) %>% # 750000
-            #   st_union
-            # 
-            # # routes within buffer:
-            # routes_within <- occ_spec_sf %>% 
-            #   st_filter(., y = pres_buffer, join = st_within)
-            
             # relevant routes, within distance of 750 km of species records:
             rel_routes <- training_routes(species = spec, buffer_km = buffer_km, output = "RTENOs")
             
+            print(paste("training routes:", length(rel_routes)))
             
             # reformat obs. as array sites x surveys x years:
             
@@ -231,11 +155,7 @@ for(i in 1:4){
             
             # fit model: ----
             
-            sink(paste0("out_", spec, "_fm_buffer", buffer_km, ".txt")) # write console output here
-            sink(type = "message")
-            
-            print(spec)
-            
+
             start.time <- Sys.time()
             
             out <- flock(
@@ -272,8 +192,8 @@ for(i in 1:4){
               backend = "cmdstanr",
               cores = 4,
               chains = 4,
-              warmup = 250,
-              iter = 250 + 1000
+              warmup = 500,
+              iter = 500 + 1000
             )
             
             print(out)
@@ -307,10 +227,14 @@ for(i in 1:4){
             end.time <- Sys.time()
             print(round(end.time - start.time, 2))
             
-            sink(file = NULL)
+            sink(type="message")
+            sink(type="output")
             
           }
 }
+
+sink(type="message")
+sink(type="output")
 
 stopCluster(cl)
 
