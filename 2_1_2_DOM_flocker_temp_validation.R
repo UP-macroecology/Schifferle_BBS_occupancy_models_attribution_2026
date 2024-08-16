@@ -93,6 +93,16 @@ for(i in 1:length(spec_blocks_list)){
           .errorhandling = "pass", #"remove",
           .verbose = TRUE) %dopar% {
             
+            
+            # check whether species has run already:
+            model_run <- file.exists(file.path(dir, "data", "temp_val", paste0("out_", spec, "_temp_val_", ifelse(n_train_years == 20, "5yrs", "10yrs"), ".RData")))
+            post_proc_run <- file.exists(file.path(dir, "data", "temp_val",  paste0("test_preds_", spec, "_temp_val_", ifelse(n_train_years == 20, "5yrs", "10yrs"), ".RData")))
+            
+            if(model_run & post_proc_run) {
+              print(paste(spec, "ran already."))
+              next
+            }
+            
             log_file_spec <- file(paste0("temp_val/", "temp_val_", ifelse(n_train_years == 20, "5yrs", "10yrs"), "_buffer_", buffer_km, "_", spec, ".txt"), open = "wt") # write console output here
             sink(log_file_spec, type = "message")
             sink(log_file_spec, type = "output")

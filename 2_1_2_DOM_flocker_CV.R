@@ -89,7 +89,7 @@ prog_log_file <- file("CV/CV_buffer_750_progress.txt", open = "wt") # write cons
 sink(prog_log_file, type = "message")
 sink(prog_log_file, type = "output")
 
-for(i in 2:length(spec_blocks_list)){
+for(i in 9:length(spec_blocks_list)){
   
   print(paste("block", i, "of", length(spec_blocks_list)))
   
@@ -98,16 +98,22 @@ for(i in 2:length(spec_blocks_list)){
           .errorhandling = "pass", #"remove",
           .verbose = TRUE) %:% 
             
-            
             foreach(fold = 1:5,
                     .packages = c("dplyr", "collapse", "flocker", "cmdstanr", "brms"), # xx
                     .errorhandling = "pass", #"remove",
                     .verbose = TRUE) %dopar% {
                       
-                      
                       log_file_spec <- file(paste0("CV/", spec, "_CV_fitting_final.txt"), open = "wt") # write console output here
                       sink(log_file_spec, type = "message")
                       sink(log_file_spec, type = "output")
+                      
+                      
+                      # check whether species has run already:
+                      CV_run <- length(list.files(path = file.path(dir, "data"), pattern = paste0(spec, "_CV_fold"))) == 10
+                      if(CV_run) {
+                        print(paste(spec, "ran already."))
+                        next
+                      } # xx
                       
                       print(spec)
                       
@@ -119,12 +125,9 @@ for(i in 2:length(spec_blocks_list)){
                       # load fold assignment:
                       load(file.path("data", "CV_route_block_allocation", "block_size_500km", paste0(spec, ".RData")))
                       
-                      # assemble data: ----
-                      
+                      # assemble data:
                       occ_dt_spec <- BBS_pres_abs_spec(species = spec)
-                      
-                      
-                      
+
                       log_file_spec_fold <- file(paste0("CV/", spec, "_CV_fitting4_fold", fold, ".txt"), open = "wt") # write console output here
                       sink(log_file_spec_fold, type = "message")
                       sink(log_file_spec_fold, type = "output")

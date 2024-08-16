@@ -86,14 +86,24 @@ prog_log_file <- file("fm_buffer_750_progress.txt", open = "wt") # write console
 sink(prog_log_file, type = "message")
 sink(prog_log_file, type = "output")
 
-for(i in 1:length(spec_blocks_list)){
+for(i in 14:length(spec_blocks_list)){
   
   print(paste("block", i, "of", length(spec_blocks_list)))
   
   foreach(spec = spec_blocks_list[[i]],
+          
           .packages = c("dplyr", "collapse", "flocker", "cmdstanr", "brms", "sf"), # xx
           .errorhandling = "pass", #"remove",
           .verbose = TRUE) %dopar% {
+            
+            # check whether species has run already:
+            model_run <- file.exists(file.path(dir, "data", paste0("out_", spec, "_fm_buffer", buffer_km, ".RData")))
+            post_proc_run <- file.exists(file.path(dir, "data", paste0("postproc_", spec, "_fm_buffer", buffer_km, ".RData")))
+            
+            if(model_run & post_proc_run) {
+              print(paste(spec, "ran already."))
+              next
+              }
             
             # assemble data: ----
 
@@ -127,7 +137,7 @@ for(i in 1:length(spec_blocks_list)){
             
             env_cov <- vector("list", length = nyears)
             for (t in 1:nyears){
-              env_cov[[t]] <- route_sel_env_dt_scaled[which(route_sel_env_dt_scaled$Year == years[t] & occ_dt_spec$RTENO %in% rel_routes), 
+              env_cov[[t]] <- route_sel_env_dt_scaled[which(route_sel_env_dt_scaled$Year == years[t] & route_sel_env_dt_scaled$RTENO %in% rel_routes), 
                                                       c("bio1", "bio2", "bio3", "bio7", "bio14", "bio15", 
                                                         "pr_spring", "pr_summer","pr_autumn", "pr_winter",
                                                         "bio1_3yrs", "bio2_3yrs", "bio3_3yrs", "bio7_3yrs", "bio14_3yrs", "bio15_3yrs",
@@ -219,6 +229,10 @@ for(i in 1:length(spec_blocks_list)){
                              "loo_cv" = loo_cv)
             
             print(res_list$loo_cv)
+            
+            high_k_routes <- loo::pareto_k_ids(loo_cv)
+            high_k_RTENO <- occ_dt_spec$RTENO[which(occ_dt_spec$RTENO %in% rel_routes)][high_k_routes]
+            print(paste("RTENO with too high pareto k:", paste(high_k_RTENO, collapse = ", ")))
             
             rm(fitted_initocc_col_ex, occ_posterior, y_predictions, loo_cv)
             
