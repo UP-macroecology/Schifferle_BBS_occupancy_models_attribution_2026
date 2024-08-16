@@ -1,0 +1,196 @@
+---
+title: "Check fitted flocker model"
+format: pdf
+editor: visual
+params:
+  spec: "Acadian Flycatcher"
+  buffer_km: 750
+  fold: 1
+  results_dir: "M:/Documents/DEBTs/analysis/Schifferle_BBS_occupancy_models_2023/results/full_model" 
+---
+
+```{r}
+#| echo: false
+#| output: false
+#| warning: false
+library(dplyr)
+library(flocker)
+library(ggplot2)
+library(cmdstanr)
+library(bayesplot)
+library(brms)
+
+# selected species, sorted by ecoregion 
+# (final_species_eco_sorted; output of 1_2_species_selection.R)
+load(file = file.path("data", "final_species_selection_eco_sorted.RData")) 
+
+```
+
+Specify model to check:
+
+```{r}
+spec <- params$spec #final_species_eco_sorted[6] # 1
+spec
+buffer_km <- params$buffer_km
+buffer_km
+fold <- params$fold
+# fold
+
+results_dir <- params$results_dir
+results_dir
+```
+
+Load fitted model:
+
+```{r}
+load(file = file.path(results_dir, 
+                      paste0("out_", spec, "_fm_buffer", buffer_km, ".RData"))) # xx adjust
+#print(out)
+
+posterior <- brms::as_draws(out)
+```
+
+## Check whether MCMC worked:
+
+### Do we have divergent transitions?
+
+```{r}
+#| echo: false
+# check for divergent transitions:
+hmc_diagnostics <- nuts_params(out)
+# extract the number of divergence transitions:
+
+# hmc_diagnostics %>%
+#   filter(Parameter == "divergent__") %>%
+#   count(Value)
+
+div_trans <- sum(subset(hmc_diagnostics, Parameter == "divergent__")$Value)
+
+print(paste("divergent transitions:", div_trans))
+
+# plot, if there are any:
+if(div_trans > 0){
+  color_scheme_set("darkgray")
+  div_style <- parcoord_style_np(div_color = "green", div_size = 0.15, div_alpha = 0.4)
+
+  for(par in c("b_occ", "b_col", "b_ex")){
+    print(
+      # parallel coordinates plot (= parameter values at each iteration as line plot):
+      mcmc_parcoord(posterior, regex_pars = par, np = hmc_diagnostics, np_style = div_style) +
+        theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+    )
+  }
+}
+```
+
+#### Explorations regarding divergent transitions:
+
+...
+
+### Is effective number of MCMC samples large enough:
+
+The larger the ratio of n_eff to N (number of samples), the better.
+
+```{r}
+#| echo: false
+n_eff_ratios <- neff_ratio(out)
+print(mcmc_neff(n_eff_ratios, size = 2)) # a useful heuristic is to worry about any neff/N less than 0.1)
+
+if("low" %in% mcmc_neff_data(n_eff_ratios)$rating){
+  print("effective sample size too small")
+} else {
+  print("effective sample size fine")
+}
+
+# effective number of samples in bulk and tail:
+out_sum <- summary(out)
+n_eff_ratio_bulk <- out_sum$fixed$Bulk_ESS/out_sum$total_ndraws
+n_eff_ratio_tail <- out_sum$fixed$Tail_ESS/out_sum$total_ndraws
+
+print("n_eff ratio bulk ESS:")
+summary(n_eff_ratio_bulk)
+print("n_eff ratio tail ESS:")
+summary(n_eff_ratio_tail)
+
+if(min(n_eff_ratio_bulk) < 0.1 |  min(n_eff_ratio_tail) < 0.1 ){
+  print("effective sample size in bulk or tail too small")
+} else {
+  print("effective sample size in bulk and tail fine")
+}
+```
+
+### Do chains mix well:
+
+```{r}
+#| echo: false
+#| fig-height: 11
+#| fig-width: 9
+color_scheme_set("mix-brightblue-gray")
+for(par in c("b_occ", "b_col", "b_ex")){
+  print(
+    mcmc_trace(posterior, regex_pars = par, np = hmc_diagnostics,
+               facet_args = list("ncol" = 4, "nrow" = 8)) + 
+      xlab("Post-warmup iteration")
+  )
+}
+```
+
+### Are R-hat values fine:
+
+```{r}
+#| echo: false
+rhats <- bayesplot::rhat(out$fit)
+summary(rhats)
+
+if(max(rhats) > 1.05){
+  print(paste("R-hat > 1.05 for", length(which(rhats > 1.05)), "parameters."))
+}
+if(max(rhats) >= 1.01){
+  print(mcmc_rhat(rhats) +
+          yaxis_text(hjust = 1)
+        )
+} else {
+  print("All R-hat values < 1.01")
+}
+```
+
+## Print model posteriors
+
+```{r}
+#| echo: false
+#| fig-height: 7
+#| fig-width: 5
+
+# for how many parameters is uncertainty interval not overlapping zero?
+
+uncertainty <- posterior_interval(out, prob = 0.95)
+ 
+overlaps_zero <- uncertainty[,1] < 0 & uncertainty[,2] > 0
+
+print("parameters for which uncertainty interval doesn't overlap zero:")
+grep(pattern = "b_occ", x = names(which(overlaps_zero == FALSE)), value = TRUE)
+grep(pattern = "b_colo", x = names(which(overlaps_zero == FALSE)), value = TRUE)
+grep(pattern = "b_ex", x = names(which(overlaps_zero == FALSE)), value = TRUE)
+
+# plot posterior intervals:
+color_scheme_set("red")
+
+# without intercept (to get better scale)
+pars_occ <- grep(pattern = "b_occ_(?!Intercept)", x = names(posterior$"1"), value = TRUE, perl = TRUE)
+pars_colo <- grep(pattern = "b_colo_(?!Intercept)", x = names(posterior$"1"), value = TRUE, perl = TRUE)
+pars_ex<- grep(pattern = "b_ex_(?!Intercept)", x = names(posterior$"1"), value = TRUE, perl = TRUE)
+
+for(par in c("b_occ", "b_colo", "b_ex")){
+  
+  if(par == "b_occ") pars <- pars_occ 
+  if(par == "b_colo") pars <- pars_colo 
+  if(par == "b_ex") pars <- pars_ex 
+  
+  print(
+    bayesplot::mcmc_intervals(posterior, 
+                              pars = pars,
+                              prob_outer = 0.95,
+                              point_est = "mean")
+  )
+ }
+```
