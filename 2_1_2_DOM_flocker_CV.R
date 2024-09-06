@@ -84,12 +84,11 @@ registerDoParallel(cl)
 spec_blocks_list <- split(final_species_eco_sorted, rep(1:(length(final_species_eco_sorted)/3), each = 3))
 names(spec_blocks_list) <- NULL
 
-
 prog_log_file <- file("CV/CV_buffer_750_progress.txt", open = "wt") # write console output here
 sink(prog_log_file, type = "message")
 sink(prog_log_file, type = "output")
 
-for(i in 9:length(spec_blocks_list)){
+for(i in 26:40){
   
   print(paste("block", i, "of", length(spec_blocks_list)))
   
@@ -106,7 +105,6 @@ for(i in 9:length(spec_blocks_list)){
                       log_file_spec <- file(paste0("CV/", spec, "_CV_fitting_final.txt"), open = "wt") # write console output here
                       sink(log_file_spec, type = "message")
                       sink(log_file_spec, type = "output")
-                      
                       
                       # check whether species has run already:
                       CV_run <- length(list.files(path = file.path(dir, "data"), pattern = paste0(spec, "_CV_fold"))) == 10
@@ -363,15 +361,13 @@ for(i in 9:length(spec_blocks_list)){
                       
                       sink(type="message")
                       sink(type="output")
+                      sink(type="message")
+                      sink(type="output")
                     }
-            
-            sink(type="message")
-            sink(type="output")
 
-          
-  sink(type="message")
-  sink(type="output")
 }
+sink(type="message")
+sink(type="output")
 
 stopCluster(cl)
 

@@ -24,8 +24,10 @@ source("0_functions.R")
 print(tempdir())
 #dir <- file.path("/import", "ecoc9z", "data-zurell", "schifferle", "BBS_occupancy_models_2023")
 dir <- getwd()
-results_dir <- file.path("M:", "Documents", "DEBTs", "analysis", "Schifferle_BBS_occupancy_models_2023", "results", "CV_cluster") 
+#results_dir <- file.path("M:", "Documents", "DEBTs", "analysis", "Schifferle_BBS_occupancy_models_2023", "results", "CV_cluster") 
 #results_dir <- file.path("results", "CV_cluster")
+results_dir <- file.path("//NAS-2-P-SN-01.ibb.uni-potsdam.de", "users$", "schifferle1", "Documents", "DEBTs", "analysis", 
+                         "Schifferle_BBS_occupancy_models_2023", "results", "CV_cluster") 
 
 
 # load data: ----
@@ -48,8 +50,8 @@ years <- 1991:2015
 # data prep.: ----
 
 
-for(i in 1:length(final_species_eco_sorted)){
-  
+for(i in 174:length(final_species_eco_sorted)){
+
   spec <- final_species_eco_sorted[i]
   
   print(paste(i, spec))
@@ -63,6 +65,12 @@ for(i in 1:length(final_species_eco_sorted)){
            error = function(e) { skip_to_next <<- TRUE})
   if(skip_to_next) { next }
   
+  # test whether script ran already for this species:
+  if(file.exists(file.path(dir, "results", "CV_cluster", "CV_eval2", paste0("CV_eval_", spec, ".RData")))){
+    print(paste(spec, "ran alrady."))
+    next
+  }
+
   for(fold in 1:5){
     
     print(fold)
@@ -95,15 +103,11 @@ for(i in 1:length(final_species_eco_sorted)){
   occ_dt_spec <- BBS_pres_abs_spec(species = spec)
   
   
-  # spatial C index: ---
+  # spatio-temporal C index: ---
   
+  # how well do we overall discriminate between occupied and non-occupied sites:
   
-  # do we get differences between sites right?
-  
-  # for each year separately, calculate Harrel's C index
-  # C index near 1 -> good
-  # C index = 0.5 -> model as good as random guessing of which of two routes has a higher probability of being occupied
-  
+  # calculate overall Harrel's C index:
   
   # 1) based on predictions of y (= occupancy (0/1) * detection prob.):
   
@@ -124,23 +128,9 @@ for(i in 1:length(final_species_eco_sorted)){
     left_join(occ_dt_spec, by = c("RTENO", "Year")) %>% 
     select(c(RTENO, Year, pred_y_mean, Count10:Count50, presence))
   
-  # C-index per year:
   
-  for(y in unique(y_preds_obs_df$Year)){
-    
-    dt <- y_preds_obs_df %>% 
-      filter(Year == y)
-    
-    y_rank_corr <- c("Year" = y, Hmisc::rcorr.cens(x = dt$presence, S = dt$pred_y_mean, outx=FALSE)) # xx
-    
-    if(y == unique(y_preds_obs_df$Year)[1]) {
-      y_rank_corr_spat <- y_rank_corr} else{
-        y_rank_corr_spat <- rbind(y_rank_corr_spat, y_rank_corr)
-      }
-  }
-  rownames(y_rank_corr_spat) <- NULL
-  y_rank_corr_spat
-  
+  y_Cind <- Hmisc::rcorr.cens(x = y_preds_obs_df$pred_y_mean, S = y_preds_obs_df$presence, outx=FALSE) # xx
+  y_auc_overall <- pROC::roc(response = y_preds_obs_df$presence, predictor = y_preds_obs_df$pred_y_mean)$auc
   
   # 2) based on predictions of occupancy probability:
   
@@ -167,6 +157,54 @@ for(i in 1:length(final_species_eco_sorted)){
     left_join(occ_dt_spec, by = c("RTENO", "Year")) %>% 
     select(c(RTENO, Year, pred_occ_mean, Count10:Count50, presence))
   
+  occ_Cind <- Hmisc::rcorr.cens(x = occ_preds_obs_df$pred_occ_mean, S = occ_preds_obs_df$presence, outx=FALSE)
+  occ_auc_overall <- pROC::roc(response = occ_preds_obs_df$presence, predictor = occ_preds_obs_df$pred_occ_mean)$auc
+  
+  
+  # spatial C index: ---
+  
+  # do we get differences between sites right?
+  
+  # for each year separately, calculate Harrel's C index
+  # C index near 1 -> good
+  # C index = 0.5 -> model as good as random guessing of which of two routes has a higher probability of being occupied
+  
+  # plus calculate AUC xx
+  
+  # 1) based on predictions of y (= occupancy (0/1) * detection prob.):
+  
+  # C-index per year:
+  
+  for(y in unique(y_preds_obs_df$Year)){
+    
+    print(y)
+    dt <- y_preds_obs_df %>% 
+      filter(Year == y)
+    
+    y_rank_corr <- c("Year" = y, Hmisc::rcorr.cens(x = dt$pred_y_mean, S = dt$presence , outx=FALSE)) # xx
+    
+    if(y == unique(y_preds_obs_df$Year)[1]) {
+      y_rank_corr_spat <- y_rank_corr} else{
+        y_rank_corr_spat <- rbind(y_rank_corr_spat, y_rank_corr)
+      }
+    
+    y_auc <- c("Year" = y, 
+               "auc" = tryCatch(pROC::roc(response = dt$presence, predictor = dt$pred_y_mean)$auc,
+                                error = function(e) {NA})) # xx
+    
+    if(y == unique(y_preds_obs_df$Year)[1]) {
+      y_auc_spat <- y_auc} else{
+        y_auc_spat <- rbind(y_auc_spat, y_auc)
+      }
+    
+  }
+  rownames(y_rank_corr_spat) <- NULL
+  y_rank_corr_spat
+  rownames(y_auc_spat) <- NULL
+  y_auc_spat
+  
+  # 2) based on predictions of occupancy probability:
+  
   # C-index per year:
   
   for(y in unique(occ_preds_obs_df$Year)){
@@ -174,17 +212,30 @@ for(i in 1:length(final_species_eco_sorted)){
     dt <- occ_preds_obs_df %>% 
       filter(Year == y)
     
-    occ_rank_corr <- c("Year" = y, Hmisc::rcorr.cens(x = dt$presence, S = dt$pred_occ_mean, outx=FALSE)) # xx
+    occ_rank_corr <- c("Year" = y, Hmisc::rcorr.cens(x = dt$pred_occ_mean, S = dt$presence, outx=FALSE)) # xx
     
     if(y == unique(occ_preds_obs_df$Year)[1]) {
       occ_rank_corr_spat <- occ_rank_corr} else{
         occ_rank_corr_spat <- rbind(occ_rank_corr_spat, occ_rank_corr)
       }
+    
+    occ_auc <- c("Year" = y, 
+                 "auc" = tryCatch(pROC::roc(response = dt$presence, predictor = dt$pred_occ_mean)$auc,
+                                              error = function(e) {NA})) # xx
+    
+    if(y == unique(y_preds_obs_df$Year)[1]) {
+      occ_auc_spat <- occ_auc} else{
+        occ_auc_spat <- rbind(occ_auc_spat, occ_auc)
+      }
+    
+    
   }
   rownames(occ_rank_corr_spat) <- NULL
   occ_rank_corr_spat
+  rownames(occ_auc_spat) <- NULL
+  occ_auc_spat
   
-  
+
   # temporal C indices: ---
   
   
@@ -197,11 +248,12 @@ for(i in 1:length(final_species_eco_sorted)){
   y_preds_obs_df_temp <- y_preds_obs_df %>% 
     group_by(Year) %>% 
     summarise(sum_obs = sum(presence, na.rm = TRUE),
-              sum_preds = sum(pred_y_mean))
+              sum_preds = sum(pred_y_mean)) # xx
   
   C_Ind_y_temp <- Hmisc::rcorr.cens(x = y_preds_obs_df_temp$sum_preds,
                                     S = y_preds_obs_df_temp$sum_obs, outx=FALSE)
   
+  # xx
   
   # same for comparing observations with occupancy probability:
   
@@ -216,19 +268,29 @@ for(i in 1:length(final_species_eco_sorted)){
   
   
   # save evaluation outputs:
-  CV_eval <- list(y_rank_corr_spat, occ_rank_corr_spat, C_Ind_y_temp, C_Ind_occ_temp)
-  names(CV_eval) <- c("C_spat_y", "C_spat_occ", "C_temp_y", "C_temp_occ")
+  CV_eval <- list(y_Cind, y_auc_overall, occ_Cind, occ_auc_overall, 
+                  y_rank_corr_spat, y_auc_spat, occ_rank_corr_spat, occ_auc_spat,
+                  C_Ind_y_temp, C_Ind_occ_temp)
+  names(CV_eval) <- c("C_spattemp_y", "auc_spattemp_y", "C_spattemp_occ", "auc_spattemp_occ", 
+                      "C_spat_y", "auc_spat_y", "C_spat_occ","auc_spat_occ", 
+                      "C_temp_y", "C_temp_occ")
   
-  save(CV_eval, file = file.path(dir, "results", "CV_cluster", "CV_eval", paste0("CV_eval_", spec, ".RData")))
+  save(CV_eval, file = file.path(dir, "results", "CV_cluster", "CV_eval2", paste0("CV_eval_", spec, ".RData")))
   
 }
 
 
-# assemble C-values for all species: ----
+# assemble C-values for all species: ---- xx
 
 CV_eval_summary <- data.frame("species" = final_species_eco_sorted,
-                              "y_spatial_C_median" = NA,
-                              "occ_spatial_C_median" = NA,
+                              "y_spattemp_C" = NA,
+                              "occ_spattemp_C" = NA,
+                              "y_spattemp_auc" = NA,
+                              "occ_spattemp_auc" = NA,
+                              "y_spatial_C_mean" = NA,
+                              "occ_spatial_C_mean" = NA,
+                              "y_spatial_auc_mean" = NA,
+                              "occ_spatial_auc_mean" = NA,
                               "y_temp_C" = NA,
                               "occ_temp_C" = NA)
 
@@ -240,22 +302,32 @@ for(i in 1:length(final_species_eco_sorted)){
   print(paste(i, spec))
   
   skip_to_next <- FALSE
-  tryCatch(print(load(file = file.path(dir, "results", "CV_cluster", "CV_eval", paste0("CV_eval_", spec, ".RData")))),
+  tryCatch(print(load(file = file.path(dir, "results", "CV_cluster", "CV_eval2", paste0("CV_eval_", spec, ".RData")))),
            error = function(e) { skip_to_next <<- TRUE})
            if(skip_to_next) { next }
   
-  CV_eval_summary$y_spatial_C_median[which(CV_eval_summary$species == spec)] <- median(CV_eval$C_spat_y[, "C Index"])
-  CV_eval_summary$occ_spatial_C_median[which(CV_eval_summary$species == spec)] <- median(CV_eval$C_spat_occ[, "C Index"])        
+  CV_eval_summary$y_spattemp_C[which(CV_eval_summary$species == spec)] <- CV_eval$C_spattemp_y["C Index"]
+  CV_eval_summary$occ_spattemp_C[which(CV_eval_summary$species == spec)] <- CV_eval$C_spattemp_occ["C Index"]
+  
+  CV_eval_summary$y_spattemp_auc[which(CV_eval_summary$species == spec)] <- CV_eval$auc_spattemp_y
+  CV_eval_summary$occ_spattemp_auc[which(CV_eval_summary$species == spec)] <- CV_eval$auc_spattemp_occ
+  
+  CV_eval_summary$y_spatial_C_mean[which(CV_eval_summary$species == spec)] <- mean(CV_eval$C_spat_y[, "C Index"], na.rm = TRUE)
+  CV_eval_summary$occ_spatial_C_mean[which(CV_eval_summary$species == spec)] <- mean(CV_eval$C_spat_occ[, "C Index"], na.rm = TRUE)  
+  
+  CV_eval_summary$y_spatial_auc_mean[which(CV_eval_summary$species == spec)] <- mean(CV_eval$auc_spat_y[ ,"auc"], na.rm = TRUE)
+  CV_eval_summary$occ_spatial_auc_mean[which(CV_eval_summary$species == spec)] <- mean(CV_eval$auc_spat_occ[ ,"auc"], na.rm = TRUE)
+  
   CV_eval_summary$y_temp_C[which(CV_eval_summary$species == spec)] <- CV_eval$C_temp_y["C Index"]
   CV_eval_summary$occ_temp_C[which(CV_eval_summary$species == spec)] <- CV_eval$C_temp_occ["C Index"]
   
 }
 
-write.csv(CV_eval_summary, file = file.path(dir, "results", "CV_cluster", "CV_eval", "CV_eval_summary.csv"), row.names = FALSE)
+write.csv(CV_eval_summary, file = file.path(dir, "results", "CV_cluster", "CV_eval2", "CV_eval_summary.csv"), row.names = FALSE)
 
 CV_eval_summary
 
-
+summary(CV_eval_summary)
 
 
 
@@ -299,3 +371,17 @@ ggplot(obs_preds_sf) +
 ggplot(occ_preds_obs_df_temp, aes(x = Year)) +
   geom_line(aes(y = scale(sum_preds))) +
   geom_line(aes(y = scale(sum_obs)), color = "blue")
+
+
+library(survival)
+age <- rnorm(400, 50, 10)
+bp  <- rnorm(400,120, 15)
+bp[1]  <- NA
+d.time <- rexp(400)
+cens   <- runif(400,.5,2)
+death  <- d.time <= cens
+d.time <- pmin(d.time, cens)
+Hmisc::rcorr.cens(age, Surv(d.time, death)) # occ prob., observation (PA)
+x <- round(rnorm(200))
+y <- rnorm(200)
+rcorr.cens(x, y, outx=TRUE)

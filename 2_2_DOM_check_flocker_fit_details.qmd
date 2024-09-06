@@ -43,8 +43,11 @@ results_dir
 Load fitted model:
 
 ```{r}
-load(file = file.path(results_dir, 
-                      paste0("out_", spec, "_fm_buffer", buffer_km, ".RData"))) # xx adjust
+# load(file = file.path(results_dir,
+#                       paste0("out_", spec, "_fm_buffer", buffer_km, ".RData"))) # xx adjust
+load(file = file.path(results_dir,
+                      paste0("out_", spec, "_temp_val_5yrs.RData")))
+
 #print(out)
 
 posterior <- brms::as_draws(out)

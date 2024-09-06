@@ -26,8 +26,9 @@ buffer_km <- 750
 print(tempdir())
 #dir <- file.path("/import", "ecoc9z", "data-zurell", "schifferle", "BBS_occupancy_models_2023")
 #dir <- getwd()
-#results_dir <- file.path("M:", "Documents", "DEBTs", "analysis", "Schifferle_BBS_occupancy_models_2023", "results") 
-results_dir <- "results/temp_val"
+results_dir <- file.path("M:", "Documents", "DEBTs", "analysis", "Schifferle_BBS_occupancy_models_2023", "results", "temp_val") 
+#results_dir <- "results/temp_val"
+results_dir <- file.path("//NAS-2-P-SN-01.ibb.uni-potsdam.de", "users$", "schifferle1", "Documents", "DEBTs", "analysis", "Schifferle_BBS_occupancy_models_2023", "results", "temp_val") 
 
 
 # load data: ----
@@ -50,66 +51,87 @@ years <- 1991:2015
 # data prep.: ----
 
 # species:
-spec <- final_species_eco_sorted[3] # 1
 
-# observations:
-# relevant routes for the species, within distance of 750 km of presences:
-rel_routes <- training_routes(species = spec, buffer_km = buffer_km, output = "RTENOs")
-occ_dt_spec <- BBS_pres_abs_spec(species = spec) %>% 
-  filter(RTENO %in% rel_routes)
-occ_dt_spec
+files <- list.files(file.path(results_dir), pattern = "test_preds")
+species_set <- gsub(pattern = "(test_preds_)|(_temp_val_5yrs.RData)", x = list.files(results_dir, pattern = "test_preds_"), replacement = "")
+
+C_temp_val_df <- data.frame("species" = species_set,
+                            "C_ind_5yrs_preds" = NA)
+
+for(i in 101:174){#length(species_set)){
+  
+  spec <- species_set[i] # 1
+  
+  print(paste(i, spec))
+  
+  # observations:
+  # relevant routes for the species, within distance of 750 km of presences:
+  rel_routes <- training_routes(species = spec, buffer_km = buffer_km, output = "RTENOs")
+  occ_dt_spec <- BBS_pres_abs_spec(species = spec) %>% 
+    filter(RTENO %in% rel_routes)
+  occ_dt_spec
+  
+  # load model predictions:
+  
+  load(file.path(results_dir, paste0("test_preds_", spec, "_temp_val_", 
+                                     ifelse(n_train_years == 20, "5yrs", "10yrs"), ".RData")))
+  
+  # load(file.path(results_dir, paste0("out_", spec, "_temp_val_", 
+  #                                    ifelse(n_train_years == 20, "5yrs", "10yrs"), ".RData")))
+  
+  
+  # sum all routes for each year (temporal trend)
+  obs_temp_trend <- occ_dt_spec %>% 
+    group_by(Year) %>% 
+    summarise(pres_sum = sum(presence, na.rm = TRUE))
+  
+  # predictions:
+  res_list$y_preds # routes - sections - years - draws
+  # sum across sections:
+  preds_routes <- apply(res_list$y_preds, MAR = c(1,3,4), FUN = max)
+  dim(preds_routes)
+  # sum across routes for each year:
+  preds_years <- apply(preds_routes, MAR = c(2,3), FUN = sum, na.rm = TRUE) # xx
+  dim(preds_years)
+  # mean:
+  preds_years_mean <- apply(preds_years, MAR = 1, FUN = mean)
+  # median:
+  preds_years_median <- apply(preds_years, MAR = 1, FUN = median)
+  # sd:
+  preds_years_sd <- apply(preds_years, MAR = 1, FUN = sd)
+  
+  # C-index of last 5 years:
+  C_temp_val <- Hmisc::rcorr.cens(x = preds_years_mean[21:25], S = obs_temp_trend$pres_sum[21:25])
+  C_temp_val_df$C_ind_5yrs_preds[i] <- C_temp_val["C Index"]
+  
+  # plot predicted y against observations summed over years:
+  
+  jpeg(file = file.path(results_dir, "temp_eval", "5_years", paste0("temp_val_5yrs_", spec,"_", buffer_km, "km.jpg")), 
+       width = 1000, height = 700, quality = 100)
+  print(
+    ggplot(obs_temp_trend, aes(x = Year)) +
+      geom_line(aes(y = pres_sum)) +
+      geom_point(aes(y = pres_sum), size = 3) +
+      geom_ribbon(aes(y=preds_years_mean, ymax=preds_years_mean + 1*preds_years_sd, ymin=preds_years_mean - 1*preds_years_sd), 
+                  alpha=0.2, fill = "cornflowerblue") +
+      geom_line(aes(y = preds_years_mean), color = "cornflowerblue") +
+      geom_point(aes(y = preds_years_mean), color = "cornflowerblue", size = 3) +
+      ylab("N routes with presence") +
+      theme_bw() +
+      theme(text = element_text(size = 20)) +
+      geom_vline(xintercept = 2010, linetype = "dashed") +
+      ggtitle(paste0(spec, ": y preds (mean +/- 1 sd) vs. obs. (C index last 5 yrs: ", round(C_temp_val,2), ")"))
+  )
+  dev.off()
+  
+}
 
 
-
-# load model predictions:
-
-load(file.path(results_dir, paste0("test_preds_", spec, "_temp_val_", 
-                                   ifelse(n_train_years == 20, "5yrs", "10yrs"), ".RData")))
-
-# load(file.path(results_dir, paste0("out_", spec, "_temp_val_", 
-#                                    ifelse(n_train_years == 20, "5yrs", "10yrs"), ".RData")))
-
-# plot observations, predictions
-# add SD?
-
-
-# sum all routes for each year (temporal trend)
-obs_temp_trend <- occ_dt_spec %>% 
-  group_by(Year) %>% 
-  summarise(pres_sum = sum(presence, na.rm = TRUE))
-
-# predictions:
-res_list$y_preds # routes - sections - years - draws
-# sum across sections:
-preds_routes <- apply(res_list$y_preds, MAR = c(1,3,4), FUN = max)
-dim(preds_routes)
-# sum across routes for each year:
-preds_years <- apply(preds_routes, MAR = c(2,3), FUN = sum)
-dim(preds_years)
-# mean:
-preds_years_mean <- apply(preds_years, MAR = 1, FUN = mean)
-# median:
-preds_years_median <- apply(preds_years, MAR = 1, FUN = median)
-# sd:
-preds_years_sd <- apply(preds_years, MAR = 1, FUN = sd)
-
-# plot predicted y against observations summed over years:
-ggplot(obs_temp_trend, aes(x = Year)) +
-  geom_line(aes(y = pres_sum)) +
-  geom_point(aes(y = pres_sum)) +
-  geom_ribbon(aes(y=preds_years_mean, ymax=preds_years_mean + 2*preds_years_sd, ymin=preds_years_mean - 2*preds_years_sd), 
-              alpha=0.2, fill = "cornflowerblue") +
-  geom_line(aes(y = preds_years_mean), color = "cornflowerblue") +
-  geom_point(aes(y = preds_years_mean), color = "cornflowerblue") +
-  theme_bw() +
-  theme(text = element_text(size = 15)) +
-  geom_vline(xintercept = 2010, linetype = "dashed") +
-  ggtitle(paste(spec, "(y preds vs. obs.)"))
+save(C_temp_val_df, file = file.path("data", "C_temp_val.RData"))
+#load(file.path("data", "C_temp_val.RData"))
 
 # decline was observed, this decline cannot be captured by the model, 
 # this suggests that species climate and land use change in the breeding area is not the main reason for decline
 # (or that climate and land use data we used are not properly capturing climate and land use change in the breeding area)
 
 
-# C-index of last 5 years:
-C_temp_val <- Hmisc::rcorr.cens(x = preds_years_mean, S = obs_temp_trend$pres_sum)

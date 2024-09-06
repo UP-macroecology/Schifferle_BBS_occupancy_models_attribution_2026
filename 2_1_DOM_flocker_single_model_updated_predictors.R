@@ -79,14 +79,47 @@ registerDoParallel(cl)
 
 # make blocks:
 # 3 species per block:
-spec_blocks_list <- split(final_species_eco_sorted, c(rep(1:17, each = 10), rep(18, 4)))
-names(spec_blocks_list) <- NULL
+# spec_blocks_list <- split(final_species_eco_sorted, c(rep(1:17, each = 10), rep(18, 4)))
+# names(spec_blocks_list) <- NULL
 
 prog_log_file <- file("fm_buffer_750_progress.txt", open = "wt") # write console output here
 sink(prog_log_file, type = "message")
 sink(prog_log_file, type = "output")
 
-for(i in 14:length(spec_blocks_list)){
+# repeat for species for which MCMC reported problems:
+species_rep <- c("Blue-winged Warbler",
+                 "Cooper's Hawk",
+                 "Eastern Wood-Pewee",
+                 "Northern Bobwhite",
+                 "Northern Mockingbird",
+                 "Yellow-billed Cuckoo",
+                 "Ferruginous Hawk",
+                 "Lazuli Bunting",
+                 "MacGillivray's Warbler",
+                 "Wilson's Warbler",
+                 "Red Crossbill",
+                 "American Kestrel",
+                 "Black-throated Gray Warbler",
+                 "Bullock's Oriole",
+                 "Common Raven",
+                 "Golden-crowned Kinglet",
+                 "Golden Eagle",
+                 "Grasshopper Sparrow",
+                 "Olive-sided Flycatcher",
+                 "Prairie Falcon",
+                 "Sedge Wren",
+                 "Sharp-shinned Hawk",
+                 "Tree Swallow",
+                 "Western Wood-Pewee",
+                 "House Sparrow",
+                 "Lark Sparrow"
+                 )
+
+# 3 species per block:
+spec_blocks_list <- split(species_rep, c(rep(1:2, each = 10), rep(3, 6)))
+names(spec_blocks_list) <- NULL
+
+for(i in 1:length(spec_blocks_list)){
   
   print(paste("block", i, "of", length(spec_blocks_list)))
   
@@ -97,8 +130,8 @@ for(i in 14:length(spec_blocks_list)){
           .verbose = TRUE) %dopar% {
             
             # check whether species has run already:
-            model_run <- file.exists(file.path(dir, "data", paste0("out_", spec, "_fm_buffer", buffer_km, ".RData")))
-            post_proc_run <- file.exists(file.path(dir, "data", paste0("postproc_", spec, "_fm_buffer", buffer_km, ".RData")))
+            model_run <- file.exists(file.path(dir, "data", "full_model", paste0("out_", spec, "_fm_buffer", buffer_km, ".RData")))
+            post_proc_run <- file.exists(file.path(dir, "data", "full_model", paste0("postproc_", spec, "_fm_buffer", buffer_km, ".RData")))
             
             if(model_run & post_proc_run) {
               print(paste(spec, "ran already."))
@@ -202,13 +235,13 @@ for(i in 14:length(spec_blocks_list)){
               backend = "cmdstanr",
               cores = 4,
               chains = 4,
-              warmup = 500,
-              iter = 500 + 1000
+              warmup = 1000, # first round: 500
+              iter = 1000 + 1000 # first round: 500 + 1000
             )
             
             print(out)
             
-            save(out, file = file.path(dir, "data", paste0("out_", spec, "_fm_buffer", buffer_km, ".RData")))
+            save(out, file = file.path(dir, "data", "full_model", paste0("out_", spec, "_fm_buffer", buffer_km, ".RData")))
             
             end.time <- Sys.time()
             print(round(end.time - start.time, 2))
@@ -236,7 +269,7 @@ for(i in 14:length(spec_blocks_list)){
             
             rm(fitted_initocc_col_ex, occ_posterior, y_predictions, loo_cv)
             
-            save(res_list, file = file.path(dir, "data", paste0("postproc_", spec, "_fm_buffer", buffer_km, ".RData")))
+            save(res_list, file = file.path(dir, "data", "full_model", paste0("postproc_", spec, "_fm_buffer", buffer_km, ".RData")))
             
             end.time <- Sys.time()
             print(round(end.time - start.time, 2))
