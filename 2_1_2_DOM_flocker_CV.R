@@ -1,6 +1,6 @@
 # 5-fold spatial cross validation to assess predictive ability of dynamic occupancy models:
 
-# folds created with package blockCV: 2_2_DOM_spatialCV.R
+# folds created with package blockCV: 2_1_1_assign_spatial_blocks_CV_folds.R
 
 # 1.) for species load fold assignment
 # 2.) refit model 5 times (5-fold cross validation)

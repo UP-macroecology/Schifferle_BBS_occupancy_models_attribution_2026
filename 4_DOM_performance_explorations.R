@@ -551,3 +551,6 @@ dt %>%
   ggplot() +
   geom_point(aes(x = Year, y = bio1, color = colo)) +
   geom_smooth(aes(x = Year, y = bio1, group = colo, colour = colo), method = "lm")
+
+
+# Elton traits...

@@ -329,7 +329,7 @@ CV_eval_summary
 
 summary(CV_eval_summary)
 
-
+CV_eval_summary <- read.csv(file = file.path(dir, "results", "CV_cluster", "CV_eval2", "CV_eval_summary.csv"))
 
 # Briscoe metrics: ---
 # xx
@@ -367,21 +367,17 @@ ggplot(obs_preds_sf) +
   theme_bw() +
   ggtitle(spec)
 
+obs_preds_sf %>% 
+  filter(Year %in% seq(1991,2015, length = 4)) %>% 
+ggplot() +
+  facet_wrap(~Year) +
+  geom_sf(aes(fill = as.factor(presence)), pch = 21, size = 3) +
+  scale_fill_viridis_d(name = "observation") +
+  geom_sf(aes(color = pred_occ_mean), size = 1) +
+  scale_color_viridis_c(name = "mean occ. prediction") +
+  theme_bw() +
+  ggtitle(spec)
 
 ggplot(occ_preds_obs_df_temp, aes(x = Year)) +
   geom_line(aes(y = scale(sum_preds))) +
   geom_line(aes(y = scale(sum_obs)), color = "blue")
-
-
-library(survival)
-age <- rnorm(400, 50, 10)
-bp  <- rnorm(400,120, 15)
-bp[1]  <- NA
-d.time <- rexp(400)
-cens   <- runif(400,.5,2)
-death  <- d.time <= cens
-d.time <- pmin(d.time, cens)
-Hmisc::rcorr.cens(age, Surv(d.time, death)) # occ prob., observation (PA)
-x <- round(rnorm(200))
-y <- rnorm(200)
-rcorr.cens(x, y, outx=TRUE)

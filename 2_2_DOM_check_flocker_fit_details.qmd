@@ -7,6 +7,7 @@ params:
   buffer_km: 750
   fold: 1
   results_dir: "M:/Documents/DEBTs/analysis/Schifferle_BBS_occupancy_models_2023/results/full_model" 
+  model_file: NA
 ---
 
 ```{r}
@@ -38,16 +39,19 @@ fold <- params$fold
 
 results_dir <- params$results_dir
 results_dir
+model_file <- params$model_file
+model_file
 ```
 
 Load fitted model:
 
 ```{r}
+# xx adjust
 # load(file = file.path(results_dir,
-#                       paste0("out_", spec, "_fm_buffer", buffer_km, ".RData"))) # xx adjust
-load(file = file.path(results_dir,
-                      paste0("out_", spec, "_temp_val_5yrs.RData")))
-
+#                       paste0("out_", spec, "_fm_buffer", buffer_km, ".RData"))) #
+# load(file = file.path(results_dir,
+#                       paste0("out_", spec, "_temp_val_5yrs.RData")))
+load(file = file.path(results_dir, model_file))
 #print(out)
 
 posterior <- brms::as_draws(out)

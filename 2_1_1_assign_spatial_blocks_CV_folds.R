@@ -1,17 +1,13 @@
-
-# assigns BBS routes to 5 folds for spatially blocked cross validation:
+# assigns BBS routes to 5 folds for spatially blocked cross validation
+# species-specific (use only routes within 750 km buffer aronf presences)
 # + plots and tests
-
-
-# repeat for buffer size 250, insert new functions to shorten!
 
 
 # packages: ----
 
 library(blockCV)
-library(sf) # working with spatial vector data
-library(terra) # working with spatial raster data
-library(tmap) # plotting maps
+library(sf)
+library(terra)
 library(dplyr)
 library(ggplot2)
 
@@ -19,9 +15,6 @@ library(ggplot2)
 
 source("0_functions.R")
 
-# can response be binary or continuous? (it said so somewhere)
-
-# repeat this after having decided which buffer to use regarding what routes to include when fitting the model!
 
 # load data: ----
 
@@ -41,7 +34,7 @@ load(file = file.path("data", "final_species_selection.RData")) # output of 1_2_
 load(file = file.path("data", "BBS_for_occ_selection.RData")) # route_sel_dt; output of 1_3_match_BBS_to_env_data.R 
 
 
-# load env. data as raster stack to check environmental similarity between training and test folds:
+# load env. data to check environmental similarity between training and test folds: ----
 
 # files:
 bioclim_files <- list.files(file.path("data", "Env_data", "ISIMIP_CHELSA-W5E5v1.0", "bioclim"), full.names = TRUE)
@@ -69,19 +62,8 @@ env_rasters <- c(bioclim_3yrs_sp_sel, sclim_3yrs_sp_sel, lu_3yrs_sp_sel)
 
 hexagon_size_m <- 500000
 
-# # what is a suitable block size?
-# 
-# # for first choice look at existing autocorrelation in response or predictors:
-# # = range over which observations are independent
-# response data:
-# sac2 <- cv_spatial_autocor(x = occ_spec_sf,
-#                        column =  "presence_summarised")
-# # 2 blocks
-
-
 # since I use a buffer around the presence points of each species to determine the
 # data used for each model, I also generate folds for each species separately:
-
 
 # iterate over species:
 for(spec in species_selection_final){
@@ -89,30 +71,20 @@ for(spec in species_selection_final){
   print(spec)
   
   # species data:
-  
   occ_dt_spec <- BBS_pres_abs_spec(species = spec) # from 0_functions.R
 
+  # routes within buffer:
+  rel_routes <- training_routes(species = spec, output = "RTENO", buffer_km = 750)
+  
   # match with routes, summarise presences over time:
-  occ_spec_sf <- routes_sel_sf %>%
+  occ_spec_sf_buffered <- routes_sel_sf %>%
     left_join(occ_dt_spec, by = c("RTENO_BBS" = "RTENO")) %>%
-    # presence on route across all sections:
-    mutate(presence = rowSums(across(paste0("Count", seq(10, 50, 10))))) %>%
-    mutate(presence = ifelse(presence >= 1, 1, 0)) %>%
     # presence on route across all years:
     group_by(RTENO_BBS) %>%
     summarise(presence_summarised = max(presence, na.rm=TRUE)) %>%
     mutate(presence_summarised = factor(presence_summarised, levels = c(1,0))) %>% 
-    arrange(RTENO_BBS)
-  
-  # buffer presences:
-  pres_buffer <- occ_spec_sf %>%
-    filter(presence_summarised == 1) %>%
-    st_buffer(dist = 750000) %>% # 750000
-    st_union
-  
-  # routes within buffer:
-  occ_spec_sf_buffered <- occ_spec_sf %>%
-    st_filter(., y = pres_buffer, join = st_within) %>% 
+    arrange(RTENO_BBS) %>%
+    filter(RTENO_BBS %in% rel_routes) %>% 
     arrange(RTENO_BBS)
   
   # create blocks and assign routes to folds:
@@ -166,7 +138,6 @@ for(spec in species_selection_final){
     theme(text = element_text(size = 18)))
   dev.off()
 }
-
 
 
 # check blockCV results: ----

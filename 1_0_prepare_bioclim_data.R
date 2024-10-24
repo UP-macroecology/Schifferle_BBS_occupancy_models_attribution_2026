@@ -149,8 +149,6 @@ foreach(year = 1990:2016,
                              overwrite = TRUE)
         }
 
-
-
 # predictor for initial occupancy: bioclims summarizing three years before start:
 
 year <- 1991 # start year

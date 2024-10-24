@@ -251,3 +251,58 @@ compare_fl_par_estimates(model1 = model1, model2 = model2, spec = testspecs[s])
 compare_post_dens(model1 = model1, model2 = model2, regex_pars = "b_occ", spec = testspecs[s])
 compare_post_dens(model1 = model1, model2 = model2, regex_pars = "b_col", spec = testspecs[s])
 compare_post_dens(model1 = model1, model2 = model2, regex_pars = "b_ex", spec = testspecs[s])
+
+
+#
+results_dir <- file.path("//NAS-2-P-SN-01.ibb.uni-potsdam.de", "users$", "schifferle1", "Documents", 
+                         "DEBTs", "analysis", "Schifferle_BBS_occupancy_models_2023", "results", "full_model",
+                         "final_run_750km") 
+
+BMIP_sel_specs <- read.csv("C:/Users/schifferle1/Documents/BMIP_data_subset/BMIP chosen birds.csv")$common.name
+spec <- BMIP_sel_specs[4]
+flocker_fitted <- load(file.path(results_dir, paste0("postproc_", spec, "_fm_buffer750.RData")))
+str(flocker_fitted)
+dim(res_list$fitted$linpred_det) # route, surveys, years, samples
+
+# detection probability is modelled only based on route section, so it doesn't differ between routes and years:
+mean_det_surv <- apply(res_list$fitted$linpred_det, c(2), mean, na.rm = TRUE)
+
+det_prob_along_transect_df <- data.frame("species" = BMIP_sel_specs, "section1"= NA,
+                                         "section2"= NA,
+                                         "section3"= NA,
+                                         "section4"= NA,
+                                         "section5"= NA)
+for(spec in BMIP_sel_specs[4:18]) {
+  
+  print(spec)
+  
+  skip_to_next <- FALSE
+  tryCatch(print(load(file.path(results_dir, paste0("postproc_", spec, "_fm_buffer750.RData")))),
+           error = function(e) { skip_to_next <<- TRUE})
+  if(skip_to_next) { next }
+  
+  mean_det_surv <- apply(res_list$fitted$linpred_det, c(2), mean, na.rm = TRUE)
+  
+  print(mean_det_surv)
+  
+  det_prob_along_transect_df[which(det_prob_along_transect_df$species == spec), 2:6] <- mean_det_surv
+  
+  print(det_prob_along_transect_df)
+  
+  rm(res_list)
+}
+
+write.csv(det_prob_along_transect_df, file = file.path("results", "detection_probs_DOM.csv"), row.names = FALSE)
+
+det_prob_along_transect_df %>% 
+  rowwise() %>% 
+  mutate(mean_det = mean(c_across(starts_with("section")), na.rm = TRUE)) %>% 
+  mutate(max_det = max(c_across(starts_with("section")))) %>%
+  mutate(min_det = min(c_across(starts_with("section")))) %>%
+  arrange(mean_det) %>% 
+  filter(!is.na(section1)) %>% 
+  tidyr::pivot_longer(cols = section1:section5, values_to = "det_prob", names_to = "section") %>% 
+  ggplot() +
+  geom_line(aes(x = section, y = det_prob, group = species, colour = species))
+
+# same across sites, years,  
