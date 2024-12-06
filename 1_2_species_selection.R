@@ -16,9 +16,16 @@
 
 # packages: --------------------------------------------------------------------
 
-library(tidyverse)
+library(dplyr)
+library(sf)
+library(ggplot2)
 
 # load data: -------------------------------------------------------------------
+
+source("0_functions.R")
+
+start <- 1995
+end <- 2019
 
 # BBS species records:
 load(file = file.path("data", "BBS_data_merged.RData")) # output of DEBTs\analysis\Schifferle_BBS_explorations_2023\BBS_data_prep.R
@@ -33,16 +40,17 @@ bbs_dt_occ
 nrow(bbs_dt_occ)
 
 # selected routes:
-load(file = file.path("data", "route_selection_1991_2015_surv_beg_end_max_5y_miss_v2_spat_thin_100km_max_30_r_per_BCR.RData")) # output of 1_1_route_selection.R
+load(file = file.path("data", "route_selection_1995_2019_surv_beg_end_max_5y_miss_v2_spat_thin_100km_max_30_r_per_BCR.RData")) # output of 1_1_route_selection.R
+sel_routes_final
 
 # BBS data, only selected routes and focal time period, join species info:
 bbs_dt_occ_sel <- bbs_dt_occ %>% 
   filter(RTENO %in% sel_routes_final) %>% 
-  filter(Year >= 1991 & Year <= 2015) %>% 
+  filter(Year >= start & Year <= end) %>% 
   left_join(BBS_species_list[, c("English_Common_Name", "Scientific_Name", "ORDER", "Family")], by = c("English_Common_Name"))
-nrow(bbs_dt_occ_sel) # 610456
+nrow(bbs_dt_occ_sel)
 
-length(unique(bbs_dt_occ_sel$English_Common_Name)) # 504 species in total
+length(unique(bbs_dt_occ_sel$English_Common_Name)) # 506 species in total
 
 
 # species selection: -----------------------------------------------------------
@@ -51,13 +59,11 @@ length(unique(bbs_dt_occ_sel$English_Common_Name)) # 504 species in total
 
 # exclude water-related birds (waterbirds & shorebirds: AOU <=2880, kingfishers: AOU >=3900 & <=3910 , dipper: AOU 7010),
 # & nocturnal birds (owls: AOU >=3650 & <=3810 and nightjars: AOU >=4160 & <=4210): 
-
-# -> these would be 137 species:
 excl_orders <- bbs_dt_occ_sel %>% 
-  filter(AOU <= 2880 | (AOU >=3900 & AOU <=3910)  | AOU == 7010 | (AOU >= 3650 & AOU <= 3810)| (AOU >=4160 & AOU <= 4210)) %>%
+  filter(AOU <= 2880 | (AOU >=3900 & AOU <=3910)  | AOU == 7010  | (AOU >= 3650 & AOU <= 3810)| (AOU >=4160 & AOU <= 4210)) %>%
   pull(English_Common_Name) %>% 
   unique
-excl_orders # 136 (114 water-related species, 22 nocturnal species)
+excl_orders # 133 (112 water-related species, 21 nocturnal species)
 
 # how many species of which order excluded:
 bbs_dt_occ_sel %>% 
@@ -87,7 +93,7 @@ seabirds_dt <- subset(EltonTraits, PelagicSpecialist == 1)[, c("Scientific", "En
 seabirdsET_BBS <- bbs_dt_occ_sel %>% 
   filter(Scientific_Name %in% seabirds_dt$Scientific | English_Common_Name %in% seabirds_dt$English) %>% 
   pull(English_Common_Name) %>% 
-  unique # 18 pelagic specialists
+  unique # 17 pelagic specialists
 
 # nocturnal species:
 nocturnal_dt <- subset(EltonTraits, Nocturnal ==1)[, c("Scientific", "English")]
@@ -95,7 +101,7 @@ nocturnal_dt <- subset(EltonTraits, Nocturnal ==1)[, c("Scientific", "English")]
 nocturnalET_BBS <- bbs_dt_occ_sel %>% 
   filter(Scientific_Name %in% nocturnal_dt$Scientific | English_Common_Name %in% nocturnal_dt$English) %>% 
   pull(English_Common_Name) %>% 
-  unique # 20 nocturnal species (owls and nightjars)
+  unique # 19 nocturnal species (owls and nightjars)
 # 2 nightjar species didn't match with EltonTraits
 
 setdiff(seabirdsET_BBS, excl_orders) # all pelagic specialists are water-related birds
@@ -122,7 +128,7 @@ spec_N_total <- bbs_dt_occ_sel %>%
   summarise(spec_N = n())
 spec_N_total
 
-# number of total presences from 1991-2015:
+# number of total presences from 1995-2019:
 N_species_presences <- spec_N_total %>% 
   rename("N_presences" = spec_N) %>% 
   group_by(N_presences) %>% 
@@ -132,7 +138,7 @@ N_species_presences <- spec_N_total %>%
   mutate(spec_with_more = length(unique(bbs_dt_occ_sel$English_Common_Name)) - spec_with_equal_or_less)
 N_species_presences
 
-# number of total routes with from 1991-2015:
+# number of total routes with from 1995-2019:
 N_species_routes <- n_routes_pres %>% 
   group_by(n_routes) %>% 
   summarise(N_species = n()) %>% 
@@ -146,7 +152,7 @@ N_species_routes
 # and species that have less than 50 routes where they were never detected:
 
 excl_data_av <- n_routes_pres %>% 
-  filter(n_routes < 50 | n_routes > (476-50)) %>%
+  filter(n_routes < 50 | n_routes > (length(sel_routes_final)-50)) %>%
   pull(English_Common_Name)
 sort(excl_data_av) # 291
 
@@ -160,17 +166,107 @@ species_selection_final <- bbs_dt_occ_sel %>%
   unique %>% 
   sort
 
-length(species_selection_final) # 174
+length(species_selection_final) # 192
 
 # save:
 save(species_selection_final, file = file.path("data", "final_species_selection.RData"))
 
+
+
+# assign ecoregions to species: ----
+
+# load data:
+
+# ecoregions level 1:
+# https://www.epa.gov/eco-research/ecoregions-north-america
+eco_sf <- read_sf(file.path("data", "na_cec_eco_l1", "NA_CEC_Eco_Level1.shp")) %>% 
+  st_transform(crs = "ESRI:102003") %>% 
+  select(NA_L1NAME)
+
+# selected routes spatial data (to buffer presences):
+routes_sel_sf <- st_read(file.path("data", "route_selection_1995_2019_surv_beg_end_max_5y_miss_v2_spat_thin_100km_max_30_r_per_BCR_centroids.shp")) # output of 1_1_route_selection.R
+
+# BBS data (which routes surveyed in which years) formatted for occupancy modelling:
+load(file = file.path("data", "BBS_for_occ.RData")) # route_dt; output of 1_0_reformat_BBS_data.R
+# only selected routes and focal time period:
+route_sel_dt <- route_dt %>%
+  filter(RTENO %in% routes_sel_sf$RTENO_BBS) %>%
+  filter(Year >= 1995 & Year <= 2019) %>% 
+  arrange(RTENO)
+nrow(route_sel_dt) # 13475
+
+# route-year-species information (only surveyed)
+load(file = file.path("data", "BBS_for_occ_spec_records.RData")) # bbs_dt_occ; output of 1_0_reformat_BBS_data.R
+
+
+# iterate over species:
+
+spec_eco_df <- data.frame(species = species_selection_final, eco = NA)
+
+for(i in 1:length(species_selection_final)){
+  
+  spec <- species_selection_final[i]
+  
+  print(paste(i, spec))
+  
+  # species presences:
+  
+  pres_spec <- BBS_pres_abs_spec(species = spec)
+  
+  pres_routes <- pres_spec %>% 
+    filter(presence == 1) %>% 
+    pull(RTENO) %>% 
+    unique
+  
+  pres_routes_sf <- routes_sel_sf %>% 
+    filter(RTENO_BBS %in% pres_routes) # 159
+  
+  # count presence per ecoregion:
+  inters <- st_intersection(pres_routes_sf, eco_sf) %>% 
+    st_drop_geometry() %>% 
+    group_by(NA_L1NAME) %>% 
+    summarise(n_routes = n())
+  
+  print(inters)
+  
+  # in which ecoregion are most presences?
+  
+  # are > 50% of presences in one ecoregion?
+  eco_spec <- inters %>% 
+    filter(n_routes > nrow(pres_routes_sf) * 0.5) %>% 
+    pull(NA_L1NAME)
+  
+  print(eco_spec)
+  
+  spec_eco_df$eco[i] <- ifelse(length(eco_spec) == 0, NA, eco_spec)
+  
+}
+
+spec_eco_df
+table(spec_eco_df$eco)
+save(spec_eco_df, file = file.path("data", "species_ecoregions.RData"))
+
+# sort selected species by ecoregion: 
+## Eastern temperate forests - Northern forests - great plains - Northwestern forested mountains - North American Deserts:
+
+final_species_eco_sorted <- c(spec_eco_df %>% filter(eco == "EASTERN TEMPERATE FORESTS") %>% pull(species),
+                              spec_eco_df %>% filter(eco == "NORTHERN FORESTS") %>% pull(species),
+                              spec_eco_df %>% filter(eco == "GREAT PLAINS") %>% pull(species),
+                              spec_eco_df %>% filter(eco == "NORTHWESTERN FORESTED MOUNTAINS") %>% pull(species),
+                              spec_eco_df %>% filter(eco == "NORTH AMERICAN DESERTS") %>% pull(species),
+                              spec_eco_df %>% filter(is.na(eco)) %>% pull(species))
+
+save(final_species_eco_sorted, file = file.path("data", "final_species_selection_eco_sorted.RData"))
+
+
 # plots to explore data availability for different species groups: -------------
 
-dir.create("plots/spec_sel")
+# folder to store plots:
+plot_dir <- file.path("plots", "spec_sel2")
+if(!dir.exists(plot_dir)){dir.create(plot_dir, recursive = TRUE)}
 
 ## number of routes on which each species was detected: ---- 
-jpeg(file = file.path("plots", "spec_sel", "excl_total_routes.jpg"), 
+jpeg(file = file.path(plot_dir, "excl_total_routes.jpg"), 
      width = 6000, height = 1000, quality = 100)
 n_routes_pres %>% 
   mutate(exclude = ifelse(!English_Common_Name %in% excl_orders, 0, 1)) %>% 
@@ -192,7 +288,7 @@ n_routes_pres %>%
 dev.off()
 
 ## excluded vs. included based on orders, total presences: ----
-jpeg(file = file.path("plots", "spec_sel", "excl_orders_total_presences.jpg"), 
+jpeg(file = file.path(plot_dir, "excl_orders_total_presences.jpg"), 
      width = 6000, height = 1000, quality = 100)
 spec_N_total %>% 
   mutate(exclude = ifelse(!English_Common_Name %in% excl_orders, 0, 1)) %>% 
@@ -212,7 +308,7 @@ spec_N_total %>%
 dev.off()
 
 ## same for total routes on which species were detected: ----
-jpeg(file = file.path("plots", "spec_sel", "excl_orders_total_routes.jpg"), 
+jpeg(file = file.path(plot_dir, "excl_orders_total_routes.jpg"), 
      width = 6000, height = 1000, quality = 100)
 n_routes_pres %>% 
   mutate(exclude = ifelse(!English_Common_Name %in% excl_orders, 0, 1)) %>% 
@@ -232,7 +328,7 @@ n_routes_pres %>%
 dev.off()
 
 ## same, but excluding only nocturnal species and pelagic specialists based on EltonTraits: ----
-jpeg(file = file.path("plots", "spec_sel", "excl_noct_pel_total_presences.jpg"), 
+jpeg(file = file.path(plot_dir, "excl_noct_pel_total_presences.jpg"), 
      width = 6000, height = 1000, quality = 100)
 spec_N_total %>% 
   mutate(exclude = ifelse(English_Common_Name %in% nocturnalET_BBS, "nocturnal", "include")) %>% 
@@ -252,7 +348,7 @@ spec_N_total %>%
 dev.off()
 
 ## same for total routes on which species were detected: ----
-jpeg(file = file.path("plots", "spec_sel", "excl_noct_pel_total_routes.jpg"), 
+jpeg(file = file.path(plot_dir, "excl_noct_pel_total_routes.jpg"), 
      width = 6000, height = 1000, quality = 100)
 n_routes_pres %>% 
   mutate(exclude = ifelse(English_Common_Name %in% nocturnalET_BBS, "nocturnal", "include")) %>% 
@@ -273,7 +369,7 @@ dev.off()
 
 
 ## only pelagic specialists (number of routes): ----
-jpeg(file = file.path("plots", "spec_sel", "pelagic_specialists_total_routes_1991-2015.jpg"), 
+jpeg(file = file.path(plot_dir, "pelagic_specialists_total_routes_1991-2015.jpg"), 
      width = 500, height = 500, quality = 100)
 n_routes_pres %>% 
   filter(English_Common_Name %in% seabirdsET_BBS) %>%
@@ -292,7 +388,7 @@ n_routes_pres %>%
 dev.off()
 
 ## only nocturnal species (number of routes): ----
-jpeg(file = file.path("plots", "spec_sel", "nocturnal_species_total_routes_1991-2015.jpg"), 
+jpeg(file = file.path(plot_dir, "nocturnal_species_total_routes_1991-2015.jpg"), 
      width = 500, height = 500, quality = 100)
 n_routes_pres %>% 
   filter(ORDER %in% c("Caprimulgiformes", "Strigiformes")) %>% # 
@@ -313,7 +409,7 @@ dev.off()
 
 
 ## only water-related species (waterbirds/shorebirds, kingfishers, dipper) (number of routes): ----
-jpeg(file = file.path("plots", "spec_sel", "water_related_birds_total_routes_1991-2015.jpg"), 
+jpeg(file = file.path(plot_dir, "water_related_birds_total_routes_1991-2015.jpg"), 
      width = 1500, height = 1000, quality = 100)
 n_routes_pres %>% 
   dplyr::left_join(y = distinct(bbs_dt_occ_sel[, c("English_Common_Name", "AOU")]), by = "English_Common_Name") %>%
@@ -333,7 +429,7 @@ n_routes_pres %>%
 dev.off()
 
 ## pelagic specialists vs. waterbirds, shorebirds, kingfisher, dipper (number of routes): ----
-jpeg(file = file.path("plots", "spec_sel", "water_related_vs_pelagic_total_routes_1991-2015.jpg"), 
+jpeg(file = file.path(plot_dir, "water_related_vs_pelagic_total_routes_1991-2015.jpg"), 
      width = 1500, height = 800, quality = 100)
 n_routes_pres %>% 
   dplyr::left_join(y = distinct(bbs_dt_occ_sel[, c("English_Common_Name", "AOU")]), by = "English_Common_Name") %>%
@@ -395,93 +491,3 @@ bbs_dt_occ_sel %>%
 # American dipper breeding range only in parts of the western US
 # Belted Kingfisher widely distributed
 # Ringed Kingfisher mainly distributed in South America
-
-
-
-# assign ecoregions to species: ----
-
-library(sf)
-source("0_functions.R")
-
-# load data:
-
-# selected species:
-load(file = file.path("data", "final_species_selection.RData")) # species_selection_final; output of 1_2_species_selection.R
-
-# selected routes spatial data (to buffer presences):
-routes_sel_sf <- st_read(file.path("data", "route_selection_1991_2015_surv_beg_end_max_5y_miss_v2_spat_thin_100km_max_30_r_per_BCR_centroids.shp")) # output of 1_1_route_selection.R
-
-# routes-years:
-load(file = file.path("data", "BBS_for_occ_selection.RData")) # route_sel_dt; output of 1_3_match_BBS_to_env_data.R 
-
-# route-year-species information (only surveyed)
-load(file = file.path("data", "BBS_for_occ_spec_records.RData")) # bbs_dt_occ; output of 1_0_reformat_BBS_data.R
-
-
-# ecoregions level 1:
-# https://www.epa.gov/eco-research/ecoregions-north-america
-eco_sf <- read_sf(file.path("data", "na_cec_eco_l1", "NA_CEC_Eco_Level1.shp"))
-
-eco_sf_proj <- eco_sf %>% 
-  st_transform(crs = "ESRI:102003") %>% 
-  select(NA_L1NAME)
-
-# iterate over species:
-
-spec_eco_df <- data.frame(species = species_selection_final, eco = NA)
-
-for(i in 1:length(species_selection_final)){
-  
-  print(i)
-  
-  spec <- species_selection_final[i]
-  
-  print(spec)
-  
-  # species presences:
-  
-  pres_spec <- BBS_pres_abs_spec(species = spec)
-  
-  pres_routes <- pres_spec %>% 
-    filter(presence == 1) %>% 
-    pull(RTENO) %>% 
-    unique
-  
-  pres_routes_sf <- routes_sel_sf %>% 
-    filter(RTENO_BBS %in% pres_routes) # 159
-  
-  # count presence per ecoregion:
-  inters <- st_intersection(pres_routes_sf, eco_sf_proj) %>% 
-    st_drop_geometry() %>% 
-    group_by(NA_L1NAME) %>% 
-    summarise(n_routes = n())
-  
-  print(inters)
-  
-  # in which ecoregion are most presences?
-  
-  # are > 50% of presences in one ecoregion?
-  eco_spec <- inters %>% 
-    filter(n_routes > nrow(pres_routes_sf) * 0.5) %>% 
-    pull(NA_L1NAME)
-  
-  print(eco_spec)
-  
-  spec_eco_df$eco[i] <- ifelse(length(eco_spec) == 0, NA, eco_spec)
-  
-}
-spec_eco_df
-summary(spec_eco_df$eco)
-save(spec_eco_df, file = file.path("data", "species_ecoregions.RData"))
-
-
-table(spec_eco_df$eco)
-# sort: Eastern temperate forests - Northern forests - great plains - Northwestern forested mountains:
-
-final_species_eco_sorted <- c(spec_eco_df %>% filter(eco == "EASTERN TEMPERATE FORESTS") %>% pull(species),
-  spec_eco_df %>% filter(eco == "NORTHERN FORESTS") %>% pull(species),
-  spec_eco_df %>% filter(eco == "GREAT PLAINS") %>% pull(species),
-  spec_eco_df %>% filter(eco == "NORTHWESTERN FORESTED MOUNTAINS") %>% pull(species),
-  spec_eco_df %>% filter(is.na(eco)) %>% pull(species))
-
-save(final_species_eco_sorted, file = file.path("data", "final_species_selection_eco_sorted.RData"))

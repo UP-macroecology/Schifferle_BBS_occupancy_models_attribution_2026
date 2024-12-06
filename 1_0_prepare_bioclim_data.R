@@ -3,89 +3,129 @@
 # climate data:
 
 # steps: 
-# 1) get climate data for 1985-2019 from Chelsa or ISIMIP, mask for conterminous US, transform to equal area (use square or hexagone grid?)
-# 2) from ISIMIP I get daily data -> aggregate to monthly data
+# 1) get daily climate data (tasmax, tasmin, pr) for 1990-2019 from ISIMIP: 
+## https://data.isimip.org/search/tree/ISIMIP3a/InputData/climate/atmosphere/gswp3-w5e5/obsclim/
+## bounding box: South: 24 North: 50 West: -126 East: -66
+# 2) aggregate to monthly data
 # 3) calculate bioclim variables
-# (4) as alternative to bioclim quarter/month variables I also calculate seasonal variables (months fixed))
+# 4) as alternative to bioclim quarter/month variables I calculate seasonal variables
 
 # packages:
-library(stars)
+library(ncdf4)
 library(doParallel)
-library(gdalUtilities)
 library(dplyr)
+library(sf)
+library(terra)
 
 # register cores for parallel computation:
 ncores <- 3 
 cl <- makeCluster(ncores, setup_timeout = 0.5)
 registerDoParallel(cl)
 
-# climate data: daily ISIMIP Chelsa data to monthly means and project: -----
+start <- 1995
+end <- 2019
 
-# xx so far only historical, add future!
+# load data:
 
-# download ISIMIP Chelsa observed climate (1800 arcsec resolution):
+# outline conterminous US, to later mask SpatRasters
+# library(spData)
+# if (requireNamespace("sf", quietly = TRUE)) {
+#   data(us_states)
+# }
+# US_albers_sf <- us_states %>%
+#   st_union() %>%
+#   st_transform(crs = "ESRI:102003")
+# # save as shp:
+# write_sf(US_albers_sf, file.path("data", "US_outline_ESRI102003.shp"))
+US_albers_sf <- read_sf(file.path("data", "US_outline_ESRI102003.shp"))
 
-# CHELSA-W5E5v1.0
-# e.g. https://data.isimip.org/datasets/4014abe4-32fb-46c9-b9b7-53b13f12166f/ -> configure download
-# chelsa-w5e5v1.0_obsclim_tasmax_1800arcsec_global_daily
-# bounding box: South: 24 North: 50 West: -126 East: -66
-# 1985-2016
 
-# save e.g. as "pr.zip", "tasmin.zip", "tasmax.zip" here:
-chelsa_path <- file.path("data", "Env_data", "ISIMIP_CHELSA-W5E5v1.0")
+# daily data to monthly means: -----
+
+# stored as "pr.zip", "tasmin.zip", "tasmax.zip" here:
+clim_path <- file.path("data", "Env_data", "ISIMIP_GSWP3_W5E5")
+
 
 # iterate over variables (tasmin, tasmax, precipitation):
-
-for(var in c("tasmin", "tasmax", "pr")) {
+foreach(var = c("tasmin", "tasmax", "pr"), 
+        .packages = c("terra", "ncdf4", "dplyr") , 
+        .verbose = TRUE) %dopar% {
+          
+          print(var)
   
-  print(var)
-  
-  # list files:
-  zipfiles <- utils::unzip(file.path(chelsa_path, paste0(var, ".zip")), 
-                           list = TRUE)
-  nc_files <- grep(x = zipfiles$Name, pattern = ".nc", value = TRUE) # every nc file contains daily values of one month
-  
-  # unzip files:
-  utils::unzip(file.path(chelsa_path, paste0(var, ".zip")), exdir = chelsa_path) # unzip the top directory
-  
-  
-  # iterate over files / months:
-  
-  foreach(i = 1:length(nc_files), 
-          .packages = c("gdalUtilities", "stars") , 
-          .verbose = TRUE) %dopar% {
-    
-    nc_dt <- read_stars(file.path(chelsa_path, nc_files[i])) # uses GDAL driver for netCDF files; daily data for one month
-    # delta = cell size = 0.5°; offset: the start coordinate (or time) value of the first pixel
-    names(nc_dt) <- var
-    
-    # set coordinate system:
-    # "All global CHELSA products are in a geographic coordinate system referenced to the WGS 84 horizontal datum"
-    st_crs(nc_dt) <- "EPSG:4326"
-    
-    # monthly mean temperature:
-    if(var %in% c("tasmin", "tasmax")){
-      monthly <- st_apply(nc_dt, c("x", "y"), mean)
-      #plot(monthly)
-    } else {
-      # monthly sum precipitation:
-      monthly <- st_apply(nc_dt, c("x", "y"), sum)
-    }
-   
-    # save as tif:
-    filename <- stringr::str_sub(nc_files[i],-9,-4) # yearmonth
-    write_stars(monthly, file.path(chelsa_path, "monthly_EPSG4326", paste0(var, "_", filename, ".tif")))
-    
-    # reproject with gdal: (reprojecting with stars and the saving did somehow not work)
-    gdalUtilities::gdalwarp(srcfile = file.path(chelsa_path, "monthly_EPSG4326", paste0(var, "_", filename, ".tif")),
-                            dstfile = file.path(chelsa_path, "monthly_albers_proj", paste0(var, "_", filename, "_ESRI102003.tif")),
-                            overwrite = TRUE,
-                            r = "near", # resampling method, nearest neighbour fine when keeping resolution
-                            t_srs = "ESRI:102003",
-                            dstnodata = -9999 # no data value in destination file
-                            )
-  }
-}
+          # list files:
+          zipfiles <- utils::unzip(file.path(clim_path, paste0(var, ".zip")), list = TRUE)
+          nc_files <- grep(x = zipfiles$Name, pattern = ".nc", value = TRUE) # every nc file contains daily values of 10 years
+          
+          # unzip files:
+          utils::unzip(file.path(clim_path, paste0(var, ".zip")), exdir = clim_path) # unzip the top directory
+          
+          # iterate over files:
+          
+          for(f in 1:length(nc_files)){
+            
+            print(paste(f, nc_files[f]))
+            
+            nc_dt <- ncdf4::nc_open(file.path(clim_path, nc_files[f])) # open nc file for reading      
+                    
+            # extract the time variable and convert it to date:
+            time <- ncvar_get(nc_dt, "time")
+            time_units <- ncatt_get(nc_dt, "time", "units")$value
+            time_origin <- lubridate::as_date(time_units)
+            time_date <- time_origin + time
+          
+            # extract latitude and longitude variables
+            lat <- ncvar_get(nc_dt, "lat")
+            lon <- ncvar_get(nc_dt, "lon")
+            
+            # to match coordinates, time and variable data in a data frame:
+            lonlattime_df <- as_tibble(expand.grid(lon, lat, time_date)) %>% 
+              rename("lon" = Var1, "lat" = Var2, "date" = Var3) %>% 
+              mutate(year = lubridate::year(date),
+                     month = lubridate::month(date))
+          
+            # add variable values to lon-lat-time:
+            var_arr <- ncvar_get(nc_dt, var) # dim: lon, lat, time
+            var_vec_long <- as.vector(var_arr) # reshape variable data
+            
+            # add to data frame:
+            var_df <- lonlattime_df %>% 
+              mutate({{var}} := var_vec_long)
+            
+            # extract one tif per month:
+            for(y in intersect((start-3):end, unique(lonlattime_df$year))){
+              
+              print(y)
+              
+              for(m in 1:12){
+                
+                print(m)
+                
+                dt_export <- var_df %>% 
+                  filter(year == y & month == m) %>% 
+                  # aggregate to monthly mean:
+                  group_by(lon, lat) %>% 
+                    summarise({{var}} := mean(.data[[var]], na.rm = TRUE)) %>%
+                  select(c(lon, lat, {{var}})) %>% 
+                  rast(crs = "EPSG:4326") %>% 
+                  crop(ext(c(-126, -66, 24, 50))) %>% # cut extent
+                  project(y = "ESRI:102003", method = "average") %>% # project
+                  mask(US_albers_sf) 
+                
+                #plot(dt_export)
+                
+                # directory to store results:
+                res_dir_proj <- file.path(clim_path, "ISIMIP_CLIM_ESRI102003")
+                if(!dir.exists(res_dir_proj)){dir.create(res_dir_proj)}
+                
+                writeRaster(dt_export,
+                            filename = file.path(res_dir_proj, paste0(var, "_", y, stringr::str_pad(m, 2, pad = 0),  "_ESRI102003.tif")),
+                            overwrite = TRUE)
+              }
+              }
+            nc_close(nc_dt)
+            }
+        }
 
 
 # bioclim vars: ----
@@ -96,10 +136,10 @@ for(var in c("tasmin", "tasmax", "pr")) {
 # use 12 months before survey started:
 
 #---
-# when were most routes surveyed?
+# in which month were most routes surveyed?
 load(file = file.path("data", "BBS_data_merged.RData"))
 # route selection:
-load(file = file.path("data", "route_selection_25ys_surv_beg_end_max_5y_miss_max_30_r_per_BCR_v2_spat_thin_100km.RData"))
+load(file = file.path("data", "route_selection_1995_2019_surv_beg_end_max_5y_miss_v2_spat_thin_100km_max_30_r_per_BCR.RData")) # output of 1_1_route_selection.R
 bbs_dt %>%
   filter(RTENO %in% sel_routes_final) %>% 
   group_by(Month) %>% 
@@ -108,14 +148,14 @@ bbs_dt %>%
 #---
 
 
-# use months from June previous year to May current year to calculate bioclim vars
+# -> use months from June previous year to May current year to calculate bioclim vars
 
 # folder to store bioclim rasters:
-bioclim_folder <- file.path(chelsa_path, "bioclim")
+bioclim_folder <- file.path(clim_path, "bioclim")
 if(!dir.exists(bioclim_folder)){dir.create(bioclim_folder, recursive = TRUE)}
 
 # iterate over years:
-foreach(year = 1990:2016, 
+foreach(year = start:end, 
         .packages = c("raster", "terra", "dismo") , 
         .verbose = TRUE) %dopar% {
           
@@ -127,11 +167,11 @@ foreach(year = 1990:2016,
             
             # bricks to store the month-wise values:
             if(var == "tasmin"){
-              tasmin_June_May <- raster::stack(x = file.path(chelsa_path, "monthly_albers_proj", files))
+              tasmin_June_May <- raster::stack(x = file.path(clim_path, "ISIMIP_CLIM_ESRI102003", files))
             } else if(var == "tasmax"){
-              tasmax_June_May <- raster::stack(x = file.path(chelsa_path, "monthly_albers_proj", files))
+              tasmax_June_May <- raster::stack(x = file.path(clim_path, "ISIMIP_CLIM_ESRI102003", files))
             } else {
-              pr_June_May <- raster::stack(x = file.path(chelsa_path, "monthly_albers_proj", files))
+              pr_June_May <- raster::stack(x = file.path(clim_path, "ISIMIP_CLIM_ESRI102003", files))
             }
           }
           
@@ -149,26 +189,26 @@ foreach(year = 1990:2016,
                              overwrite = TRUE)
         }
 
-# predictor for initial occupancy: bioclims summarizing three years before start:
 
-year <- 1991 # start year
+# bioclims summarising three years before focal period as predictor for initial occupancy: ----
 
-# template to store output:
-out <- raster::brick(raster::raster(list.files(file.path(chelsa_path, "monthly_albers_proj"), full.names = TRUE)[1]),
+
+# template to store output (raster brick required by dismo):
+out <- raster::brick(raster::raster(list.files(file.path(clim_path, "ISIMIP_CLIM_ESRI102003"), full.names = TRUE)[1]),
                      values = FALSE)
 pr_mean <- tasmin_mean <- tasmax_mean <- out
 
-# mean for each month within 3 years prior to survey:
+# 3 year-mean for each month:
 
 for(var in c("tasmin", "tasmax", "pr")){
   
   print(var)
   
   # corresponding filenames, May start year to June three years earlier:
-  files <- c(paste0(var, "_", year-3, stringr::str_pad(c(6:12), width = 2, pad = "0"), "_ESRI102003.tif"),
-             paste0(var, "_", year-2, stringr::str_pad(c(1:12), width = 2, pad = "0"), "_ESRI102003.tif"),
-             paste0(var, "_", year-1, stringr::str_pad(c(1:12), width = 2, pad = "0"), "_ESRI102003.tif"),
-             paste0(var, "_", year, stringr::str_pad(c(1:5), width = 2, pad = "0"), "_ESRI102003.tif"))
+  files <- c(paste0(var, "_", start-3, stringr::str_pad(c(6:12), width = 2, pad = "0"), "_ESRI102003.tif"),
+             paste0(var, "_", start-2, stringr::str_pad(c(1:12), width = 2, pad = "0"), "_ESRI102003.tif"),
+             paste0(var, "_", start-1, stringr::str_pad(c(1:12), width = 2, pad = "0"), "_ESRI102003.tif"),
+             paste0(var, "_", start, stringr::str_pad(c(1:5), width = 2, pad = "0"), "_ESRI102003.tif"))
   
   # iterate over months:
   for(m in 1:12){
@@ -176,11 +216,9 @@ for(var in c("tasmin", "tasmax", "pr")){
     print(m)
     
     # monthly means:
-    out[[m]] <- raster::stack(x = file.path(chelsa_path, "monthly_albers_proj",
+    out[[m]] <- raster::stack(x = file.path(clim_path, "ISIMIP_CLIM_ESRI102003",
                                             files[which(grepl(paste0(stringr::str_pad(m, width = 2, pad = "0"), "_"), files))])) %>% 
       raster::calc(fun = mean)
-    
-    names(out[[m]]) <- paste0("month", stringr::str_pad(m, width = 2, pad = "0"))
     
     if(var == "tasmin"){
       tasmin_mean <- out
@@ -197,9 +235,9 @@ tasmin_mean_June_May <- tasmin_mean[[c(6:12, 1:5)]]
 tasmax_mean_June_May <- tasmax_mean[[c(6:12, 1:5)]]
 pr_mean_June_May <- pr_mean[[c(6:12, 1:5)]]
 
-raster::plot(tasmin_mean_June_May)
-raster::plot(tasmax_mean_June_May)
-raster::plot(pr_mean_June_May)
+# raster::plot(tasmin_mean_June_May)
+# raster::plot(tasmax_mean_June_May)
+# raster::plot(pr_mean_June_May)
 
 # calculate bioclimatic variables:
 biovars_init_occ <- dismo::biovars(prec = pr_mean_June_May,
@@ -211,7 +249,7 @@ biovars_rast <- terra::rast(biovars_init_occ) # convert to terra object
 # save tifs:
 terra::writeRaster(biovars_rast,
                    filename = file.path(bioclim_folder, 
-                                        paste0(names(biovars_init_occ), "_",year-3, "_", year, ".tif")), 
+                                        paste0(names(biovars_rast), "_",start-3, "_", start, ".tif")), 
                    overwrite = TRUE)
 
 terra::plot(biovars_rast)
@@ -230,7 +268,8 @@ for(i in 1:19){
 }
 
 
-# seasonal temperature and precipitation summaries (months fixed): -----
+
+# seasonal temperature and precipitation summaries (fixed months): -----
 
 # spring = March, April, May
 # summer = June, July, August
@@ -238,7 +277,7 @@ for(i in 1:19){
 # winter = December, January, February
 
 # folder to store rasters:
-seasonal_folder <- file.path(chelsa_path, "seasonal")
+seasonal_folder <- file.path(clim_path, "seasonal")
 if(!dir.exists(seasonal_folder)){dir.create(seasonal_folder, recursive = TRUE)}
 
 # months considered for each season:
@@ -249,13 +288,13 @@ months_seasons_ls <- list(spring = stringr::str_pad(c(3:5), width = 2, pad = "0"
      winter = stringr::str_pad(c(12, 1:2), width = 2, pad = "0"))
 
 # iterate over years:
-foreach(year = 1990:2016, 
+foreach(year = 1995:2019, 
         .packages = c("raster", "terra") , 
         .verbose = TRUE) %dopar% {
           
-          # temperature:
+          # mean min. and max. temperature and precipitation:
           
-          for(var in c("tasmin", "tasmax")){
+          for(var in c("tasmin", "tasmax", "pr")){
             
             # iterate over seasons:
             for(s in 1:4){
@@ -270,8 +309,8 @@ foreach(year = 1990:2016,
                            paste0(var, "_", year, c("01", "02"), "_ESRI102003.tif"))
               }
               
-              # max. values for season:
-              rast_dt <- terra::rast(x = file.path(chelsa_path, "monthly_albers_proj", files))
+              # mean values for season:
+              rast_dt <- terra::rast(x = file.path(clim_path, "ISIMIP_CLIM_ESRI102003", files))
               #terra::plot(rast_dt)
               mean_rast <- terra::mean(rast_dt)
               names(mean_rast) <- paste0(var, "_mean_", names(months_seasons_ls)[[s]])
@@ -304,7 +343,7 @@ foreach(year = 1990:2016,
             }
             
             # mean values for season:
-            rast_dt <- terra::rast(x = file.path(chelsa_path, "monthly_albers_proj", files))
+            rast_dt <- terra::rast(x = file.path(clim_path, "ISIMIP_CLIM_ESRI102003", files))
             #terra::plot(rast_dt)
             mean_rast <- terra::mean(rast_dt)
             names(mean_rast) <- paste0("tas_mean_", names(months_seasons_ls)[[s]])
@@ -316,67 +355,43 @@ foreach(year = 1990:2016,
                                                     paste0("tas_mean_", names(months_seasons_ls)[s], "_", year, ".tif")), 
                                overwrite = TRUE)
           }
-          
-          
-          # precipitation:
-          
-          # iterate over seasons:
-          for(s in 1:4){
-            
-            # corresponding filenames:
-            if(s < 4){
-              # spring, summer, autumn:
-              files <- paste0("pr", "_", year, months_seasons_ls[[s]], "_ESRI102003.tif")
-            } else {
-              # winter: December previous year and Jan. and Febr. current year:
-              files <- c(paste0("pr", "_", year-1, "12", "_ESRI102003.tif"),
-                         paste0("pr", "_", year, c("01", "02"), "_ESRI102003.tif"))
-            }
-            
-            # mean and max. values for season:
-            rast_dt <- terra::rast(x = file.path(chelsa_path, "monthly_albers_proj", files))
-            #terra::plot(rast_dt)
-            sum_rast <- sum(rast_dt)
-            names(sum_rast) <- paste0("pr_", names(months_seasons_ls)[[s]])
-            #terra::plot(sum_rast)
-            
-            # save tifs:
-            terra::writeRaster(sum_rast,
-                               filename = file.path(seasonal_folder, 
-                                                    paste0("pr_", names(months_seasons_ls)[s], "_", year, ".tif")), 
-                               overwrite = TRUE)
-          }
         }
 
-# predictor for initial occupancy: seasonal climate summarizing three years before start:
 
-year <- 1991 # start year
 
-# temperature:
+# seasonal climate summarising three years before focal period as predictor for initial occupancy: ----
 
-for(var in c("tasmin", "tasmax")){
+for(var in c("tasmin", "tasmax", "pr")){
   
   # iterate over seasons:
   for(s in 1:4){
     
     # corresponding filenames:
-    if(s < 4){
-      # spring, summer, autumn:
-      files <- c(paste0(var, "_", year, months_seasons_ls[[s]], "_ESRI102003.tif"),
-                 paste0(var, "_", year-1, months_seasons_ls[[s]], "_ESRI102003.tif"),
-                 paste0(var, "_", year-2, months_seasons_ls[[s]], "_ESRI102003.tif"))
-    } else {
-      # winter: December previous year and Jan. and Febr. current year:
-      files <- c(paste0(var, "_", year-1, "12", "_ESRI102003.tif"),
-                 paste0(var, "_", year, c("01", "02"), "_ESRI102003.tif"),
-                 paste0(var, "_", year-2, "12", "_ESRI102003.tif"),
-                 paste0(var, "_", year-1, c("01", "02"), "_ESRI102003.tif"),
-                 paste0(var, "_", year-3, "12", "_ESRI102003.tif"),
-                 paste0(var, "_", year-2, c("01", "02"), "_ESRI102003.tif"))
+    
+    if(s ==1){ # spring (before survey = 1995, 1994, 1993)
+        
+      files <- c(paste0(var, "_", start, months_seasons_ls[[s]], "_ESRI102003.tif"),
+                 paste0(var, "_", start-1, months_seasons_ls[[s]], "_ESRI102003.tif"),
+                 paste0(var, "_", start-2, months_seasons_ls[[s]], "_ESRI102003.tif"))
+      
+    } else if(s >= 2 & s <= 3){ # summer, autumn(before survey = 1994, 1993, 1992):
+        
+        files <- c(paste0(var, "_", start-1, months_seasons_ls[[s]], "_ESRI102003.tif"),
+                   paste0(var, "_", start-2, months_seasons_ls[[s]], "_ESRI102003.tif"),
+                   paste0(var, "_", start-3, months_seasons_ls[[s]], "_ESRI102003.tif"))
+       
+         } else {   # winter: December previous year and Jan. and Febr. current year (1994/1995, 1993/1994, 1992/1993):
+          
+          files <- c(paste0(var, "_", start-1, "12", "_ESRI102003.tif"),
+                     paste0(var, "_", start, c("01", "02"), "_ESRI102003.tif"),
+                     paste0(var, "_", start-2, "12", "_ESRI102003.tif"),
+                     paste0(var, "_", start-1, c("01", "02"), "_ESRI102003.tif"),
+                     paste0(var, "_", start-3, "12", "_ESRI102003.tif"),
+                     paste0(var, "_", start-2, c("01", "02"), "_ESRI102003.tif"))
     }
     
-    # max. values for season:
-    rast_dt <- terra::rast(x = file.path(chelsa_path, "monthly_albers_proj", files))
+    # mean values for season:
+    rast_dt <- terra::rast(x = file.path(clim_path, "ISIMIP_CLIM_ESRI102003", files))
     #terra::plot(rast_dt)
     mean_rast <- terra::mean(rast_dt)
     names(mean_rast) <- paste0(var, "_mean_", names(months_seasons_ls)[[s]])
@@ -385,7 +400,7 @@ for(var in c("tasmin", "tasmax")){
     # save tifs:
     terra::writeRaster(mean_rast,
                        filename = file.path(seasonal_folder, 
-                                            paste0(var, "_mean_", names(months_seasons_ls)[s], "_1988_1991", ".tif")), 
+                                            paste0(var, "_mean_", names(months_seasons_ls)[s], "_1992_1995.tif")), 
                        overwrite = TRUE)
   }
 }
@@ -396,32 +411,42 @@ for(var in c("tasmin", "tasmax")){
 for(s in 1:4){
   
   # corresponding filenames:
-  if(s < 4){
+  if(s == 1){
     # spring, summer, autumn:
-    files <- c(paste0("tasmin", "_", year, months_seasons_ls[[s]], "_ESRI102003.tif"),
-               paste0("tasmin", "_", year-1, months_seasons_ls[[s]], "_ESRI102003.tif"),
-               paste0("tasmin", "_", year-2, months_seasons_ls[[s]], "_ESRI102003.tif"),
-               paste0("tasmax", "_", year, months_seasons_ls[[s]], "_ESRI102003.tif"),
-               paste0("tasmax", "_", year-1, months_seasons_ls[[s]], "_ESRI102003.tif"),
-               paste0("tasmax", "_", year-2, months_seasons_ls[[s]], "_ESRI102003.tif"))
+    files <- c(paste0("tasmin", "_", start, months_seasons_ls[[s]], "_ESRI102003.tif"),
+               paste0("tasmin", "_", start-1, months_seasons_ls[[s]], "_ESRI102003.tif"),
+               paste0("tasmin", "_", start-2, months_seasons_ls[[s]], "_ESRI102003.tif"),
+               paste0("tasmax", "_", start, months_seasons_ls[[s]], "_ESRI102003.tif"),
+               paste0("tasmax", "_", start-1, months_seasons_ls[[s]], "_ESRI102003.tif"),
+               paste0("tasmax", "_", start-2, months_seasons_ls[[s]], "_ESRI102003.tif"))
+  } else if(s >= 2 & s <= 3) {
+    
+    files <- c(paste0("tasmin", "_", start-1, months_seasons_ls[[s]], "_ESRI102003.tif"),
+               paste0("tasmin", "_", start-2, months_seasons_ls[[s]], "_ESRI102003.tif"),
+               paste0("tasmin", "_", start-3, months_seasons_ls[[s]], "_ESRI102003.tif"),
+               paste0("tasmax", "_", start-1, months_seasons_ls[[s]], "_ESRI102003.tif"),
+               paste0("tasmax", "_", start-2, months_seasons_ls[[s]], "_ESRI102003.tif"),
+               paste0("tasmax", "_", start-3, months_seasons_ls[[s]], "_ESRI102003.tif")) 
+    
   } else {
+    
     # winter: December previous year and Jan. and Febr. current year:
-    files <- c(paste0("tasmin", "_", year-1, "12", "_ESRI102003.tif"),
-               paste0("tasmin", "_", year, c("01", "02"), "_ESRI102003.tif"),
-               paste0("tasmin", "_", year-2, "12", "_ESRI102003.tif"),
-               paste0("tasmin", "_", year-1, c("01", "02"), "_ESRI102003.tif"),
-               paste0("tasmin", "_", year-3, "12", "_ESRI102003.tif"),
-               paste0("tasmin", "_", year-2, c("01", "02"), "_ESRI102003.tif"),
-               paste0("tasmax", "_", year-1, "12", "_ESRI102003.tif"),
-               paste0("tasmax", "_", year, c("01", "02"), "_ESRI102003.tif"),
-               paste0("tasmax", "_", year-2, "12", "_ESRI102003.tif"),
-               paste0("tasmax", "_", year-1, c("01", "02"), "_ESRI102003.tif"),
-               paste0("tasmax", "_", year-3, "12", "_ESRI102003.tif"),
-               paste0("tasmax", "_", year-2, c("01", "02"), "_ESRI102003.tif"))
+    files <- c(paste0("tasmin", "_", start-1, "12", "_ESRI102003.tif"),
+               paste0("tasmin", "_", start, c("01", "02"), "_ESRI102003.tif"),
+               paste0("tasmin", "_", start-2, "12", "_ESRI102003.tif"),
+               paste0("tasmin", "_", start-1, c("01", "02"), "_ESRI102003.tif"),
+               paste0("tasmin", "_", start-3, "12", "_ESRI102003.tif"),
+               paste0("tasmin", "_", start-2, c("01", "02"), "_ESRI102003.tif"),
+               paste0("tasmax", "_", start-1, "12", "_ESRI102003.tif"),
+               paste0("tasmax", "_", start, c("01", "02"), "_ESRI102003.tif"),
+               paste0("tasmax", "_", start-2, "12", "_ESRI102003.tif"),
+               paste0("tasmax", "_", start-1, c("01", "02"), "_ESRI102003.tif"),
+               paste0("tasmax", "_", start-3, "12", "_ESRI102003.tif"),
+               paste0("tasmax", "_", start-2, c("01", "02"), "_ESRI102003.tif"))
   }
   
   # mean values for season:
-  rast_dt <- terra::rast(x = file.path(chelsa_path, "monthly_albers_proj", files))
+  rast_dt <- terra::rast(x = file.path(clim_path, "ISIMIP_CLIM_ESRI102003", files))
   #terra::plot(rast_dt)
   mean_rast <- terra::mean(rast_dt)
   names(mean_rast) <- paste0("tas_mean_", names(months_seasons_ls)[[s]])
@@ -430,49 +455,13 @@ for(s in 1:4){
   # save tifs:
   terra::writeRaster(mean_rast,
                      filename = file.path(seasonal_folder, 
-                                          paste0("tas_mean_", names(months_seasons_ls)[s], "_1988_1991", ".tif")), 
+                                          paste0("tas_mean_", names(months_seasons_ls)[s], "_1992_1995.tif")), 
                      overwrite = TRUE)
 }
 
 
-# precipitation:
 
-# iterate over seasons:
-for(s in 1:4){
-  
-  # corresponding filenames:
-  if(s < 4){
-    # spring, summer, autumn:
-    files <- c(paste0("pr", "_", year, months_seasons_ls[[s]], "_ESRI102003.tif"),
-               paste0("pr", "_", year-1, months_seasons_ls[[s]], "_ESRI102003.tif"),
-               paste0("pr", "_", year-2, months_seasons_ls[[s]], "_ESRI102003.tif"))
-  } else {
-    # winter: December previous year and Jan. and Febr. current year:
-    files <- c(paste0("pr", "_", year-1, "12", "_ESRI102003.tif"),
-               paste0("pr", "_", year, c("01", "02"), "_ESRI102003.tif"),
-               paste0("pr", "_", year-2, "12", "_ESRI102003.tif"),
-               paste0("pr", "_", year-1, c("01", "02"), "_ESRI102003.tif"),
-               paste0("pr", "_", year-3, "12", "_ESRI102003.tif"),
-               paste0("pr", "_", year-2, c("01", "02"), "_ESRI102003.tif"))
-  }
-  
-  # mean and max. values for season:
-  rast_dt <- terra::rast(x = file.path(chelsa_path, "monthly_albers_proj", files))
-  #terra::plot(rast_dt)
-  sum_rast <- sum(rast_dt)
-  names(sum_rast) <- paste0("pr_", names(months_seasons_ls)[[s]])
-  #terra::plot(sum_rast)
-  
-  # save tifs:
-  terra::writeRaster(sum_rast,
-                     filename = file.path(seasonal_folder, 
-                                          paste0("pr_", names(months_seasons_ls)[s], "_1988_1991", ".tif")), 
-                     overwrite = TRUE)
-}
-
-
-###
-# explore/plot seasonal variables:
+# explore/plot seasonal variables: ----
 files <- list.files(seasonal_folder, full.names = TRUE)
 sclims_rast <- terra::rast(files[which(grepl("2000", files))]) # 2000
 sclims_rast_scaled <- terra::scale(sclims_rast)
@@ -484,19 +473,17 @@ for(i in 1:16){
   dev.off()
 }
 
+# plot overall trend:
+var <- "bio15"
+files <- list.files(bioclim_folder, full.names = TRUE)
+cl_rast <- terra::rast(files[which(grepl(paste0(var, "_[0-9]{4}.tif"), files))])
+values_df <- values(cl_rast, dataframe = TRUE) 
+#dim(values_df) # each column = one year
 
-# ---
-library(ggplot2)
-library(viridis)
-ggplot() + 
-  geom_stars(data = nc_dt2) +
-  facet_wrap(~time)+
-  theme_void() +
-  scale_fill_viridis() #+
-#scale_x_discrete(expand = c(0, 0)) +
-#scale_y_discrete(expand = c(0, 0))
+plot(x = 1995:2019, y = colSums(values_df, na.rm = TRUE)/(colSums(values_df, na.rm = TRUE)[1]), type = "o", 
+     main = var#, 
+     #ylim = c(-1, 1)
+     )
 
-ggplot() + 
-  geom_stars(data = monthly_mean2) +
-  theme_void() +
-  scale_fill_viridis()
+
+# future

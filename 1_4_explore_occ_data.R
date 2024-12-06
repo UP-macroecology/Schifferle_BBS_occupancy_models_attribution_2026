@@ -9,12 +9,14 @@ library(ggplot2)
 
 # load data: ----
 
+source("0_functions.R") # BBS_pres_abs_spec()
+
 # BBS route selection (centroids):
-routes_sel_sf <- st_read(file.path("data", "route_selection_1991_2015_surv_beg_end_max_5y_miss_v2_spat_thin_100km_max_30_r_per_BCR_centroids.shp")) # output of 1_1_route_selection.R
+routes_sel_sf <- st_read(file.path("data", "route_selection_1995_2019_surv_beg_end_max_5y_miss_v2_spat_thin_100km_max_30_r_per_BCR_centroids.shp")) # output of 1_1_route_selection.R
 
 # selected species:
 load(file = file.path("data", "final_species_selection.RData")) # output of 1_2_species_selection.R
-species_selection_final <- sort(species_selection_final)
+
 load(file = file.path("data", "final_species_selection_eco_sorted.RData")) # final_species_eco_sorted; output of 1_2_species_selection.R
 
 # route-year-species information (only surveyed)
@@ -37,37 +39,14 @@ for(i in 1:length(species_selection_final)){
   
   print(species_selection_final[i])
   
-  presences_spec <- bbs_dt_occ %>% 
-    select(c(English_Common_Name, RTENO, Year, paste0("Count", seq(10, 50, 10)))) %>% 
-    filter(English_Common_Name == species_selection_final[i])
-  
-  # match to routes-year-env:
-  occ_dt_spec <- route_sel_env_dt_final %>% 
-    select(c(RTENO, Year, Surveyed)) %>% 
-    # add observations:
-    collapse::join(presences_spec, on = c("RTENO", "Year"), how = "left") %>% 
-    # if route was surveyed but species not observed, replace NA with 0:
-    mutate(across(Count10:Count50, ~ 
-                    case_when(Surveyed == 1 & is.na(.) ~ 0,
-                              .default = .))) %>%
-    # convert bird counts to presence / absence:
-    mutate(across(Count10:Count50, ~ 
-                    case_when(. > 1 ~ 1,
-                              .default = .)))
-  
-  # match to spatial data:
-  occ_spec_sf <- routes_sel_sf %>%
-    left_join(occ_dt_spec, by = c("RTENO_BBS" = "RTENO")) %>% # species counts
-    mutate(presence = rowSums(across(paste0("Count", seq(10, 50, 10))))) %>%
-    mutate(presence = ifelse(presence >= 1, 1, 0))
-  
-  # summarise presences across years:
-  spec_pres_abs_cum <- occ_spec_sf %>%
-    group_by(RTENO_BBS) %>%
+  spec_pres_abs_cum <- BBS_pres_abs_spec(species_selection_final[i]) %>%
+    right_join(routes_sel_sf, by = c("RTENO" = "RTENO_BBS")) %>% 
+    st_as_sf() %>% 
+    group_by(RTENO) %>%
+    # presence = at least one record between 1995-2019:
     summarise(presence_summarised = max(presence, na.rm=TRUE)) %>%
-    mutate(presence_summarised = factor(presence_summarised, levels = c(1,0))) %>% 
-    select(presence_summarised)
-  
+    mutate(presence_summarised = factor(presence_summarised, levels = c(1,0)))
+
   plot_list[[i]] <- ggplot(spec_pres_abs_cum) +
     geom_sf(aes(colour = presence_summarised), size = 0.5) +
     ggtitle(species_selection_final[i]) +
@@ -96,42 +75,6 @@ pres_sf <- routes_sel_sf %>%
   select(c("RTENO" = RTENO_BBS, Year, "species" = English_Common_Name))
 
 st_write(pres_sf, file.path("data", "spec_presences.shp"), append = FALSE)
-
-
-
-
-# explore correlation between env. variables taking only route locations (and not whole US) into account: ----
-
-M <- cor(route_sel_env_dt_final[, c(9:32)], method = "s")
-corrplot::corrplot(M, method = "square", order = "hclust",
-         addCoef.col = "black",
-         diag = FALSE,
-         tl.cex = 1,
-         number.cex = 0.8,
-         number.digits= 2)
-
-M <- cor(route_sel_env_dt_final[, c("bio2", "bio3", "bio5", "bio6", "bio13", "bio14",
-                                    "sum_annual_crops","urban", "pastr", "secdn", "primn")], method = "s")
-corrplot::corrplot(M, method = "square", order = "hclust",
-                   addCoef.col = "black",
-                   diag = FALSE,
-                   tl.cex = 1,
-                   number.cex = 0.8,
-                   number.digits= 2)
-# secdn and primn are too highly correlated considering only route locations
-
-M <- cor(route_sel_env_dt_final[, c("bio1", "bio2", "bio3", "bio10", "bio12", "bio16")], method = "s")
-corrplot::corrplot(M, method = "square", order = "hclust",
-                   addCoef.col = "black",
-                   diag = FALSE,
-                   tl.cex = 1,
-                   number.cex = 0.8,
-                   number.digits= 2)
-# bio1 and bio10, bio12 and bio16 are highly correlated taking only route locations in account
-
-
-
-
 
 
 
@@ -189,56 +132,32 @@ lm_trend_df %>%
 # quantify trend as slope of linear model (env. variable ~ year):
 # species specific: consider only data from routes within 750 km buffer around presences
 
-# these species have been discarded in a later step because MCMC fitting didn't work for them:
-species_discard <- c("Golden Eagle", "Prairie Falcon", "Sharp-shinned Hawk", "Broad-winged Hawk",
-                     "Cooper's Hawk", "Osprey", "Evening Grosbeak", "Golden-crowned Kinglet", "Olive-sided Flycatcher",
-                     "Wilson's Warbler", "Bullock's Oriole", "Western Wood-Pewee", "Black-throated Gray Warbler",
-                     "MacGillivray's Warbler", "Ruffed Grouse", "Northern Bobwhite",
-                     "Common Raven", "Common Yellowthroat", "Hairy Woodpecker", "Indigo Bunting",
-                     "Louisiana Waterthrush", "Northern Mockingbird", "Northern Parula", "Prairie Warbler",
-                     "Bewick's Wren", "Brewer's Blackbird")
+# # these species have been discarded in a later step because MCMC fitting didn't work for them:
+# species_discard <- c("Golden Eagle", "Prairie Falcon", "Sharp-shinned Hawk", "Broad-winged Hawk",
+#                      "Cooper's Hawk", "Osprey", "Evening Grosbeak", "Golden-crowned Kinglet", "Olive-sided Flycatcher",
+#                      "Wilson's Warbler", "Bullock's Oriole", "Western Wood-Pewee", "Black-throated Gray Warbler",
+#                      "MacGillivray's Warbler", "Ruffed Grouse", "Northern Bobwhite",
+#                      "Common Raven", "Common Yellowthroat", "Hairy Woodpecker", "Indigo Bunting",
+#                      "Louisiana Waterthrush", "Northern Mockingbird", "Northern Parula", "Prairie Warbler",
+#                      "Bewick's Wren", "Brewer's Blackbird")
 
-species_set <- final_species_eco_sorted[!final_species_eco_sorted %in% species_discard]
+#species_set <- final_species_eco_sorted[!final_species_eco_sorted %in% species_discard]
+species_set <- species_selection_final
 
-env_vars <- c("bio1", "bio2", "bio3", "bio7", "bio14", "bio15", 
-              "pr_spring", "pr_summer","pr_autumn", "pr_winter",
-              "sum_annual_crops", "secdf","pastr", "urban")
+# selected variables (output of 1_2_variable_selection.R):
+load(file = file.path("data", "selected_variables.RData"))
+selvar_final
 
 route_sel_env_dt <- route_sel_env_dt_final %>% 
   # only selected variables:
-  select(c("RTENO", "Year", "bio1", "bio2", "bio3", "bio7", "bio14", "bio15", 
-           "pr_spring", "pr_summer","pr_autumn", "pr_winter",
-           "sum_annual_crops", "secdf","pastr", "urban"))
+  select(c("RTENO", "Year", all_of(selvar_final)))
 
-lm_env_trend_df <- data.frame("species" = species_set,
-                              "bio1_trend" = NA,
-                              "bio1_p_value" = NA,
-                              "bio2_trend" = NA,
-                              "bio2_p_value" = NA,
-                              "bio3_trend" = NA,
-                              "bio3_p_value" = NA,
-                              "bio7_trend" = NA,
-                              "bio7_p_value" = NA,
-                              "bio14_trend" = NA,
-                              "bio14_p_value" = NA,
-                              "bio15_trend" = NA,
-                              "bio15_p_value" = NA,
-                              "pr_spring_trend" = NA,
-                              "pr_spring_p_value" = NA,
-                              "pr_summer_trend" = NA,
-                              "pr_summer_p_value" = NA,
-                              "pr_autumn_trend" = NA,
-                              "pr_autumn_p_value" = NA,
-                              "pr_winter_trend" = NA,
-                              "pr_winter_p_value" = NA,
-                              "sum_annual_crops_trend" = NA,
-                              "sum_annual_crops_p_value" = NA,
-                              "secdf_trend" = NA,
-                              "secdf_p_value" = NA,
-                              "pastr_trend" = NA,
-                              "pastr_p_value" = NA,
-                              "urban_trend" = NA,
-                              "urban_p_value" = NA)
+# data frame to store results:
+
+colnames <- c("species", sort(paste0(rep(selvar_final, 2), c("_trend", "_pval"))))
+lm_env_trend_df <- as.data.frame(matrix(NA, nrow = length(species_set), ncol = length(colnames)))
+colnames(lm_env_trend_df) <- colnames
+lm_env_trend_df$species <- species_set
 
 for(i in 1:length(species_set)){
   
@@ -252,13 +171,13 @@ for(i in 1:length(species_set)){
   env_dt_spec <- route_sel_env_dt %>% 
     filter(RTENO %in% rel_routes)
   
-  for(v in env_vars){
+  for(v in selvar_final){
     
     print(v)
     
     summary_lm <- summary(lm(unlist(env_dt_spec[,v]) ~ unlist(env_dt_spec[,"Year"])))
     lm_env_trend_df[i, paste0(v, "_trend")] <- summary_lm$coefficients[2,1]
-    lm_env_trend_df[i, paste0(v, "_p_value")] <- summary_lm$coefficients[2,4]
+    lm_env_trend_df[i, paste0(v, "_pval")] <- summary_lm$coefficients[2,4]
 
   }
 
@@ -269,6 +188,6 @@ write.csv(lm_env_trend_df, file = file.path("results", "env_vars_trends_species.
 # plot
 route_sel_env_dt %>% 
   filter(RTENO %in% rel_routes) %>% 
-  ggplot(aes(x = Year, y = urban)) +
+  ggplot(aes(x = Year, y = secondary_nonforests)) +
   geom_line(aes(group = RTENO)) +
   geom_smooth(method = 'lm')
