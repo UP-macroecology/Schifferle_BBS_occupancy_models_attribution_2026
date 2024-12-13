@@ -21,8 +21,8 @@ source("0_functions.R")
 # x - y - abs/pres:
 load(file = file.path("data", "BBS_for_occ_spec_records.RData")) # output of 1_0_reformat_BBS_data.R
 
-# BBS route selection (centroids) to fit models:
-routes_sel_sf <- st_read(file.path("data", "route_selection_1991_2015_surv_beg_end_max_5y_miss_v2_spat_thin_100km_max_30_r_per_BCR_centroids.shp")) # output of 1_1_route_selection.R
+# selected routes spatial data (to buffer presences):
+routes_sel_sf <- st_read(file.path("data", "route_selection_1995_2019_surv_beg_end_max_5y_miss_v2_spat_thin_100km_max_30_r_per_BCR_centroids.shp")) # output of 1_1_route_selection.R
 
 # merged route, year, environment data:
 load(file = file.path("data", "route_year_env_data.RData"))
@@ -33,26 +33,27 @@ load(file = file.path("data", "final_species_selection.RData")) # output of 1_2_
 # routes-years:
 load(file = file.path("data", "BBS_for_occ_selection.RData")) # route_sel_dt; output of 1_3_match_BBS_to_env_data.R 
 
+# selected variables:
+load(file = file.path("data", "selected_variables.RData")) # selvar_final; output of 1_2_variable_selection.R
+
 
 # load env. data to check environmental similarity between training and test folds: ----
 
 # files:
-bioclim_files <- list.files(file.path("data", "Env_data", "ISIMIP_CHELSA-W5E5v1.0", "bioclim"), full.names = TRUE)
-lu_files <- list.files(file.path("data", "Env_data", "LUH2", "albers_proj"), full.names = TRUE)
-sclim_files <- list.files(file.path("data", "Env_data", "ISIMIP_CHELSA-W5E5v1.0", "seasonal"), full.names = TRUE) #xx
+bioclim_files <- list.files(file.path("data", "Env_data", "ISIMIP_GSWP3_W5E5", "bioclim"), full.names = TRUE)
+lu_files <- list.files(file.path("data", "Env_data", "ISIMIP_land_use_and_irrigation", "ISIMIP_LU_ESRI102003"), full.names = TRUE)
+sclim_files <- list.files(file.path("data", "Env_data", "ISIMIP_GSWP3_W5E5", "seasonal"), full.names = TRUE)
 
-bioclim_3yrs_sp <- rast(bioclim_files[which(grepl("1988_1991", bioclim_files))])
-sclim_3yrs_sp <- rast(sclim_files[which(grepl("1988_1991", sclim_files))])
-lu_3yrs_sp <- rast(lu_files[which(grepl("1988_1990", lu_files))])
+bioclim_3yrs_sp <- rast(bioclim_files[which(grepl("1992_1995", bioclim_files))])
+sclim_3yrs_sp <- rast(sclim_files[which(grepl("1992_1995", sclim_files))])
+lu_3yrs_sp <- rast(lu_files[which(grepl("1992_1994", lu_files))])
 
-# selected variables:
-selvar <- c("bio1", "bio2", "bio3", "bio7", "bio14", "bio15", "pr_spring", "pr_summer", "pr_autumn", "pr_winter",
-            "sum_annual_crops", "secdf", "pastr", "urban")
+selvar_final
 
 # reduce to selected variables:
-bioclim_3yrs_sp_sel <- bioclim_3yrs_sp[[selvar[grepl(pattern = "bio", x = selvar)]]]
-sclim_3yrs_sp_sel <- sclim_3yrs_sp[[selvar[grepl(pattern = "(spring|summer|autumn|winter)", x = selvar)]]]
-lu_3yrs_sp_sel <- lu_3yrs_sp[[selvar[!grepl(pattern = "bio|pr_", x = selvar)]]] # xx
+bioclim_3yrs_sp_sel <- bioclim_3yrs_sp[[selvar_final[grepl(pattern = "bio", x = selvar_final)]]]
+sclim_3yrs_sp_sel <- sclim_3yrs_sp[[selvar_final[grepl(pattern = "(spring|summer|autumn|winter)", x = selvar_final)]]]
+lu_3yrs_sp_sel <- lu_3yrs_sp[[selvar_final[!grepl(pattern = "bio|pr_", x = selvar_final)]]] # xx
 
 # combine:
 env_rasters <- c(bioclim_3yrs_sp_sel, sclim_3yrs_sp_sel, lu_3yrs_sp_sel)
@@ -61,6 +62,15 @@ env_rasters <- c(bioclim_3yrs_sp_sel, sclim_3yrs_sp_sel, lu_3yrs_sp_sel)
 # assign routes to folds: ----
 
 hexagon_size_m <- 500000
+
+# directory to save plots:
+if(!dir.exists(file.path("plots", "blockCV_folds", paste0("block_size_", hexagon_size_m/1000, "km")))){
+  dir.create(file.path("plots", "blockCV_folds", paste0("block_size_", hexagon_size_m/1000, "km")), recursive = TRUE)
+}
+# directory to save block assignment:
+if(!dir.exists(file.path("data", "CV_route_block_allocation", paste0("block_size_", hexagon_size_m/1000, "km")))){
+  dir.create(file.path("data", "CV_route_block_allocation", paste0("block_size_", hexagon_size_m/1000, "km")), recursive = TRUE)
+}
 
 # since I use a buffer around the presence points of each species to determine the
 # data used for each model, I also generate folds for each species separately:
@@ -93,13 +103,14 @@ for(spec in species_selection_final){
                       k = 5, # number of folds
                       size = hexagon_size_m, # size of the blocks in metres
                       selection = "random", # random blocks-to-fold; more even distribution of presence/absence instances between the train and test folds compared to ‘systematic’
-                      iteration = 100, # find evenly dispersed folds; 50 no enough, 100 = default, 200 = no improvement for critical species
+                      iteration = 100, # find evenly dispersed folds; 50 not enough, 100 = default, 200 = no improvement for critical species
                       biomod2 = FALSE, # also create folds for biomod2
                       flat_top = TRUE,
-                      seed = 5254,# 3456789: 39
+                      seed = 3# 5254,# 3456789: 39
                       )
 
   # write plot to file:
+  
   jpeg(file = file.path("plots", "blockCV_folds", paste0("block_size_", hexagon_size_m/1000, "km"), paste0(spec, ".jpg")), 
        width = 1000, height = 800, quality = 100)
   print(cv_plot(cv = sb_US,
@@ -201,3 +212,9 @@ for(spec in species_selection_final){
 }
 n_species_without_enough_presences
 sink(file = NULL)
+
+
+# we want 80 % of presences in training data, 20 % in test data
+# species detected on at least 50 routes -> at least 10 presences in test data
+# and 40 presences in training data
+# not yet

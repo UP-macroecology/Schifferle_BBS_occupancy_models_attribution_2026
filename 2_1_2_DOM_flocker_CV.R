@@ -6,7 +6,7 @@
 # 2.) refit model 5 times (5-fold cross validation)
 # 3.) predict to test folds: occupancy probability per year and predicted y (0/1) (this is comparable to observed data)
 
-# first for 750 km buffer, later repeat for 250 km buffer!
+# first for 750 km buffer
 
 # packages: ----
 
@@ -19,12 +19,22 @@ set_cmdstan_path(path = NULL)
 #set_cmdstan_path("C:/Users/schifferle1/Documents/cmdstan-2.34.1") # xx
 library(sf)
 
+# register cores for parallel computation:
+ncores <- 20 # 5 fold * 4 chains * species
+cl <- makeCluster(ncores, setup_timeout = 0.5)
+registerDoParallel(cl)
+
 
 # directories: ----
 
 print(tempdir())
 dir <- file.path("/import", "ecoc9z", "data-zurell", "schifferle", "BBS_occupancy_models_2023")
 #dir <- getwd()
+
+# directory for logfiles:
+log_dir <- file.path("logfiles", "CV_buffer750km")
+# directory for results:
+res_dir <- file.path(dir, "results", "CV_buffer750km")
 
 
 # functions: ----
@@ -35,64 +45,58 @@ source("0_functions.R")
 # load data: ----
 
 # selected routes and focal years matched to environmental data:
-# merged route, year, environment data:
 
+# merged route, year, environment data:
 load(file = file.path("data", "route_year_env_data.RData")) # route_sel_env_dt_final; output of 1_3_match_BBS_to_env_data.R
-# scale covariates:
-route_sel_env_dt_scaled <- route_sel_env_dt_final %>% 
-  mutate(across(bio2:pr_winter_3yrs, ~ (scale(.)) %>% as.vector())) %>% 
-  # only selected variables:
-  select(c("RTENO", "Year", "bio1", "bio2", "bio3", "bio7", "bio14", "bio15", 
-           "pr_spring", "pr_summer","pr_autumn", "pr_winter",
-           "bio1_3yrs", "bio2_3yrs", "bio3_3yrs", "bio7_3yrs", "bio14_3yrs", "bio15_3yrs",
-           "pr_spring_3yrs", "pr_summer_3yrs", "pr_autumn_3yrs", "pr_winter_3yrs", 
-           "sum_annual_crops", "secdf","pastr", "urban",
-           "sum_annual_crops_3yrs", "secdf_3yrs", "pastr_3yrs", "urban_3yrs"))
+
+# selected variables:
+load(file = file.path("data", "selected_variables.RData")) # selvar_final; output of 1_2_variable_selection.R
 
 # routes-years:
 load(file = file.path("data", "BBS_for_occ_selection.RData")) # route_sel_dt; output of 1_3_match_BBS_to_env_data.R 
 
 # selected routes spatial data (to buffer presences):
-routes_sel_sf <- st_read(file.path("data", "route_selection_1991_2015_surv_beg_end_max_5y_miss_v2_spat_thin_100km_max_30_r_per_BCR_centroids.shp")) # output of 1_1_route_selection.R
+routes_sel_sf <- st_read(file.path("data", "route_selection_1995_2019_surv_beg_end_max_5y_miss_v2_spat_thin_100km_max_30_r_per_BCR_centroids.shp")) # output of 1_1_route_selection.R
 
 # route-year-species information (only surveyed)
 load(file = file.path("data", "BBS_for_occ_spec_records.RData")) # bbs_dt_occ; output of 1_0_reformat_BBS_data.R
 
 # selected species:
-#load(file = file.path("data", "final_species_selection.RData")) # species_selection_final; output of 1_2_species_selection.R
 # sorted by ecoregion:
 load(file = file.path("data", "final_species_selection_eco_sorted.RData")) # final_species_eco_sorted; output of 1_2_species_selection.R
 
 
 
-# assemble data: ----
+# assemble overall data: ----
 
-nyears <- length(unique(route_sel_env_dt_final$Year)) # 25
+# scale covariates:
+
+route_sel_env_dt_scaled <- route_sel_env_dt_final %>% 
+  select(-c(Latitude, Longitude, BCR, ObsN, doy)) %>% 
+  mutate(across(!c(RTENO, Year, Surveyed), ~ as.numeric(scale(., center=mean(.), scale = sd(.)))))
+
+rm(route_sel_env_dt_final)
+
+
+nyears <- length(unique(route_sel_env_dt_scaled$Year)) # 25
 nsurveys <- 5
-nsites <- length(unique(route_sel_env_dt_final$RTENO)) # 476
+#nsites <- length(unique(route_sel_env_dt_scaled$RTENO)) # 476
 
 
-# register cores for parallel computation:
-ncores <- 63 # 5 fold * 4 chains * species
-cl <- makeCluster(ncores, setup_timeout = 0.5)
-registerDoParallel(cl)
-
-# for species block...
-
-# make blocks:
+# make blocks of species:
 # 3 species per block:
 spec_blocks_list <- split(final_species_eco_sorted, rep(1:(length(final_species_eco_sorted)/3), each = 3))
 names(spec_blocks_list) <- NULL
 
-prog_log_file <- file("CV/CV_buffer_750_progress.txt", open = "wt") # write console output here
+prog_log_file <- file(file.path(log_dir, "CV_buffer_750_progress.txt"), open = "wt") # write console output here
 sink(prog_log_file, type = "message")
 sink(prog_log_file, type = "output")
 
-for(i in 26:40){
+#for(i in 1:3){
   
-  print(paste("block", i, "of", length(spec_blocks_list)))
+#  print(paste("block", i, "of", length(spec_blocks_list)))
   
-  foreach(spec = spec_blocks_list[[i]],
+  foreach(spec = spec_blocks_list[[1]][2], #spec_blocks_list[[i]],
           .packages = c("dplyr", "collapse", "flocker", "cmdstanr", "brms", "sf"), # xx
           .errorhandling = "pass", #"remove",
           .verbose = TRUE) %:% 
@@ -102,17 +106,17 @@ for(i in 26:40){
                     .errorhandling = "pass", #"remove",
                     .verbose = TRUE) %dopar% {
                       
-                      log_file_spec <- file(paste0("CV/", spec, "_CV_fitting_final.txt"), open = "wt") # write console output here
-                      sink(log_file_spec, type = "message")
-                      sink(log_file_spec, type = "output")
+                      spec_log_file <- file(file.path(log_dir, paste0(spec, "_CV_fitting.txt")), open = "wt") # write console output here
+                      sink(spec_log_file, type = "message")
+                      sink(spec_log_file, type = "output")
                       
                       # check whether species has run already:
-                      CV_run <- length(list.files(path = file.path(dir, "data"), pattern = paste0(spec, "_CV_fold"))) == 10
+                      CV_run <- length(list.files(path = file.path(res_dir), pattern = paste0(spec, "_CV_fold"))) == 10
                       if(CV_run) {
                         print(paste(spec, "ran already."))
                         next
-                      } # xx
-                      
+                      }
+
                       print(spec)
                       
                       # relevant routes, within distance of 750 km of species records:
@@ -126,7 +130,7 @@ for(i in 26:40){
                       # assemble data:
                       occ_dt_spec <- BBS_pres_abs_spec(species = spec)
 
-                      log_file_spec_fold <- file(paste0("CV/", spec, "_CV_fitting4_fold", fold, ".txt"), open = "wt") # write console output here
+                      log_file_spec_fold <- file(file.path(log_dir, paste0(spec, "_CV_fitting_fold", fold, ".txt")), open = "wt") # write console output here
                       sink(log_file_spec_fold, type = "message")
                       sink(log_file_spec_fold, type = "output")
                       
@@ -161,12 +165,7 @@ for(i in 26:40){
                       env_cov <- vector("list", length = nyears)
                       for (t in 1:nyears){
                         env_cov[[t]] <- route_sel_env_dt_scaled[which(route_sel_env_dt_scaled$Year == years[t] & route_sel_env_dt_scaled$RTENO %in% occ_dt_spec_subset$RTENO), 
-                                                                c("bio1", "bio2", "bio3", "bio7", "bio14", "bio15", 
-                                                                  "pr_spring", "pr_summer","pr_autumn", "pr_winter",
-                                                                  "bio1_3yrs", "bio2_3yrs", "bio3_3yrs", "bio7_3yrs", "bio14_3yrs", "bio15_3yrs",
-                                                                  "pr_spring_3yrs", "pr_summer_3yrs", "pr_autumn_3yrs", "pr_winter_3yrs", 
-                                                                  "sum_annual_crops", "secdf","pastr", "urban",
-                                                                  "sum_annual_crops_3yrs", "secdf_3yrs", "pastr_3yrs", "urban_3yrs")]
+                                                                c(selvar_final, paste0(selvar_final, "_3yrs"))]
                       }
                       
                       # covariate for detection probability:
@@ -194,24 +193,24 @@ for(i in 26:40){
                       
                       out <- flock(
                         f_occ = ~ bio1_3yrs + bio2_3yrs + bio3_3yrs + bio7_3yrs + bio14_3yrs + bio15_3yrs +
-                          pr_spring_3yrs + pr_summer_3yrs + pr_autumn_3yrs + pr_winter_3yrs  + 
+                          pr_mean_spring_3yrs + pr_mean_summer_3yrs + pr_mean_autumn_3yrs + pr_mean_winter_3yrs  + 
                           I(bio1_3yrs^2) + I(bio2_3yrs^2) + I(bio3_3yrs^2) + I(bio7_3yrs^2) + I(bio14_3yrs^2) + I(bio15_3yrs^2) + 
-                          I(pr_spring_3yrs^2) + I(pr_summer_3yrs^2) + I(pr_autumn_3yrs^2) + I(pr_winter_3yrs^2)  +
-                          sum_annual_crops_3yrs + secdf_3yrs + pastr_3yrs + urban_3yrs +
-                          I(sum_annual_crops_3yrs^2) + I(secdf_3yrs^2) + I(pastr_3yrs^2) + I(urban_3yrs^2),
+                          I(pr_mean_spring_3yrs^2) + I(pr_mean_summer_3yrs^2) + I(pr_mean_autumn_3yrs^2) + I(pr_mean_winter_3yrs^2)  +
+                          urbanareas_3yrs + managed_pastures_3yrs + primary_nonforests_3yrs + secondary_nonforests_3yrs + sum_annual_crops_3yrs +
+                          I(urbanareas_3yrs^2) + I(managed_pastures_3yrs^2) + I(primary_nonforests_3yrs^2) + I(secondary_nonforests_3yrs^2) + I(sum_annual_crops_3yrs^2),
                         f_det = ~ route_section,
                         f_col = ~ bio1 + bio2 + bio3 + bio7 + bio14 + bio15 +
-                          pr_spring + pr_summer + pr_autumn + pr_winter +
+                          pr_mean_spring + pr_mean_summer + pr_mean_autumn + pr_mean_winter +
                           I(bio1^2) + I(bio2^2) + I(bio3^2) + I(bio7^2)+ I(bio14^2)+ I(bio15^2) +
-                          I(pr_spring^2) + I(pr_summer^2) + I(pr_autumn^2) + I(pr_winter^2)  + 
-                          sum_annual_crops + secdf + pastr + urban +
-                          I(sum_annual_crops^2) + I(secdf^2) + I(pastr^2) + I(urban^2),
+                          I(pr_mean_spring^2) + I(pr_mean_summer^2) + I(pr_mean_autumn^2) + I(pr_mean_winter^2)  + 
+                          urbanareas + managed_pastures + primary_nonforests + secondary_nonforests + sum_annual_crops +
+                          I(urbanareas^2) + I(managed_pastures^2) + I(primary_nonforests^2) + I(secondary_nonforests^2) + I(sum_annual_crops^2),
                         f_ex = ~ bio1 + bio2 + bio3 + bio7 + bio14 + bio15 +
-                          pr_spring + pr_summer + pr_autumn + pr_winter +
+                          pr_mean_spring + pr_mean_summer + pr_mean_autumn + pr_mean_winter +
                           I(bio1^2) + I(bio2^2) + I(bio3^2) + I(bio7^2)+ I(bio14^2)+ I(bio15^2) +
-                          I(pr_spring^2) + I(pr_summer^2) + I(pr_autumn^2) + I(pr_winter^2)  + 
-                          sum_annual_crops + secdf + pastr + urban +
-                          I(sum_annual_crops^2) + I(secdf^2) + I(pastr^2) + I(urban^2),
+                          I(pr_mean_spring^2) + I(pr_mean_summer^2) + I(pr_mean_autumn^2) + I(pr_mean_winter^2)  + 
+                          urbanareas + managed_pastures + primary_nonforests + secondary_nonforests + sum_annual_crops +
+                          I(urbanareas^2) + I(managed_pastures^2) + I(primary_nonforests^2) + I(secondary_nonforests^2) + I(sum_annual_crops^2),
                         flocker_data = fd,
                         prior = c(brms::set_prior("logistic(0,1)", class = "Intercept") + # flat on probability scale (https://cran.r-project.org/web/packages/flocker/vignettes/flocker_tutorial.html)
                                     brms::set_prior("logistic(0,1)", class = "Intercept", dpar = "occ"),
@@ -227,13 +226,13 @@ for(i in 26:40){
                         cores = 4,
                         chains = 4,
                         warmup = 1000,
-                        iter = 1000 + 1000 # 250 + 1000 # including warmup
+                        iter = 1000 + 1000
                       )
                       
                       print(out)
                       
                       # save fitted model for each fold:
-                      save(out, file = file.path(dir, "data", paste0("out_", spec, "_CV_fold", fold, ".RData")))
+                      save(out, file = file.path(res_dir, paste0("out_", spec, "_CV_fold", fold, ".RData")))
                       
                       end.time <- Sys.time()
                       time.taken <- round(end.time - start.time, 2)
@@ -284,13 +283,9 @@ for(i in 26:40){
                       env_cov_test <- vector("list", length = nyears)
                       for (t in 1:nyears){
                         env_cov_test[[t]] <- route_sel_env_dt_scaled[which(route_sel_env_dt_scaled$Year == years[t] & route_sel_env_dt_scaled$RTENO %in% test_RTENOs), 
-                                                                c("bio1", "bio2", "bio3", "bio7", "bio14", "bio15", 
-                                                                  "pr_spring", "pr_summer","pr_autumn", "pr_winter",
-                                                                  "bio1_3yrs", "bio2_3yrs", "bio3_3yrs", "bio7_3yrs", "bio14_3yrs", "bio15_3yrs",
-                                                                  "pr_spring_3yrs", "pr_summer_3yrs", "pr_autumn_3yrs", "pr_winter_3yrs", 
-                                                                  "sum_annual_crops", "secdf","pastr", "urban",
-                                                                  "sum_annual_crops_3yrs", "secdf_3yrs", "pastr_3yrs", "urban_3yrs")]
+                                                                c(selvar_final, paste0(selvar_final, "_3yrs"))]
                       }
+                      
                       
                       # make flocker data:
                       fd_test <- make_flocker_data_dynamic(
@@ -324,7 +319,10 @@ for(i in 26:40){
           
                       # occupancy probability:
                       
-                      occ_posterior <- get_Z(out, history_condition = FALSE, new_data = fd_test, sample = FALSE) # for each site and year 4000 draws
+                      occ_posterior <- get_Z(out, 
+                                             history_condition = FALSE, 
+                                             new_data = fd_test, 
+                                             sample = FALSE) # for each site and year 4000 draws
                       
                       print(paste("dim occ. posterior", dim(occ_posterior)))
                       
@@ -351,10 +349,11 @@ for(i in 26:40){
                                        "fitted_median" = fitted_initocc_col_ex_det_median,
                                        "occ_posterior_mean" = occ_posterior_mean,
                                        "occ_posterior_median" = occ_posterior_median,
+                                       "occ_posterior" = occ_posterior,
                                        "y_preds" = y_predictions,
                                        "y_preds_mean" = y_predictions_mean)
                       
-                      save(res_list, file = file.path(dir, "data", paste0("test_preds_", spec, "_CV_fold", fold, ".RData")))
+                      save(res_list, file = file.path(res_dir, paste0("test_preds_", spec, "_CV_fold", fold, ".RData")))
           
                       end.time <- Sys.time()
                       print(paste("finished", spec, "; time taken", round(end.time - start.time, 2)))
@@ -365,7 +364,7 @@ for(i in 26:40){
                       sink(type="output")
                     }
 
-}
+#}
 sink(type="message")
 sink(type="output")
 

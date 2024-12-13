@@ -268,6 +268,8 @@ for(i in 1:3){#length(spec_blocks_list)){
             
             save(res_list, file = file.path(res_dir, paste0("postproc_", spec, "_fm_buffer", buffer_km, ".RData")))
             
+            rm(res_list) 
+            
             end.time <- Sys.time()
             print(round(end.time - start.time, 2))
             

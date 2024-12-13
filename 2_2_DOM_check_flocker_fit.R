@@ -17,19 +17,27 @@ library(brms)
 # settings: ----
 # results_dir <- file.path("M:", "Documents", "DEBTs", "analysis", "Schifferle_BBS_occupancy_models_2023",
 #                          "results", "temp_val", "round2_2000_2000")
-# results_dir <- file.path("M:", "Documents", "DEBTs", "analysis", "Schifferle_BBS_occupancy_models_2023", 
-#                          "results", "full_model", "round2_warmup1000")
+results_dir <- file.path("M:", "Documents", "DEBTs", "analysis", "Schifferle_BBS_occupancy_models_2023",
+                         "results", "full_model")
 # results_dir <- file.path("//NAS-2-P-SN-01.ibb.uni-potsdam.de", "users$", "schifferle1", "Documents", "DEBTs", "analysis", 
 #                          "Schifferle_BBS_occupancy_models_2023", "results", "full_model", "round2_warmup1000")
 # results_dir <- file.path("M:", "Documents", "DEBTs", "analysis", "Schifferle_BBS_occupancy_models_2023",
 #                          "results", "CV_cluster", "round2_2000_2000")
-results_dir <- file.path("M:", "Documents", "DEBTs", "analysis", "Schifferle_BBS_occupancy_models_2023",
-                         "results", "attribution")
+# results_dir <- file.path("M:", "Documents", "DEBTs", "analysis", "Schifferle_BBS_occupancy_models_2023",
+#                          "results", "attribution")
+# results_dir <- file.path("C:", "Users", "schifferle1", "Documents", "DEBTs", "analysis", "Schifferle_BBS_occupancy_models_2023",
+#                          "results", "full_model")
 buffer_km <- 750
 
 
 # log output / store initial information as text file:
-MCMC_check_file <- file(file.path(results_dir, "check_output", "MCMC_check.txt"), open = "wt") # write console output here
+if(!dir.exists(file.path(results_dir, "check_output"))){
+  dir.create(file.path(results_dir, "check_output"))
+}
+
+specs_MCMC_failed <- vector(mode = "character")
+
+MCMC_check_file <- file(file.path(results_dir, "check_output", "MCMC_check3.txt"), open = "wt") # write console output here
 sink(MCMC_check_file, type = "output")
 
 print(paste("buffer distance:", buffer_km))
@@ -48,23 +56,16 @@ print(paste("model outputs:", results_dir))
 # models in folder:
 model_file <- list.files(results_dir, pattern = "out_")
 
-
-#for(i in 1:length(species_set)){
 for(i in 1:length(model_file)){ 
-  
+
   spec <- unlist(strsplit(model_file[i], split = "_"))[2]
-  
-  #spec <- species_set[i] # 1
-  
+
+  # check whether species ran already:
+  if(file.exists(file.path(results_dir, "check_output", paste0("check_out_", spec, "_fm_buffer", buffer_km, ".pdf")))){
+    next
+  }
+
   print(paste(i, model_file[i]))
-  
-  # load fitted model:
-  # skip_to_next <- FALSE
-  #  #tryCatch(print(load(file = file.path(results_dir, paste0("out_", spec, "_temp_val_5yrs.RData")))),
-  #  #         error = function(e) { skip_to_next <<- TRUE})
-  # tryCatch(print(load(file = file.path(results_dir, paste0("out_", spec, "_fm_buffer", buffer_km, ".RData")))),
-  #          error = function(e) { skip_to_next <<- TRUE})
-  # if(skip_to_next) { next }
   
   load(file = file.path(results_dir, model_file[i]))
   
@@ -75,10 +76,13 @@ for(i in 1:length(model_file)){
   div_trans <- sum(subset(hmc_diagnostics, Parameter == "divergent__")$Value)
   print(paste("divergent transitions:", div_trans))
   
+  if(div_trans != 0) {specs_MCMC_failed <- c(specs_MCMC_failed, spec)}
+  
   # is effective number of MCMC samples large enough: 
   n_eff_ratios <- neff_ratio(out)
   if("low" %in% mcmc_neff_data(n_eff_ratios)$rating){
     print("effective sample size too small")
+    specs_MCMC_failed <- c(specs_MCMC_failed, spec)
   }
   
   # effective number of samples in bulk and tail:
@@ -88,6 +92,7 @@ for(i in 1:length(model_file)){
   
   if(min(n_eff_ratio_bulk) < 0.1 |  min(n_eff_ratio_tail) < 0.1 ){
     print("effective sample size in bulk or tail too small")
+    specs_MCMC_failed <- c(specs_MCMC_failed, spec)
   } else {
     print("effective sample size in bulk and tail fine")
   }
@@ -96,6 +101,7 @@ for(i in 1:length(model_file)){
   rhats <- bayesplot::rhat(out$fit)
   if(max(rhats) > 1.01){
     print(paste("R-hat > 1.01 for", length(which(rhats > 1.01)), "parameters.  R-hat max.", max(rhats)))
+    specs_MCMC_failed <- c(specs_MCMC_failed, spec)
   } else {
     print("R-hat < 1.01 for all parameters")
   }
@@ -122,3 +128,28 @@ for(i in 1:length(model_file)){
                         quiet = TRUE)
 }
 sink(file = NULL)
+specs_MCMC_failed <- unique(specs_MCMC_failed)
+
+save(specs_MCMC_failed, file = file.path(results_dir, "check_output", "specs_MCMC_failed.RData"))
+specs_MCMC_failed # 16 species
+sort(specs_MCMC_failed)
+# which part failed:
+# Acadian Flycatcher: effective sample size too small
+# American Kestrel fine (R-hat < 1.02)
+# Bald Eagle: effective sample size too small
+# Black-billed Magpie: divergent transitions
+# Broad-winged Hawk: effective sample size too small, too large R-hat
+# Brown-headed Nuthatch: divergent transitions
+# Chipping Sparrow: effective sample size too small, too large R-hat
+# Cooper's Hawk: effective sample size too small, too large R-hat
+# Evening Grosbeak: effective sample size too small
+# Golden Eagle: effective sample size too small, too large R-hat
+# Hooded Warbler: effective sample size too small 
+# Lincoln's Sparrow: fine (Rhat < 1.02)
+# Louisiana Waterthrush: effective sample size too small, too large R-hat
+# Prairie Warbler: effective sample size too small
+# Sharp-shinned Hawk: effective sample size too small, too large R-hat
+# Winter Wren: effective sample size too small, too large R-hat
+
+specs_refit <- sort(specs_MCMC_failed[-which(specs_MCMC_failed %in% c("American Kestrel", "Lincoln's Sparrow"))])
+save(specs_refit, file = file.path(results_dir, "check_output", "specs_refit.RData"))
