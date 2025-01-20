@@ -26,14 +26,17 @@ buffer_km <- 750
 print(tempdir())
 #dir <- file.path("/import", "ecoc9z", "data-zurell", "schifferle", "BBS_occupancy_models_2023")
 #dir <- getwd()
-results_dir <- file.path("M:", "Documents", "DEBTs", "analysis", "Schifferle_BBS_occupancy_models_2023", "results", "temp_val_buffer_750_10yrs") 
-#results_dir <- file.path("//NAS-2-P-SN-01.ibb.uni-potsdam.de", "users$", "schifferle1", "Documents", "DEBTs", "analysis", "Schifferle_BBS_occupancy_models_2023", "results", "temp_val") 
+results_dir <- file.path("M:", "Documents", "DEBTs", "analysis", "Schifferle_BBS_occupancy_models_2023", 
+                         "results", "temp_val_buffer_750_10yrs")
+#results_dir <- file.path("//NAS-2-P-SN-01.ibb.uni-potsdam.de", "users$", "schifferle1", "Documents", 
+# "DEBTs", "analysis", "Schifferle_BBS_occupancy_models_2023", "results", "temp_val") 
 
 
 # load data: ----
 
-# selected species, sorted by ecoregion:
-load(file = file.path("data", "final_species_selection_eco_sorted.RData")) # final_species_eco_sorted; output of 1_2_species_selection.R
+# selected species:
+load(file = file.path("data", "species_set_analysis.RData"))
+final_species
 
 # selected routes spatial data (to buffer presences):
 routes_sel_sf <- st_read(file.path("data", "route_selection_1995_2019_surv_beg_end_max_5y_miss_v2_spat_thin_100km_max_30_r_per_BCR_centroids.shp")) # output of 1_1_route_selection.R
@@ -51,17 +54,23 @@ years <- min(route_sel_dt$Year):max(route_sel_dt$Year)
 
 # species:
 
-files <- list.files(file.path(results_dir), pattern = "preds")
-species_set <- gsub(pattern = "(preds_)|(_temp_val_10yrs_buffer_750.RData)", x = list.files(results_dir, pattern = "preds_"), replacement = "")
-
-C_temp_val_df <- data.frame("species" = species_set,
+C_temp_val_df <- data.frame("species" = final_species,
                             "C_ind_10yrs_preds" = NA)
 
-for(i in 1:length(species_set)){
+for(i in 77:length(final_species)){
   
-  spec <- species_set[i] # 1
+  spec <- final_species[i] # 1
   
   print(paste(i, spec))
+  
+  # check where to look for model output (did MCMC fitting work with less or only with more iterations?)
+  if(file.exists(file.path(results_dir, "refit_2000_2000", paste0("out_", spec, "_temp_val_10yrs_buffer_750.RData")))){
+    output_dir <- file.path(results_dir, "refit_2000_2000")
+  } else {
+    output_dir <- results_dir
+  }
+
+  print(output_dir)
   
   # observations:
   
@@ -76,10 +85,9 @@ for(i in 1:length(species_set)){
     summarise(pres_sum = sum(presence, na.rm = TRUE))
   
   # model predictions:
-  
-  load(file.path(results_dir, paste0("preds_", spec, "_temp_val_10yrs_buffer_750.RData")))
-  
-  res_list$y_preds # routes - sections - years - draws
+  load(file.path(output_dir, paste0("preds_", spec, "_temp_val_10yrs_buffer_750.RData")))
+
+  #dim(res_list$y_preds) # routes - sections - years - draws
   # sum across route sections:
   preds_routes <- apply(res_list$y_preds, MAR = c(1,3,4), FUN = max)
   dim(preds_routes)
@@ -126,10 +134,9 @@ for(i in 1:length(species_set)){
 
 
 save(C_temp_val_df, file = file.path(results_dir, "temp_eval", "10_years", "C_temp_val_10yrs.RData"))
-#load(file.path("data", "C_temp_val.RData"))
 
+#load(file.path(results_dir, "temp_eval", "10_years", "C_temp_val_10yrs.RData"))
 # decline was observed, this decline cannot be captured by the model, 
 # this suggests that species climate and land use change in the breeding area is not the main reason for decline
 # (or that climate and land use data we used are not properly capturing climate and land use change in the breeding area)
-
 
