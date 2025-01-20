@@ -15,6 +15,17 @@
 ## landuse-pastures_histsoc_annual_1901_2021.nc 
 ## landuse-urbanareas_histsoc_annual_1901_2021.nc 
 
+# 5) for the attribution part I repeat the same steps using counterfactual land use data 
+# (direct human influence fixed at 1901 level) from ISIMIP:
+# https://data.isimip.org/search/tree/ISIMIP3a/InputData/socioeconomic/landuse/1901soc/
+# (adjust directory)
+# ISIMIP files:
+## landuse-5crops_histsoc_annual_1901_2021.nc 
+## landuse-forests-and-natural-vegetation_1901soc_annual_1901_2021.nc 
+## landuse-pastures_1901soc_annual_1901_2021.nc 
+## landuse-5crops_1901soc_annual_1901_2021.nc
+
+
 # variables:
 # we discard C3 and C4 perennial crops as they occur only in few regions in the US (C3: trees, vine, C4: sugar cane)
 # also I keep managed pasture and rangeland seperate for now xx
@@ -35,6 +46,11 @@ library(stars)
 library(dplyr)
 library(sf)
 
+# directories:
+# ISIMIP  data:
+#lu_path <- file.path("data", "Env_data", "ISIMIP_land_use_and_irrigation")
+lu_path <- file.path("data", "Counterfactual_env_data", "ISIMIP_land_use_and_irrigation")
+
 # load data: ----
 
 # outline conterminous US, to later mask SpatRasters
@@ -49,9 +65,8 @@ library(sf)
 # write_sf(US_albers_sf, file.path("data", "US_outline_ESRI102003.shp"))
 US_albers_sf <- read_sf(file.path("data", "US_outline_ESRI102003.shp"))
 
-# ISIMIP land use data:
-lu_path <- file.path("data", "Env_data", "ISIMIP_land_use_and_irrigation")
-# files:
+
+# land use files:
 lu_files <- list.files(lu_path, full.names = TRUE, pattern = ".nc")
 
 

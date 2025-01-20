@@ -83,7 +83,7 @@ env_dt_cc_ss <- env_dt_cc %>%
   select(-c("bio8", "bio9", "bio18", "bio19", 
             "secondary_mean_age", "secondary_mean_biomass", "primary_forests"))
 
-ncol(env_dt_cc_ss) # 39: 15 bioclim, 16 seasonal clim, 8 land use variables
+ncol(env_dt_cc_ss) # 38: 15 bioclim, 16 seasonal clim, 7 land use variables
 
 
 # 1.) PCA of all candidate variables: -------------------------------------------

@@ -65,7 +65,11 @@ load(file = file.path("data", "BBS_for_occ_spec_records.RData")) # bbs_dt_occ; o
 # sorted by ecoregion:
 load(file = file.path("data", "final_species_selection_eco_sorted.RData")) # final_species_eco_sorted; output of 1_2_species_selection.R
 
+# so far discarded species:
+load(file = file.path("M:", "Documents", "DEBTs", "analysis", "Schifferle_BBS_occupancy_models_2023",
+                      "results", "fm_buffer750km", "refit_2000_2000", "check_output", "specs_discard.RData")) # specs_discard_fm; output of 2_2_DOM_check_flocker_fit.R
 
+species_set <- final_species_eco_sorted[-which(final_species_eco_sorted %in% specs_discard_fm)]
 
 # assemble overall data: ----
 
@@ -85,7 +89,8 @@ nsurveys <- 5
 
 # make blocks of species:
 # 3 species per block:
-spec_blocks_list <- split(final_species_eco_sorted, rep(1:(length(final_species_eco_sorted)/3), each = 3))
+spec_blocks_list <- split(species_set, c(rep(1:(floor(length(species_set)/3)), each = 3), 
+                                                      rep(ceiling(length(species_set)/3), length(species_set) %% 3))) # xx change once it runs
 names(spec_blocks_list) <- NULL
 
 prog_log_file <- file(file.path(log_dir, "CV_buffer_750_progress.txt"), open = "wt") # write console output here

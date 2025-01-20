@@ -15,18 +15,21 @@ set_cmdstan_path("C:/Users/schifferle1/Documents/cmdstan-2.34.1")
 library(brms)
 
 # settings: ----
-# results_dir <- file.path("M:", "Documents", "DEBTs", "analysis", "Schifferle_BBS_occupancy_models_2023",
-#                          "results", "temp_val", "round2_2000_2000")
-results_dir <- file.path("M:", "Documents", "DEBTs", "analysis", "Schifferle_BBS_occupancy_models_2023",
-                         "results", "full_model")
+
+
 # results_dir <- file.path("//NAS-2-P-SN-01.ibb.uni-potsdam.de", "users$", "schifferle1", "Documents", "DEBTs", "analysis", 
 #                          "Schifferle_BBS_occupancy_models_2023", "results", "full_model", "round2_warmup1000")
 # results_dir <- file.path("M:", "Documents", "DEBTs", "analysis", "Schifferle_BBS_occupancy_models_2023",
-#                          "results", "CV_cluster", "round2_2000_2000")
+#                          "results", "fm_buffer750km")
 # results_dir <- file.path("M:", "Documents", "DEBTs", "analysis", "Schifferle_BBS_occupancy_models_2023",
-#                          "results", "attribution")
-# results_dir <- file.path("C:", "Users", "schifferle1", "Documents", "DEBTs", "analysis", "Schifferle_BBS_occupancy_models_2023",
-#                          "results", "full_model")
+#                          "results", "fm_buffer750km", "refit_2000_2000")
+# results_dir <- file.path("M:", "Documents", "DEBTs", "analysis", "Schifferle_BBS_occupancy_models_2023",
+#                          "results", "full_model", "adapt_delta_0_9")
+# results_dir <- file.path("M:", "Documents", "DEBTs", "analysis", "Schifferle_BBS_occupancy_models_2023",
+#                          "results", "temp_val_buffer_750_10yrs")
+results_dir <- file.path("M:", "Documents", "DEBTs", "analysis", "Schifferle_BBS_occupancy_models_2023",
+                         "results", "temp_val_buffer_750_10yrs", "refit_2000_2000")
+
 buffer_km <- 750
 
 
@@ -37,11 +40,11 @@ if(!dir.exists(file.path(results_dir, "check_output"))){
 
 specs_MCMC_failed <- vector(mode = "character")
 
-MCMC_check_file <- file(file.path(results_dir, "check_output", "MCMC_check3.txt"), open = "wt") # write console output here
+MCMC_check_file <- file(file.path(results_dir, "check_output", "MCMC_check_res.txt"), open = "wt") # write console output here
 sink(MCMC_check_file, type = "output")
 
 print(paste("buffer distance:", buffer_km))
-print(paste("model outputs:", results_dir))
+print(gsub(pattern  = "M:/Documents/DEBTs/analysis/", replacement = "", results_dir))
 
 # iterate over species / files: ----
 
@@ -50,7 +53,6 @@ print(paste("model outputs:", results_dir))
 
 # species for which models are fit:
 #species_set <- final_species_eco_sorted
-#species_set <- gsub(pattern = "(out_)|(_fm_buffer250.RData)", x = list.files(results_dir, pattern = "out_"), replacement = "")
 #species_set <- gsub(pattern = "(out_)|(_temp_val_5yrs.RData)", x = list.files(results_dir, pattern = "out_"), replacement = "")
 
 # models in folder:
@@ -60,10 +62,10 @@ for(i in 1:length(model_file)){
 
   spec <- unlist(strsplit(model_file[i], split = "_"))[2]
 
-  # check whether species ran already:
-  if(file.exists(file.path(results_dir, "check_output", paste0("check_out_", spec, "_fm_buffer", buffer_km, ".pdf")))){
-    next
-  }
+  # # check whether species ran already:
+  # if(file.exists(file.path(results_dir, "check_output", paste0("check_out_", spec, "_fm_buffer", buffer_km, ".pdf")))){
+  #   next
+  # } #xx
 
   print(paste(i, model_file[i]))
   
@@ -99,11 +101,11 @@ for(i in 1:length(model_file)){
   
   # are R-hat values fine:
   rhats <- bayesplot::rhat(out$fit)
-  if(max(rhats) > 1.01){
-    print(paste("R-hat > 1.01 for", length(which(rhats > 1.01)), "parameters.  R-hat max.", max(rhats)))
+  if(max(rhats) > 1.02){
+    print(paste("R-hat > 1.02 for", length(which(rhats > 1.02)), "parameters.  R-hat max.", max(rhats)))
     specs_MCMC_failed <- c(specs_MCMC_failed, spec)
   } else {
-    print("R-hat < 1.01 for all parameters")
+    print("R-hat < 1.02 for all parameters")
   }
   
   # run quarto for more detailed report:
@@ -115,8 +117,9 @@ for(i in 1:length(model_file)){
   # dir_name <- file.path("results", "full_model", "check_output")
   
   #file_name <-  paste0("check_", spec, "_fm_buffer", buffer_km, ".pdf")
-  file_name <-  paste0("check_", gsub(pattern = ".RData", replacement = "", x = model_file[i]), ".pdf")
   
+  file_name <-  paste0("check_", gsub(pattern = ".RData", replacement = "", x = model_file[i]), ".pdf")
+
   quarto::quarto_render("2_2_DOM_check_flocker_fit_details.qmd",
                         output_file = file_name,
                         output_format = "pdf",
@@ -128,28 +131,28 @@ for(i in 1:length(model_file)){
                         quiet = TRUE)
 }
 sink(file = NULL)
+
+
 specs_MCMC_failed <- unique(specs_MCMC_failed)
 
 save(specs_MCMC_failed, file = file.path(results_dir, "check_output", "specs_MCMC_failed.RData"))
-specs_MCMC_failed # 16 species
-sort(specs_MCMC_failed)
-# which part failed:
-# Acadian Flycatcher: effective sample size too small
-# American Kestrel fine (R-hat < 1.02)
-# Bald Eagle: effective sample size too small
-# Black-billed Magpie: divergent transitions
-# Broad-winged Hawk: effective sample size too small, too large R-hat
-# Brown-headed Nuthatch: divergent transitions
-# Chipping Sparrow: effective sample size too small, too large R-hat
-# Cooper's Hawk: effective sample size too small, too large R-hat
-# Evening Grosbeak: effective sample size too small
-# Golden Eagle: effective sample size too small, too large R-hat
-# Hooded Warbler: effective sample size too small 
-# Lincoln's Sparrow: fine (Rhat < 1.02)
-# Louisiana Waterthrush: effective sample size too small, too large R-hat
-# Prairie Warbler: effective sample size too small
-# Sharp-shinned Hawk: effective sample size too small, too large R-hat
-# Winter Wren: effective sample size too small, too large R-hat
+sort(specs_MCMC_failed) # fm: 14, fm refit: 9, temp. val.: 10 (17), temp. val. refit:
 
-specs_refit <- sort(specs_MCMC_failed[-which(specs_MCMC_failed %in% c("American Kestrel", "Lincoln's Sparrow"))])
-save(specs_refit, file = file.path(results_dir, "check_output", "specs_refit.RData"))
+
+# temporal validation:
+if(results_dir == "M:/Documents/DEBTs/analysis/Schifferle_BBS_occupancy_models_2023/results/temp_val_buffer_750_10yrs"){
+  
+  # refit for species not excluded in the previous step:
+  load(file.path(results_dir, "check_output", "specs_MCMC_failed.RData"))
+  specs_MCMC_failed_tv <- specs_MCMC_failed
+  
+  load(file.path("M:", "Documents", "DEBTs", "analysis", "Schifferle_BBS_occupancy_models_2023",
+                 "results", "fm_buffer750km", "refit_2000_2000", "check_output", "specs_MCMC_failed.RData"))
+  specs_MCMC_failed_fm <- specs_MCMC_failed
+  
+  species_refit <- subset(specs_MCMC_failed_tv, !specs_MCMC_failed_tv %in% specs_MCMC_failed_fm)
+  save(species_refit, file = file.path(results_dir, "check_output", "species_refit.RData")) # rerun for these
+  
+}
+
+

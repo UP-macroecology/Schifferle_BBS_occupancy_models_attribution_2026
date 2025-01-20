@@ -10,12 +10,23 @@
 # 3) calculate bioclim variables
 # 4) as alternative to bioclim quarter/month variables I calculate seasonal variables
 
+# 5) for the attribution part I repeat the same steps using counterfactual climate data from ISIMIP:
+# https://data.isimip.org/search/tree/ISIMIP3a/InputData/climate/atmosphere/gswp3-w5e5/counterclim/
+# (adjust directory)
+
+
 # packages:
 library(ncdf4)
 library(doParallel)
 library(dplyr)
 library(sf)
 library(terra)
+
+# directories:
+# data stored as "pr.zip", "tasmin.zip", "tasmax.zip" here:
+#clim_path <- file.path("data", "Env_data", "ISIMIP_GSWP3_W5E5") # factual data
+clim_path <- file.path("data", "Counterfactual_env_data", "ISIMIP_GSWP3_W5E5") # counterfactual data
+
 
 # register cores for parallel computation:
 ncores <- 3 
@@ -41,10 +52,6 @@ US_albers_sf <- read_sf(file.path("data", "US_outline_ESRI102003.shp"))
 
 
 # daily data to monthly means: -----
-
-# stored as "pr.zip", "tasmin.zip", "tasmax.zip" here:
-clim_path <- file.path("data", "Env_data", "ISIMIP_GSWP3_W5E5")
-
 
 # iterate over variables (tasmin, tasmax, precipitation):
 foreach(var = c("tasmin", "tasmax", "pr"), 
@@ -137,14 +144,14 @@ foreach(var = c("tasmin", "tasmax", "pr"),
 
 #---
 # in which month were most routes surveyed?
-load(file = file.path("data", "BBS_data_merged.RData"))
-# route selection:
-load(file = file.path("data", "route_selection_1995_2019_surv_beg_end_max_5y_miss_v2_spat_thin_100km_max_30_r_per_BCR.RData")) # output of 1_1_route_selection.R
-bbs_dt %>%
-  filter(RTENO %in% sel_routes_final) %>% 
-  group_by(Month) %>% 
-  summarise(n = n()) %>% 
-  mutate(percent = round(n/sum(n) * 100, 1))# 85 % of selected routes surveyed in June
+# load(file = file.path("data", "BBS_data_merged.RData"))
+# # route selection:
+# load(file = file.path("data", "route_selection_1995_2019_surv_beg_end_max_5y_miss_v2_spat_thin_100km_max_30_r_per_BCR.RData")) # output of 1_1_route_selection.R
+# bbs_dt %>%
+#   filter(RTENO %in% sel_routes_final) %>% 
+#   group_by(Month) %>% 
+#   summarise(n = n()) %>% 
+#   mutate(percent = round(n/sum(n) * 100, 1))# 85 % of selected routes surveyed in June
 #---
 
 

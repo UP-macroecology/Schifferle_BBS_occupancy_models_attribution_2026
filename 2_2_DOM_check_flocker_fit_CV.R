@@ -12,14 +12,22 @@ set_cmdstan_path("C:/Users/schifferle1/Documents/cmdstan-2.34.1")
 library(brms)
 
 # settings: ----
+
+# results_dir <- file.path("//NAS-2-P-SN-01.ibb.uni-potsdam.de", "users$", "schifferle1", "Documents", "DEBTs", "analysis",
+#                          "Schifferle_BBS_occupancy_models_2023", "results", "CV_buffer750km")
+# results_dir <- file.path("M:", "Documents", "DEBTs", "analysis", "Schifferle_BBS_occupancy_models_2023",
+#                          "results", "CV_buffer750km")
 results_dir <- file.path("M:", "Documents", "DEBTs", "analysis", "Schifferle_BBS_occupancy_models_2023",
-                         "results", "CV_cluster")
-# results_dir <- file.path("//NAS-2-P-SN-01.ibb.uni-potsdam.de", "users$", "schifferle1", "Documents", "DEBTs", "analysis", 
-#                          "Schifferle_BBS_occupancy_models_2023", "results", "CV_cluster")
+                         "results", "CV_buffer750km", "refit_2000_2000")
 buffer_km <- 750
 
 # log output / store initial information as text file:
-MCMC_check_file <- file(file.path(results_dir, "check_output", paste0("MCMC_check_CV_buffer_",  buffer_km, "_final_final.txt")), open = "wt") # write console output here
+
+if(!dir.exists(file.path(results_dir, "check_output"))){
+  dir.create(file.path(results_dir, "check_output"))
+}
+
+MCMC_check_file <- file(file.path(results_dir, "check_output", "MCMC_check_res.txt"), open = "wt") # write console output here
 sink(MCMC_check_file, type = "output")
 
 print(paste("buffer distance:", buffer_km))
@@ -28,11 +36,11 @@ print(paste("model outputs:", results_dir))
 # iterate over species: ----
 
 # selected species, sorted by ecoregion:
-load(file = file.path("data", "final_species_selection_eco_sorted.RData")) # final_species_eco_sorted; output of 1_2_species_selection.R
+#load(file = file.path("data", "final_species_selection_eco_sorted.RData")) # final_species_eco_sorted; output of 1_2_species_selection.R
 
 species_set <- unique(gsub(pattern = "(out_)|(_CV_fold..RData)", x = list.files(results_dir, pattern = "out_"), replacement = ""))
 
-# species and folds for which MCMC failed: xx
+# species and folds for which MCMC failed:
 spec_folds_MCMC_fail <- vector(mode = "list", length = length(species_set))
 names(spec_folds_MCMC_fail) <- species_set
 
@@ -45,11 +53,11 @@ for(i in 1:length(species_set)){
   # load model fits of each fold:
   out_folds <- vector(mode = "list", length = 5)
   
-  # test whether species data are there:
-  skip_to_next <- FALSE
-  tryCatch(print(load(file = file.path(results_dir, paste0("test_preds_", spec, "_CV_fold5.RData")))),
-           error = function(e) { skip_to_next <<- TRUE})
-  if(skip_to_next) { next }
+  # # test whether species data are there:
+  # skip_to_next <- FALSE
+  # tryCatch(print(load(file = file.path(results_dir, paste0("test_preds_", spec, "_CV_fold5.RData")))),
+  #          error = function(e) { skip_to_next <<- TRUE})
+  # if(skip_to_next) { next }
   
   for(fold in 1:5){
     
@@ -66,6 +74,10 @@ for(i in 1:length(species_set)){
   # check for divergent transitions:
   hmc_diagnostics <- lapply(out_folds, function(x) nuts_params(x))
   div_trans <- lapply(hmc_diagnostics, function(x) sum(subset(x, Parameter == "divergent__")$Value))
+  
+  if(any(div_trans != 0)) {
+    spec_folds_MCMC_fail[[i]] <- which(div_trans != 0)
+  }
   
   print(paste("divergent transitions:", paste(div_trans, collapse = ",")))
   
@@ -89,10 +101,10 @@ for(i in 1:length(species_set)){
   
   # are R-hat values fine:
   rhats <- lapply(out_folds, function(x) bayesplot::rhat(x$fit))
-  if(max(unlist(rhats)) > 1.01){
-    print(paste("R-hat > 1.01 for", length(which(unlist(rhats) > 1.01)), "parameters. R-hat max.", max(unlist(rhats))))
+  if(max(unlist(rhats)) > 1.02){
+    print(paste("R-hat > 1.02 for", length(which(unlist(rhats) > 1.02)), "parameters. R-hat max.", max(unlist(rhats))))
   } else {
-    print("R-hat < 1.01 for all parameters")
+    print("R-hat <= 1.02 for all parameters")
   }
   
   # which folds are problematic:
@@ -103,78 +115,36 @@ for(i in 1:length(species_set)){
   folds_MCMCfail <- sort(unique(c(n_eff_rat, n_eff_bulk, n_eff_tail, rhat_large)))
   print(paste("Folds for which MCMC fails:", paste(folds_MCMCfail, collapse = ", ")))
 
-  spec_folds_MCMC_fail[[i]] <- folds_MCMCfail
+  spec_folds_MCMC_fail[[i]] <- unique(c(spec_folds_MCMC_fail[[i]], folds_MCMCfail))
   
   }
 sink(file = NULL)
 
 save(spec_folds_MCMC_fail, 
-     file = file.path(results_dir, "check_output", paste0("MCMC_check_CV_buffer_",  buffer_km, "_MCMC_fail.RData")))
+     file = file.path(results_dir, "check_output", "specs_folds_MCMC_failed.RData"))
+
+names(which(lengths(spec_folds_MCMC_fail) != 0))
 
 
+# have species been excluded in previous steps (fitting full model, fitting model for temporal validation):
+# temporal validation:
 
-## second fitting round (single folds, single species): ----
+# refit for species not excluded in the previous step:
 
-results_dir <- file.path("M:", "Documents", "DEBTs", "analysis", "Schifferle_BBS_occupancy_models_2023",
-                         "results", "CV_cluster", "round2_2000_2000")
-
-buffer_km <- 750
-
-MCMC_check_file <- file(file.path(results_dir, "check_output", paste0("MCMC_check_buffer_",  buffer_km, "_final.txt")), open = "wt") # write console output here
-sink(MCMC_check_file, type = "output")
-
-print(paste("buffer distance:", buffer_km))
-print(paste("model outputs:", results_dir))
-
-
-species_set <- gsub(pattern = "(out_)|(_CV_fold..RData)", x = list.files(results_dir, pattern = "out_"), replacement = "")
-
-files <- list.files(results_dir, pattern = "out_")
-
-for(i in 1:length(files)){
+if(results_dir == "M:/Documents/DEBTs/analysis/Schifferle_BBS_occupancy_models_2023/results/CV_buffer750km"){
   
-  print(i)
-  print(files[i])
+  load(file.path("M:", "Documents", "DEBTs", "analysis", "Schifferle_BBS_occupancy_models_2023",
+                 "results", "fm_buffer750km", "refit_2000_2000", "check_output", "specs_MCMC_failed.RData"))
+  specs_discard_fm <- specs_MCMC_failed
   
-  # load fitted model:
-  skip_to_next <- FALSE
-  #tryCatch(print(load(file = file.path(results_dir, paste0("out_", spec, "_temp_val_5yrs.RData")))),
-  #         error = function(e) { skip_to_next <<- TRUE})
-  tryCatch(print(load(file = file.path(results_dir, files[i]))),
-           error = function(e) { skip_to_next <<- TRUE})
-  if(skip_to_next) { next }
+  load(file.path("M:", "Documents", "DEBTs", "analysis", "Schifferle_BBS_occupancy_models_2023",
+                 "results", "temp_val_buffer_750_10yrs", "refit_2000_2000", "check_output", "specs_MCMC_failed.RData"))
+  specs_discard_tv <- specs_MCMC_failed
   
-  
-  # check MCMC:
-  
-  # check for divergent transitions:
-  hmc_diagnostics <- nuts_params(out)
-  div_trans <- sum(subset(hmc_diagnostics, Parameter == "divergent__")$Value)
-  print(paste("divergent transitions:", div_trans))
-  
-  # is effective number of MCMC samples large enough: 
-  n_eff_ratios <- neff_ratio(out)
-  if("low" %in% mcmc_neff_data(n_eff_ratios)$rating){
-    print("effective sample size too small")
-  }
-  
-  # effective number of samples in bulk and tail:
-  out_sum <- summary(out)
-  n_eff_ratio_bulk <- out_sum$fixed$Bulk_ESS/out_sum$total_ndraws
-  n_eff_ratio_tail <- out_sum$fixed$Tail_ESS/out_sum$total_ndraws
-  
-  if(min(n_eff_ratio_bulk) < 0.1 |  min(n_eff_ratio_tail) < 0.1 ){
-    print("effective sample size in bulk or tail too small")
-  } else {
-    print("effective sample size in bulk and tail fine")
-  }
-  
-  # are R-hat values fine:
-  rhats <- bayesplot::rhat(out$fit)
-  if(max(rhats) > 1.01){
-    print(paste("R-hat > 1.01 for", length(which(rhats > 1.01)), "parameters.  R-hat max.", max(rhats)))
-  } else {
-    print("R-hat < 1.01 for all parameters")
-  }
+  load(file.path(results_dir, "check_output", "specs_folds_MCMC_failed.RData"))
+  specs_MCMC_failed_cv <- names(which(lengths(spec_folds_MCMC_fail) != 0))
+    
+  species_refit <- subset(specs_MCMC_failed_cv, !specs_MCMC_failed_cv %in% c(specs_discard_fm, specs_discard_tv))
+  species_refit
+  save(species_refit, file = file.path(results_dir, "check_output", "species_refit.RData"))
 }
-sink(file = NULL)

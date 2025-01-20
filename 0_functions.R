@@ -257,3 +257,149 @@ training_routes <- function(species, buffer_km, BBS_spec_data = bbs_dt_occ,
   
 }
 
+
+# modified flocker function to get Z matrix of occupancy probabilities from flocker models faster:
+
+# flocker get_Z() for multi-colex and history condition = FALSE:
+
+# function (flocker_fit, draw_ids = NULL, history_condition = TRUE, sample = FALSE, new_data = NULL) {
+# 
+#   if (is.null(draw_ids)) {
+#     n_iter <- brms::ndraws(flocker_fit)
+#   }
+#   else {
+#     n_iter <- length(draw_ids)
+#   }
+# 
+#   use_components <- c("occ", "col", "ex", "auto", "Omega")
+#   obs <- NULL
+# 
+#   #lik_type "multi_colex":
+#   lps2 <- fitted_flocker(flocker_fit, components = c("occ", "colo", "ex"), draw_ids = draw_ids, new_data = new_data)
+#   init <- lps2$linpred_occ[, 1, ]
+#   colo <- lps2$linpred_col
+#   ex <- lps2$linpred_ex
+#   det <- NULL
+# 
+#   Z <- get_Z_dynamic(init, colo, ex, history_condition, sample, obs, det)
+#   class(Z) <- c("postZ", class(Z))
+#   Z
+# }
+# 
+# # flocker get_Z_dynamic:
+# 
+# function (init, colo, ex, history_condition, sample, obs = NULL, det = NULL) {
+# 
+#   nsite <- nrow(init)
+#   ntimestep <- ncol(colo)
+#   ndraw <- ncol(init)
+# 
+#   det <- NULL
+# 
+#   out <- new_array(colo)
+# 
+#   for (i in 1:nsite) {
+#     for (j in 1:ndraw) {
+#       out[i, , j] <- forward_sim(init[i, j], colo[i, 
+#                                                   , j], ex[i, , j], sample)
+#     }
+#   }
+#   out
+# }
+# 
+# # flocker forward_sim:
+# 
+# function (init, colo, ex, sample = FALSE) {
+# 
+#   length_out <- length(colo)
+#   
+#   if (!identical(colo, NA)) { # if there is at least one NA in colo
+#     colo <- colo[1:max(which(!is.na(colo)))] # removes NAs at the end only?
+#     ex <- ex[1:max(which(!is.na(colo)))]
+#   }
+# 
+#   out <- rep(NA, length_out)
+#   
+#   out[1] <- init
+#   if (length(colo) > 1) {
+#     for (i in 2:length(colo)) {
+#       out[i] <- (1 - out[i - 1]) * colo[i] + (out[i -  1]) * (1 - ex[i])
+#     }
+#   }
+#   out
+# }
+
+# adapted version to use data frame as new data (much faster):
+ get_Z_mod <- function(flocker_fit, 
+                       draw_ids = NULL, 
+                       new_data = NULL){ # as data frame
+   
+   new_data <- as.data.frame(new_data)
+   
+   if (is.null(draw_ids)) {
+     n_iter <- brms::ndraws(flocker_fit)
+   }
+   else {
+     n_iter <- length(draw_ids)
+   }
+   
+   # initial occ. prob., colonisation and extinction prob.:
+   
+   lps2 <- fitted_flocker(flocker_fit, 
+                          components = c("occ", "colo", "ex"), 
+                          draw_ids = draw_ids, 
+                          new_data = new_data)
+     
+   # reformat from long df to array:
+   
+   #dim(lps2$linpred_occ) # 71800, 1000
+   
+   nsites <- length(unique(new_data$cellID))
+   nyears <- length(unique(new_data$year))
+   
+   init <- lps2$linpred_occ[1:nsites, ]
+   
+   colo <- array(NA, dim = c(nsites, nyears, n_iter))
+   for(t in 1:nyears){
+     colo[,t,] <- lps2$linpred_col[(t-1) * nsites + (1:nsites),]
+   }
+
+   ex <- array(NA, dim = c(nsites, nyears, n_iter))
+   for(t in 1:nyears){
+     ex[,t,] <- lps2$linpred_ex[(t-1) * nsites + (1:nsites),]
+   }
+
+   # calculate occ. probs for each site and year:
+   
+   out <- array(NA, dim = dim(colo))
+
+   for (i in 1:nsites) {
+     
+     print(i)
+     
+     for (j in 1:n_iter) {
+
+       length_out <- length(colo[i, , j])
+
+       if (!identical(colo[i, , j], NA)) { # if there is at least one NA in colo xx
+         colo[i, , j] <- colo[i, , j][1:max(which(!is.na(colo[i, , j])))] # removes NAs at the end only?
+         ex[i, , j] <- ex[i, , j][1:max(which(!is.na(colo[i, , j])))]
+       }
+       
+       time_series <- rep(NA, length_out)
+       
+       time_series[1] <- init[i, j]
+         
+       if (length(colo[i, , j]) > 1) {
+         
+         for (y in 2:length_out) {
+           time_series[y] <- (1 - time_series[y - 1]) * colo[i, y, j] + (time_series[y - 1]) * (1 - ex[i, y, j])
+         }
+       }
+       
+       out[i, , j] <- time_series
+     }
+   }
+  out # Z matrix
+  
+  }
