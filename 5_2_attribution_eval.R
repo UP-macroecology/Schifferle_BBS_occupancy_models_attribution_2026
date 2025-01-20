@@ -27,9 +27,9 @@ source("0_functions.R")
 print(tempdir())
 #dir <- file.path("/import", "ecoc9z", "data-zurell", "schifferle", "BBS_occupancy_models_2023")
 dir <- getwd()
-results_dir <- file.path("M:", "Documents", "DEBTs", "analysis", "Schifferle_BBS_occupancy_models_2023", "results", "attribution", "CV") 
-# results_dir <- file.path("//NAS-2-P-SN-01.ibb.uni-potsdam.de", "users$", "schifferle1", "Documents", "DEBTs", "analysis", 
-#                          "Schifferle_BBS_occupancy_models_2023", "results", "CV_cluster") 
+#results_dir <- file.path("M:", "Documents", "DEBTs", "analysis", "Schifferle_BBS_occupancy_models_2023", "results", "attribution", "CV") 
+results_dir <- file.path("//NAS-2-P-SN-01.ibb.uni-potsdam.de", "users$", "schifferle1", "Documents", "DEBTs", "analysis",
+                         "Schifferle_BBS_occupancy_models_2023", "results", "attribution", "CV")
 
 
 # load data: ----

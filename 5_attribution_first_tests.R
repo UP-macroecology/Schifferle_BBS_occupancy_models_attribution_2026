@@ -124,15 +124,15 @@ foreach(var = c("bio1", "bio3", "pr_summer", "pr_winter", "sum_annual_crops", "s
   env_dt_spec_detr <- env_dt_spec %>% 
     mutate("{var}" := get(var) - lm_trend_var*(Year - 1991))
   
-  # # plots to test:
-  # env_dt_spec %>%
-  #   ggplot(aes(x = Year, y = bio1)) +
-  #   geom_line(aes(group = RTENO)) +
-  #   geom_smooth(method = 'lm')
-  # env_dt_spec_detr %>%
-  #   ggplot(aes(x = Year, y = bio1)) +
-  #   geom_line(aes(group = RTENO)) +
-  #   geom_smooth(method = 'lm')
+  # plots to test:
+  env_dt_spec %>%
+    ggplot(aes(x = Year, y = pr_winter)) +
+    geom_line(aes(group = RTENO)) +
+    geom_smooth(method = 'lm')
+  env_dt_spec_detr %>%
+    ggplot(aes(x = Year, y = pr_winter)) +
+    geom_line(aes(group = RTENO)) +
+    geom_smooth(method = 'lm')
   
   # scale resulting environmental variables:
   env_dt_spec_detr_scaled <- env_dt_spec_detr %>% 
