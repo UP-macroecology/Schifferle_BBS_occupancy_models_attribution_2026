@@ -79,6 +79,10 @@ clim_lu_cells <- bind_rows(bioclim_coords, lu_coords) %>%
   st_as_sf(coords = c("x", "y"), crs = "ESRI:102003") %>% 
   mutate(cellID = row_number())
 
+ggplot(clim_lu_cells) +
+  geom_sf(aes(fill = cellID, colour = cellID)) +
+  theme_bw()
+# cellID goes up to down from left to right
 #write_sf(clim_lu_cells, file.path("data", "cell_centroids_US_ESRI102003.shp"))
 
 

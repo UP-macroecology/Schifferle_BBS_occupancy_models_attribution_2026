@@ -151,9 +151,9 @@ foreach(spec = final_species[43:length(final_species)],
         .errorhandling = "pass", #"remove",
         .verbose = TRUE) %dopar% {
 
-for(spec in final_species[1:length(final_species)]){ # xx}
+#for(spec in final_species[1:length(final_species)]){ # xx}
   
-  print(spec)
+#  print(spec)
 
   # # check where to look for model output (did MCMC fitting work with less or only with more iterations?)
   # if(file.exists(file.path(results_dir, "refit_2000_2000", paste0("out_", spec, "_CV_fold1.RData")))){

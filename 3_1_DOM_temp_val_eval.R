@@ -35,7 +35,7 @@ results_dir <- file.path("M:", "Documents", "DEBTs", "analysis", "Schifferle_BBS
 # load data: ----
 
 # selected species:
-load(file = file.path("data", "species_set_analysis.RData"))
+load(file = file.path("data", "species_set_analysis.RData")) # output of 3_1_DOM_CV_evaluation_metrics.R
 final_species
 
 # selected routes spatial data (to buffer presences):
@@ -132,11 +132,4 @@ for(i in 77:length(final_species)){
   
 }
 
-
 save(C_temp_val_df, file = file.path(results_dir, "temp_eval", "10_years", "C_temp_val_10yrs.RData"))
-
-#load(file.path(results_dir, "temp_eval", "10_years", "C_temp_val_10yrs.RData"))
-# decline was observed, this decline cannot be captured by the model, 
-# this suggests that species climate and land use change in the breeding area is not the main reason for decline
-# (or that climate and land use data we used are not properly capturing climate and land use change in the breeding area)
-
