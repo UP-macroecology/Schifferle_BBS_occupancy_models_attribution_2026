@@ -1,0 +1,516 @@
+# 1) Prepare climate .nc-files from ISIMIP data that will then be used as input for
+# ATTRICI (Mengel et al. 2021) to calculate counterfactual climate data
+# that will be used for attributing impact of climate change on species range dynamics
+# 2) convert ATTRICI output to tifs, postprocess temperature
+# 3) calculate selected variables for fitting DOMs
+
+# packages: --------------------------------------------------------------------
+
+library(ncdf4)
+library(dplyr)
+library(sf)
+library(terra)
+library(ggplot2)
+
+
+# directories: -----------------------------------------------------------------
+
+# factual climate data downloaded from ISIMIP:
+## https://data.isimip.org/search/tree/ISIMIP3a/InputData/climate/atmosphere/gswp3-w5e5/obsclim/
+## bounding box: South: 24 North: 50 West: -126 East: -66
+## 1901 - 2019
+fclim_path <- file.path("data", "Env_data", "ISIMIP_GSWP3_W5E5")
+
+# output directory:
+output_path <- file.path("T:", "Schifferle_BBS_occupancy_models_2023", "data", "Counterfactual_env_data",
+                         "ISIMIP_GSWP3_W5E5", "attrici_detrending", "input_files")
+
+
+# create mask for the US: ------------------------------------------------------
+
+# US outline:
+US_albers_sf <- read_sf(file.path("data", "US_outline_ESRI102003.shp"))
+# transform to WGS84 (to match ISIMIP data):
+US_albers_sf_wgs84 <- st_transform(US_albers_sf, crs = 4326)
+plot(US_albers_sf_wgs84)
+
+# example ISIMIP file:
+pr_files <- list.files(fclim_path, pattern = "_pr_.*\\.nc$", full.names = TRUE)
+pr_files
+pr1 <- ncdf4::nc_open(pr_files[1])
+
+# create mask:
+nc_rast <- rast(pr_files[1])
+mask_test <- terra::mask(nc_rast$pr_1, US_albers_sf_wgs84)
+mask_test <-  ifel(is.na(mask_test), 0, 1) # 1s for cells within US, 0s otherwise
+names(mask_test) <- "mask"
+
+# write as netCDF-file:
+
+# extract values:
+mask_values <- as.integer(values(mask_test))
+
+# define dimensions:
+lon <- xFromCol(mask_test, seq_len(ncol(mask_test)))  
+lat <- yFromRow(mask_test, seq_len(nrow(mask_test)))  
+londim <- ncdf4::ncdim_def(name = "lon", units = "degrees_east", vals = lon, longname = "Longitude")
+latdim <- ncdf4::ncdim_def(name = "lat", units = "degrees_north", vals = lat, longname = "Latitude")
+
+# define variable:
+vardef <- ncdf4::ncvar_def(name = "mask", units = "", dim = list(londim, latdim), prec = "integer")
+
+# create NetCDF file:
+ncpath <- file.path(output_path, "US_mask3.nc")
+ncout <- ncdf4::nc_create(ncpath, vardef)
+# fill in values:
+ncdf4::ncvar_put(nc = ncout, varid = vardef, vals = mask_values)
+# close file:
+ncdf4::nc_close(ncout)
+
+# # read to check:
+# mask_test <- ncdf4::nc_open(file.path(output_path, "US_mask3.nc"))
+# mask_test
+# plot(rast(file.path(output_path, "US_mask3.nc")))
+# length(which(ncvar_get(mask_test, "mask") == 1))
+
+
+# merge climate data from 1901 to 2019 into single nc file: --------------------
+
+vars <- c("tas", "tasmin", "tasmax", "pr") # tas needed to calculate tasrange and tasskew for ATTRICI, which are then detrended and converted back to tasmin, tasmax
+
+for(i in 1:length(vars)){
+  
+  var_name <- vars[i]
+  
+  print(var_name)
+  
+  var_files <- list.files(fclim_path, pattern = paste0("obsclim_", var_name, "_.*\\.nc$"), full.names = TRUE)
+  
+  # extract data of all files:
+  data_list <- lapply(var_files, function(f) {
+    print(f)
+    nc <- nc_open(f)
+    data <- ncvar_get(nc, var_name)
+    nc_close(nc)
+    return(data)
+  })
+  
+  # merge data:
+  data_merged <- abind::abind(
+    data_list, along = 3)
+  dim(data_merged) # 120, 52, 43464
+  
+  # get variable definition and dimension from one file:
+  example_file <- nc_open(var_files[1])
+  
+  # # note: date origin not the same across nc files!
+  # example_file$dim$time # days since 1900-01-01!!
+  # # 1-8 (1901-1980): days since 1860-1-1
+  # # 9-12 (1981-2019): days since 1900-1-1
+  
+  var <- example_file$var[[var_name]]
+  var$dim
+  nc_close(example_file)
+  
+  var$dim[[3]]$vals <- seq(from = var$dim[[3]]$vals[1], length = dim(data_merged)[3]) # 58438
+  var$dim[[3]]$len <- dim(data_merged)[3]
+  
+  # define variable:
+  var_def <- ncvar_def(name = var$name, units = var$units, dim = var$dim,
+                       longname = var$longname)
+  
+  # create new file:
+  file_merged <- nc_create(
+    filename = file.path(output_path, paste0("US_", var_name, "_1901_2019.nc")), 
+    vars = var_def)
+  
+  # fill in values:
+  ncvar_put(nc = file_merged, varid = var_name, vals = data_merged)
+  
+  # close file:
+  nc_close(file_merged)
+  
+}
+
+
+# detrending using ATTRICI Python package (Mengel et al. 2021): ----------------
+
+# (requires CDO installation on the HPC)
+# cloned bootstrapping branch (recommended by Matthias Mengel): https://github.com/ISI-MIP/attrici/tree/bootstrapping
+# create and activate virtual environment:
+# schifferle@ecoc9:~/DEBTs/attrici$ python3 -m venv env
+# schifferle@ecoc9:~/DEBTs/attrici$ source env/bin/activate
+# install ATTRICI:
+# (env) schifferle@ecoc9:~/DEBTs/attrici$ pip install -e .[dev]
+
+# 1) preprocessing (did it via command line):
+
+# attrici preprocess-tas /mnt/ibb_share/zurell_transfer/Schifferle_BBS_occupancy_models_2023/data/Counterfactual_env_data/ISIMIP_GSWP3_W5E5/attrici_detrending/input_files/US_tas_1901_2019.nc
+# /mnt/ibb_share/zurell_transfer/Schifferle_BBS_occupancy_models_2023/data/Counterfactual_env_data/ISIMIP_GSWP3_W5E5/attrici_detrending/input_files/US_tasmin_1901_2019.nc
+# /mnt/ibb_share/zurell_transfer/Schifferle_BBS_occupancy_models_2023/data/Counterfactual_env_data/ISIMIP_GSWP3_W5E5/attrici_detrending/input_files/US_tasmax_1901_2019.nc 
+#/mnt/ibb_share/zurell_transfer/Schifferle_BBS_occupancy_models_2023/data/Counterfactual_env_data/ISIMIP_GSWP3_W5E5/attrici_detrending/input_files/US_tasrange_1901_2019.nc 
+#/mnt/ibb_share/zurell_transfer/Schifferle_BBS_occupancy_models_2023/data/Counterfactual_env_data/ISIMIP_GSWP3_W5E5/attrici_detrending/input_files/US_tasskew_1901_2019.nc 
+
+# 2) detrending, see scripts:
+# attrici_US_pr.sh
+# attrici_US_tas.sh
+# attrici_US_tasrange.sh
+# attrici_US_tasskew.sh
+
+# 3) merge outputs (did it via command line):
+
+# (env) schifferle@ecoc9z:~/DEBTs/attrici$ attrici merge-output /mnt/ibb_share/zurell_transfer/Schifferle_BBS_occupancy_models_2023/data/Counterfactual_env_data/ISIMIP_GSWP3_W5E5/attrici_detrending/output/pr_detrended/timeseries/pr /mnt/ibb_share/zurell_transfer/Schifferle_BBS_occupancy_models_2023/data/Counterfactual_env_data/ISIMIP_GSWP3_W5E5/attrici_detrending/output/pr_detrended/US_pr_detrended_1901_2019.nc  
+# (env) schifferle@ecoc9z:~/DEBTs/attrici$ attrici merge-output /mnt/ibb_share/zurell_transfer/Schifferle_BBS_occupancy_models_2023/data/Counterfactual_env_data/ISIMIP_GSWP3_W5E5/attrici_detrending/output/tas_detrended/timeseries/tas /mnt/ibb_share/zurell_transfer/Schifferle_BBS_occupancy_models_2023/data/Counterfactual_env_data/ISIMIP_GSWP3_W5E5/attrici_detrending/output/tas_detrended/US_tas_detrended_1901_2019.nc 
+# (env) schifferle@ecoc9z:~/DEBTs/attrici$ attrici merge-output /mnt/ibb_share/zurell_transfer/Schifferle_BBS_occupancy_models_2023/data/Counterfactual_env_data/ISIMIP_GSWP3_W5E5/attrici_detrending/output/tasskew_detrended/timeseries/tasskew /mnt/ibb_share/zurell_transfer/Schifferle_BBS_occupancy_models_2023/data/Counterfactual_env_data/ISIMIP_GSWP3_W5E5/attrici_detrending/output/tasskew_detrended/US_tasskew_detrended_1901_2019.nc
+# (env) schifferle@ecoc9z:~/DEBTs/attrici$ attrici merge-output /mnt/ibb_share/zurell_transfer/Schifferle_BBS_occupancy_models_2023/data/Counterfactual_env_data/ISIMIP_GSWP3_W5E5/attrici_detrending/output/tasrange_detrended/timeseries/tasrange /mnt/ibb_share/zurell_transfer/Schifferle_BBS_occupancy_models_2023/data/Counterfactual_env_data/ISIMIP_GSWP3_W5E5/attrici_detrending/output/tasrange_detrended/US_tasrange_detrended_1901_2019.nc
+
+
+# postprocessing ATTRICI output: -----------------------------------------------
+
+# output directory:
+attrici_out <- file.path("T:", "Schifferle_BBS_occupancy_models_2023", "data", "Counterfactual_env_data", 
+          "ISIMIP_GSWP3_W5E5", "attrici_detrending", "output")
+#attrici_out <- "/mnt/ibb_share/zurell_transfer/Schifferle_BBS_occupancy_models_2023/data/Counterfactual_env_data/ISIMIP_GSWP3_W5E5/attrici_detrending/output"
+
+# directory to store results:
+res_dir_proj <- file.path(attrici_out, "ATTRICI_CLIM_ESRI102003_tifs")
+if(!dir.exists(res_dir_proj)){dir.create(res_dir_proj)}
+
+## extract one tif per month from nc files: ----
+
+start <- 1994
+end <- 2019
+
+vars <- c("tas", "tasrange", "tasskew", "pr")
+
+for(i in 1:length(vars)){
+  
+  var <- vars[i]
+  print(paste(i, var))
+  
+  # output attrici:
+  nc_cfact <- ncdf4::nc_open(file.path(attrici_out, paste0(var, "_detrended"), 
+                                       paste0("US_", var, "_detrended_1901_2019.nc")))
+  
+  # extract time and convert it to date:
+  time <- ncvar_get(nc_cfact, "time")
+  time_units <- ncatt_get(nc_cfact, "time", "units")$value
+  time_origin <- lubridate::as_date(time_units)
+  time_date <- time_origin + time
+  range(time_date)
+  
+  # extract latitude and longitude
+  lat <- ncvar_get(nc_cfact, "lat")
+  lon <- ncvar_get(nc_cfact, "lon")
+  
+  #nc_cfact$var$cfact # detrended, counterfactual data
+  #nc_cfact$var$y # factual data
+  #nc_cfact$var$logp # log posterior predictive density? lppd, to see predictive accuracy of model relating to GMT
+  
+  var_arr <- ncvar_get(nc_cfact, varid = "cfact")
+  #dim(var_arr) # lon, lat, time in days
+  
+  # to match coordinates, time and variable data in a data frame:
+  lonlattime_df <- as_tibble(expand.grid(lon, lat, time_date)) %>% 
+    rename("lon" = Var1, "lat" = Var2, "date" = Var3) %>% 
+    mutate(year = lubridate::year(date),
+           month = lubridate::month(date))
+  
+  # add variable values to lon-lat-time:
+  var_vec_long <- as.vector(var_arr) # reshape variable data
+  
+  # add to data frame:
+  var_df <- lonlattime_df %>% 
+    mutate(cfact = var_vec_long) %>% 
+    filter(date >= lubridate::as_date("1994-01-01"))
+  
+  # clean up:
+  rm(var_arr)
+  nc_close(nc_cfact)
+  rm(lonlattime_df)
+  
+  # how to deal with initial occupancy
+  # use detrended values from 1992-1995
+  # then: redo detrending using data from 1992-2019 xx
+  
+  # extract one tif per month:
+  #for(y in intersect((start-3):end, unique(lonlattime_df$year))){
+  
+  # example raster to align to:
+  #ex_rast <- rast(file.path(fclim_path, "ISIMIP_CLIM_ESRI102003", "pr_199501_ESRI102003.tif"))
+  ex_rast <- rast(file.path( "data", "Env_data", "ISIMIP_GSWP_W5E5", "ISIMIP_CLIM_ESRI102003", "pr_199501_ESRI102003.tif"))
+  
+  ex_rast
+  
+  for(y in start:end){  
+    
+    print(y)
+    
+    for(m in 1:12){
+      
+      print(m)
+      
+      dt_export <- var_df %>% 
+        filter(year == y & month == m) %>% 
+        # aggregate to monthly mean:
+        group_by(lon, lat) %>% 
+        summarise({{var}} := mean(cfact, na.rm = TRUE)) %>%
+        select(c(lon, lat, {{var}})) %>% 
+        rast(crs = "EPSG:4326") %>% 
+        project(y = "ESRI:102003", method = "average") %>%
+        resample(y = ex_rast, method = "average") %>%
+        mask(US_albers_sf) 
+
+      writeRaster(dt_export,
+                  filename = file.path(res_dir_proj, paste0(var, "_", y, stringr::str_pad(m, 2, pad = 0),  "_ESRI102003.tif")),
+                  overwrite = TRUE)
+    }
+  }
+  rm(var_vec_long)
+}
+
+
+## postprocess temperature: ----------------------------------------------------
+## get from tas, tasskew, tasrange to tasmin and tasmax
+
+# calculate tasmin and tasmax from detrended tasrange and tasskew:
+# using attrici postprocess-tas function throws errors coming from cdo, didn't manage to fix this
+# instead I do equivalent postprocessing here:
+# see https://github.com/ISI-MIP/attrici/tree/main:
+# tasskew = (tas - tasmin) / tasrange
+# tasrange = tasmax - tasmin
+# ->
+# tasmin = tas - (tasskew * tasrange)
+# tasmax = tasmin + tasrange
+
+# (attrici postprocess-tas uses cdo commands:
+# cdo -O -f nc4 -z zip -chname,tas,tasmin -sub <tas_file> -mul <tasskew_file> <tasrange_file> <tasmin_outputfile>
+# cdo -O -f nc4 -z zip -chname,tasmin,tasmax -add <tasmin_file> <tasrange_file> <tasmax_outputfile>)
+
+# load files:
+tasskew_files <- list.files(file.path(res_dir_proj), pattern = "tasskew", full.names = TRUE)
+tasskew_rast <- rast(tasskew_files)
+
+tasrange_files <- list.files(file.path(res_dir_proj), pattern = "tasrange", full.names = TRUE)
+tasrange_rast <- rast(tasrange_files)
+
+tas_files <- list.files(file.path(res_dir_proj), pattern = "tas_", full.names = TRUE)
+tas_rast <- rast(tas_files)
+
+# convert to tasmin, tasmax:
+tasmin_rast <- tas_rast - (tasskew_rast * tasrange_rast)
+tasmin_rast
+tasmax_rast <- tasmin_rast + tasrange_rast
+tasmax_rast
+
+# save tasmin as separate tifs:
+tasmin_names <- paste0("tasmin", "_",
+                       paste0(rep(1994:2019, each = length(stringr::str_pad(1:12, 2, pad = 0))),
+                              stringr::str_pad(1:12, 2, pad = 0)), "_ESRI102003.tif")
+
+writeRaster(tasmin_rast,
+            filename = file.path(res_dir_proj, tasmin_names),
+            overwrite = TRUE)
+
+# save tasmax as separate tifs:
+tasmax_names <- paste0("tasmax", "_",
+                       paste0(rep(1994:2019, each = length(stringr::str_pad(1:12, 2, pad = 0))),
+                              stringr::str_pad(1:12, 2, pad = 0)), "_ESRI102003.tif")
+
+writeRaster(tasmax_rast,
+            filename = file.path(res_dir_proj, tasmax_names),
+            overwrite = TRUE)
+
+
+# calculate selected predictor variables: --------------------------------------
+
+#clim_path <- file.path("T:", "Schifferle_BBS_occupancy_models_2023", "data", "Counterfactual_env_data", 
+#                       "ISIMIP_GSWP3_W5E5", "attrici_detrending", "output", "ATTRICI_CLIM_ESRI102003_tifs") # Attrici counterfactual data
+clim_path <- file.path("/mnt", "ibb_share", "zurell_transfer", "Schifferle_BBS_occupancy_models_2023", "data", "Counterfactual_env_data", 
+                       "ISIMIP_GSWP3_W5E5", "attrici_detrending", "output", "ATTRICI_CLIM_ESRI102003_tifs") 
+
+# selected variables:
+load(file = file.path("data", "selected_variables.RData")) # selvar_final; output of 1_2_variable_selection.R
+selvar_final
+
+# bioclimatic variables:
+# for each year (to model colonisation and extinction probability)
+
+# folder to store bioclim rasters:
+bioclim_folder <- file.path(clim_path, "bioclim")
+if(!dir.exists(bioclim_folder)){dir.create(bioclim_folder, recursive = TRUE)}
+
+start <- 1995
+end <- 2019
+
+# iterate over years:
+foreach(year = start:end, 
+        .packages = c("raster", "terra", "dismo") , 
+        .verbose = TRUE) %dopar% {
+          
+          for(var in c("tasmin", "tasmax", "pr")){
+            
+            # corresponding filenames, June previous year to May current year:
+            files <- c(paste0(var, "_", year-1, stringr::str_pad(c(6:12), width = 2, pad = "0"), "_ESRI102003.tif"),
+                       paste0(var, "_", year, stringr::str_pad(c(1:5), width = 2, pad = "0"), "_ESRI102003.tif"))
+            
+            # bricks to store the month-wise values:
+            if(var == "tasmin"){
+              tasmin_June_May <- raster::stack(x = file.path(clim_path, files))
+            } else if(var == "tasmax"){
+              tasmax_June_May <- raster::stack(x = file.path(clim_path, files))
+            } else {
+              pr_June_May <- raster::stack(x = file.path(clim_path, files))
+            }
+          }
+          
+          # calculate bioclimatic variables:
+          biovars <- dismo::biovars(prec = pr_June_May,  # monthly = 12 variables for each variable; Raster brick
+                                    tmin = tasmin_June_May, 
+                                    tmax = tasmax_June_May)
+          
+          biovars_rast <- terra::rast(biovars) # convert to terra object
+          
+          # save tifs:
+          terra::writeRaster(biovars_rast,
+                             filename = file.path(bioclim_folder, 
+                                                  paste0(names(biovars), "_", year, ".tif")), 
+                             overwrite = TRUE)
+        }
+
+
+# seasonal temperature and precipitation summaries (fixed months):
+
+selvar_final # pr_mean_spring, pr_mean_summer, pr_mean_autumn, pr_mean_winter
+
+# folder to store rasters:
+seasonal_folder <- file.path(clim_path, "seasonal")
+if(!dir.exists(seasonal_folder)){dir.create(seasonal_folder, recursive = TRUE)}
+
+# months considered for each season:
+
+# spring = March, April, May
+# summer = June, July, August
+# autumn = September, October, November
+# winter = December, January, February
+
+months_seasons_ls <- list(spring = stringr::str_pad(c(3:5), width = 2, pad = "0"),
+                          summer = stringr::str_pad(c(6:8), width = 2, pad = "0"),
+                          autumn = stringr::str_pad(c(9:11), width = 2, pad = "0"),
+                          winter = stringr::str_pad(c(12, 1:2), width = 2, pad = "0"))
+
+# iterate over years:
+foreach(year = 1995:2019, 
+        .packages = c("raster", "terra") , 
+        .verbose = TRUE) %dopar% {
+
+          # mean precipitation:
+          var <- "pr"
+            
+          # iterate over seasons:
+          for(s in 1:4){
+            
+            # corresponding filenames:
+            if(s < 4){
+              # spring, summer, autumn:
+              files <- paste0(var, "_", year, months_seasons_ls[[s]], "_ESRI102003.tif")
+            } else {
+              # winter: December previous year and Jan. and Febr. current year:
+              files <- c(paste0(var, "_", year-1, "12", "_ESRI102003.tif"),
+                         paste0(var, "_", year, c("01", "02"), "_ESRI102003.tif"))
+            }
+            
+            # mean values for season:
+            rast_dt <- terra::rast(x = file.path(clim_path, files))
+            mean_rast <- terra::mean(rast_dt)
+            names(mean_rast) <- paste0(var, "_mean_", names(months_seasons_ls)[[s]])
+            
+            # save tifs:
+            terra::writeRaster(mean_rast,
+                               filename = file.path(seasonal_folder, 
+                                                    paste0(var, "_mean_", names(months_seasons_ls)[s], "_", year, ".tif")), 
+                               overwrite = TRUE)
+          }
+        }
+
+# use as input for 1_3_env_data_df_contUS.R
+
+
+# explorative plots: -----------------------------------------------------------
+
+library(rts) # raster time series
+
+# dates:
+d <- paste0(rep(1994:2019, each = length(stringr::str_pad(1:12, 2, pad = 0))),
+            stringr::str_pad(1:12, 2, pad = 0))
+d <- lubridate::as_date(d, format = "%Y%m")
+
+var <- "pr" #"tasmax" #"tasmin"
+
+# compare time series for single locations:
+
+# factual raster time series:
+files_factual <- list.files(file.path(fclim_path, "ISIMIP_CLIM_ESRI102003"), 
+                            pattern = paste0(var, "_"), full.names = TRUE)
+files_factual_s <- grep(x = files_factual, pattern = paste0(paste0("(", 1994:2019, "[0-9])", collapse = "|")), value = TRUE)
+factual_rast <- rast(files_factual_s)
+factual_ts <- rts(factual_rast, d)
+
+# counterfactual raster time series:
+files_cfactual <- list.files(res_dir_proj, pattern = paste0(var, "_"), full.names = TRUE)
+cfactual_rast <- rast(files_cfactual)
+cfactual_ts <- rts(cfactual_rast, d)
+
+
+# # plot time series for one location:
+# # find cell number:
+# plot(factual_rast[[1]]) # to find location
+# c <- click(factual_rast[[1]], n=1, cell=TRUE)$cell
+# plot_df <- data.frame("date" = d, "counterfactual" = cfactual_ts[c][,1])
+# plot_df$factual <- factual_ts[c][,1]
+# 
+# plot(x = plot_df$date, y = plot_df$factual, type = "l", main = var)
+# points(x = plot_df$date, y = plot_df$counterfactual, type = "l", col = "red")
+# legend("bottomleft", col = c("black", "red"), legend = c("factual", "counterfactual"), lty = 1)
+
+
+# plot time series for BBS routes:
+
+# selected routes:
+routes_sel_sf <- st_read(file.path("data", "route_selection_1995_2019_surv_beg_end_max_5y_miss_v2_spat_thin_100km_max_30_r_per_BCR_centroids.shp")) # output of 1_1_route_selection.R
+
+# extract data:
+factual_routes <- extract(x = factual_rast, y = routes_sel_sf, cells = TRUE, ID = FALSE)
+factual_routes <- cbind(factual_routes, "RTENO" = routes_sel_sf$RTENO_BBS)
+cfactual_routes <- extract(x = cfactual_rast, y = routes_sel_sf, cells = TRUE, ID = FALSE)
+cfactual_routes <- cbind(cfactual_routes, "RTENO" = routes_sel_sf$RTENO_BBS)
+
+# assemble data frame for plotting:
+plot_df_2 <- factual_routes %>% 
+  tidyr::pivot_longer(cols = !c(cell, RTENO), values_to = "factual") %>% 
+  cbind("date" = rep(d, times = nrow(routes_sel_sf))) %>%
+  cbind("counterfactual" = tidyr::pivot_longer(data = cfactual_routes, cols = !c(cell, RTENO), values_to = "counterfactual")$counterfactual) %>% 
+  select(-c(name)) %>% 
+  tidyr::pivot_longer(cols = c(factual, counterfactual), values_to = "value", names_to = "scenario") %>% 
+  mutate(cell = factor(cell))
+
+# plot:
+nrow(routes_sel_sf)/12
+page <- 8
+
+plot_df_2 %>% 
+  #filter(cell %in% unique(plot_df_2$cell)[528:539]) %>% 
+  #filter(cell == 5790) %>% 
+  ggplot(aes(x = date, y = value, colour = scenario, fill = scenario)) +
+  ggforce::facet_wrap_paginate(~RTENO, nrow = 3, ncol = 4, page = page, scales = "free_y") +
+  #facet_wrap(~cell, nrow = 3, ncol = 4) +
+  geom_line() +
+  geom_smooth(method = "lm") +
+  ggtitle(var) +
+  theme_bw() +
+  theme(text = element_text(size = 18))
+
+# map corresponding routes:
+RTENOS_plot <- unique(plot_df_2$RTENO)[(page*12-11):(page*12)]
+plot(st_geometry(routes_sel_sf))
+points(routes_sel_sf %>% filter(RTENO_BBS %in% RTENOS_plot), col = "red")
