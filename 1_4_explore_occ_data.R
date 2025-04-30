@@ -29,6 +29,8 @@ load(file = file.path("data", "route_year_env_data.RData"))
 # routes-years:
 load(file = file.path("data", "BBS_for_occ_selection.RData")) # route_sel_dt; output of 1_3_match_BBS_to_env_data.R 
 
+# selected variables:
+load(file = file.path("data", "selected_variables.RData")) # selvar_final; output of 1_2_variable_selection.R
 
 
 # overview map species detections: ------------
@@ -191,3 +193,145 @@ route_sel_env_dt %>%
   ggplot(aes(x = Year, y = secondary_nonforests)) +
   geom_line(aes(group = RTENO)) +
   geom_smooth(method = 'lm')
+
+
+
+
+# counterfactual land use data: ----
+
+# across US:
+
+# factual environmental data for each US grid cell:
+load(file = file.path("data", "US_grid_env_data.RData")) # output of 1_3_env_data_df_contUS.R; clim_lu_cells_sf
+fact_env_df <- sf::st_drop_geometry(clim_lu_cells_sf)
+
+# counterfactual environmental data for each US grid cell:
+#load(file = file.path("data", "US_grid_env_data_cf.RData")) # xx output of 1_3_env_data_df_contUS.R; clim_lu_cells_sf
+#counterfact_env_df <- sf::st_drop_geometry(clim_lu_cells_sf)
+
+load(file = file.path("data", "US_grid_env_data_cf_1950soc.RData")) # xx output of 1_3_env_data_df_contUS.R; clim_lu_cells_sf
+counterfact_env_df <- sf::st_drop_geometry(clim_lu_cells_sf_cf_year)
+# scale env. data:
+
+# load mean and sd with which training data were scaled:
+load(file.path("data", "route_env_dt_scale_pars.RData")) # output of 2_1_DOM_flocker_fit_fm.R; env_scale_pars
+
+# factual data:
+fact_env_df_scaled <- fact_env_df
+# iterate over columns:
+for(c in colnames(fact_env_df[, 3:ncol(fact_env_df)])){
+  print(c)
+  fact_env_df_scaled[, c] <- as.numeric(scale(fact_env_df[, c], 
+                                              center = as.numeric(env_scale_pars$center[c]),
+                                              scale = as.numeric(env_scale_pars$scale[c])))
+}
+
+# counterfactual data:
+counterfact_env_df_scaled <- counterfact_env_df
+# iterate over columns:
+for(c in colnames(counterfact_env_df[, 3:ncol(counterfact_env_df)])){
+  print(c)
+  counterfact_env_df_scaled[, c] <- as.numeric(scale(counterfact_env_df[, c], 
+                                                     center = as.numeric(env_scale_pars$center[c]),
+                                                     scale = as.numeric(env_scale_pars$scale[c])))
+}
+
+
+# factual all US:
+fact_env_df_scaled %>% 
+  select(c(year, grep(x = selvar_final, pattern = "(bio)|(pr_mean)", value = TRUE, invert = TRUE)))  %>% 
+  tidyr::pivot_longer(cols = -year, names_to = "variable", values_to = "value") %>% 
+  group_by(year, variable) %>% 
+  summarise(sum = sum(value)) %>% 
+  ggplot() +
+  geom_line(aes(x = year, y = sum, colour = variable), linewidth = 2) +
+  theme_bw() 
+
+# counterfactual all US:
+counterfact_env_df_scaled %>% 
+  select(c(year, grep(x = selvar_final, pattern = "(bio)|(pr_mean)", value = TRUE, invert = TRUE)))  %>% 
+  tidyr::pivot_longer(cols = -year, names_to = "variable", values_to = "value") %>% 
+  group_by(year, variable) %>% 
+  summarise(sum = sum(value)) %>% 
+  ggplot() +
+  geom_line(aes(x = year, y = sum, colour = variable), linewidth = 2) +
+  theme_bw() 
+
+# -> counterfactual data static over 1995 - 2019
+
+# compare factual (histsoc) and counterfcatual (1901soc) land use data from (1850) 1901 to 2019:
+# (via sum across US)
+
+# load tifs:
+library(terra)
+
+# counterfactual data:
+
+lu_vars <- grep(x = selvar_final, pattern = "(bio)|(pr_mean)", value = TRUE, invert = TRUE)
+
+for(i in 1:length(lu_vars)){
+  
+  lu_v <- lu_vars[i]
+  
+  print(lu_v)
+  
+  files <- list.files(path = file.path("data", "Env_data", "ISIMIP_land_use_and_irrigation", 
+                                       "ISIMIP_LU_ESRI102003"),
+                      pattern = paste0(lu_v, "_[0-9]{4}"),
+                      full.names = TRUE)
+  
+  rast_stack_f <- rast(files)
+  #names(rast_stack_f) <- paste0(lu_v, "_", 1850:2019) 
+  
+  US_sum <- global(rast_stack_f, "sum", na.rm = TRUE)$sum
+  US_sum 
+  # for few variables data from 1850 onwards, remove data unitil 1901:
+  if(length(US_sum) == 170){
+    US_sum <- US_sum[52:length(US_sum)]
+  }
+  
+  df_var <- data.frame(var = lu_v, sum_US_fact = US_sum, year = 1901:2019)
+  
+  # counterfactual data:
+  files <- list.files(path = file.path("data", "Counterfactual_env_data", "ISIMIP_land_use_and_irrigation",
+                                       "ISIMIP_LU_ESRI102003"),
+                      pattern = paste0(lu_v, "_[0-9]{4}"),
+                      full.names = TRUE)
+  
+  # files <- list.files(path = file.path("data", "Env_data", "ISIMIP_land_use_and_irrigation",
+  #                                      "ISIMIP_LU_ESRI102003"),
+  #                     pattern = paste0(lu_v, "_1995"),
+  #                     full.names = TRUE)
+  
+  rast_stack_cf <- rast(files)
+  
+  #names(rast_stack_cf) <- paste0(lu_v, "_", 1850:2019) 
+  
+  sum_cf <- global(rast_stack_cf, "sum", na.rm = TRUE)$sum
+  # for few variables data from 1850 onwards, remove data unitil 1901:
+  if(length(sum_cf) == 170){
+    sum_cf <- sum_cf[52:length(sum_cf)]
+  }
+  
+  df_var$sum_US_cf <- sum_cf
+  
+  if(i == 1){
+    df_all <- df_var
+  } else {
+    df_all <- rbind(df_all, df_var)
+  }
+  
+}
+
+# plot changes in cell sums of land use classes, factual vs. counterfactual:
+df_all %>% 
+  tidyr::pivot_longer(cols = c(sum_US_fact , sum_US_cf), names_to = "scen", values_to = "sum_US") %>% 
+  mutate(scen = case_match(scen, "sum_US_cf" ~ "counterfact.", "sum_US_fact" ~ "fact.")) %>% 
+  ggplot() +
+  geom_point(aes(x = year, y = sum_US, colour = as.factor(scen)), size = 3) +
+  geom_vline(xintercept = 1995, linetype = 2) +
+  facet_wrap(~var, scales = "free") +
+  theme_bw() +
+  ylab("cells summed across US") +
+  theme(legend.title = element_blank(), text = element_text(size = 25))
+

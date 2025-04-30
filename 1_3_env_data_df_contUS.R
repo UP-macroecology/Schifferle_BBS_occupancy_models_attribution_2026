@@ -11,12 +11,15 @@
 library(sf)
 library(dplyr)
 library(terra)
+library(ggplot2)
 
-# directories:
+
+# directories: -----------------------------------------------------------------
 
 # environmental data:
-#env_dir <- file.path("data", "Env_data") # factual data used to fit DOMs
-env_dir <- file.path("data", "Counterfactual_env_data") # counterfactual data for prediction / attribution
+env_dir <- file.path("data", "Env_data") # factual data used to fit DOMs
+#env_dir <- file.path("data", "Counterfactual_env_data") # counterfactual data for prediction / attribution
+
 
 # output (env. data for each US grid cell):
 
@@ -24,6 +27,7 @@ env_dir <- file.path("data", "Counterfactual_env_data") # counterfactual data fo
 #out_csv <- file.path("data", "US_grid_env_data.csv")
 out_RData <- file.path("data", "US_grid_env_data_cf.RData")
 out_csv <- file.path("data", "US_grid_env_data_cf.csv")
+
 
 # load data: -------------------------------------------------------------------
 
@@ -52,7 +56,6 @@ years <- 1995:2019
 i = 1
 bioclim_year <- rast(bioclim_files[which(grepl(paste0("bio.{1,2}_", years[i], ".tif"), bioclim_files))])
 lu_year <- rast(lu_files[which(grepl(paste0(years[i], "_ESRI102003.tif$"), lu_files))])
-
 
 
 # extract coordinates of cell centroids within conterminous US:
@@ -84,7 +87,6 @@ ggplot(clim_lu_cells) +
   theme_bw()
 # cellID goes up to down from left to right
 #write_sf(clim_lu_cells, file.path("data", "cell_centroids_US_ESRI102003.shp"))
-
 
 
 # add environmental data: ------------------------------------------------------
@@ -184,3 +186,122 @@ clim_lu_cells_sf <- clim_lu_cells_all %>%
 save(clim_lu_cells_sf, file = out_RData)
 write.csv(st_drop_geometry(clim_lu_cells_sf), file = out_csv,
           row.names = FALSE)
+
+
+# land use 1950soc / 1995soc counterfactuals: ----------------------------------------------
+
+# instead using ISIMIP's 1901soc, fix land use levels in 1950 / 1995
+
+year_lu_cf <- 1950
+#year_lu_cf <- 1995
+
+# land use variables:
+lu_vars <- grep(x = selvar_final, pattern = "(bio)|(pr_mean)", value = TRUE, invert = TRUE)
+
+# load data for 1950 and select lu variables:
+lu_cf_rast <- rast(file.path("data", "Env_data", "ISIMIP_land_use_and_irrigation", "ISIMIP_LU_ESRI102003", paste0(lu_vars, "_", year_lu_cf, "_ESRI102003.tif")))
+lu_cf_rast
+
+# extract route locations:
+lu_cf_routes_sf <- cbind(clim_lu_cells,
+                         terra::extract(x = lu_cf_rast, y = clim_lu_cells, ID = FALSE))
+nrow(lu_cf_routes_sf)
+nrow(clim_lu_cells_sf)
+
+# repeat lu data for each year
+lu_cf_routes_all_years_sf <- lu_cf_routes_sf %>% 
+  slice(rep(1:n(), times = length(years)))
+nrow(lu_cf_routes_all_years_sf)
+
+# replace land use data in previous counterfactual data set:
+load(file.path("data", "US_grid_env_data_cf.RData"))
+clim_lu_cells_sf_cf_year <- clim_lu_cells_sf
+clim_lu_cells_sf_cf_year[, lu_vars] <- st_drop_geometry(lu_cf_routes_all_years_sf[, lu_vars])
+
+# mean of 3 years before the first year -> for static land use we can just use the same values as for single years:
+clim_lu_cells_sf_cf_year[, paste0(lu_vars, "_3yrs")] <- st_drop_geometry(lu_cf_routes_all_years_sf[, lu_vars])
+
+# write to file:
+save(clim_lu_cells_sf_cf_year, file = file.path("data", paste0("US_grid_env_data_cf_", year_lu_cf, "soc.RData")))
+# to use in 5_0_DOM_y_predictions_routes_counterfactual_data.R 
+
+
+# ATTRICI 1995 climate counterfactuals and land use fixed at 1995: -------------
+
+# instead using ISIMIP's climate counterfactual detrended from 1901 onwards,
+# use ISIMIP's climate data detrended with ATTRICI from 1995 onwards
+# together with factual 3-year summaries as covariates for initial occupancy
+# and land use fixed at 1995er level
+
+clim_lu_cells
+
+# env. data files:
+env_dir <- file.path("//NAS-2-P-SN-01.ibb.uni-potsdam.de", "daten$", "AG26", "Transfer", "Schifferle_BBS_occupancy_models_2023",
+                     "data", "Counterfactual_env_data", "ISIMIP_GSWP3_W5E5", "attrici_detrending", "output", "ATTRICI_CLIM_ESRI102003_tifs") # counterfactual data for prediction / attribution
+
+bioclim_files <- list.files(file.path(env_dir, "bioclim"), full.names = TRUE)
+sclim_files <- list.files(file.path(env_dir, "seasonal"), full.names = TRUE)
+
+# yearly data::
+years <- 1995:2019
+
+# iterate over years:
+for(i in 1:length(years)){
+  
+  print(years[i])
+  
+  clim_lu_cells_year <- clim_lu_cells
+  clim_lu_cells_year$year <- years[i]
+  
+  # bioclimatic variables of year i:
+  bioclim_year <- rast(grep(paste0("bio.{1,2}_", years[i], ".tif"), bioclim_files, value = TRUE))
+  # reduce to selected variables:
+  bioclim_year_sel <- bioclim_year[[grep(pattern = "bio", x = selvar_final, value = TRUE)]]
+  # extract values of each bioclimatic variable at each grid cell:
+  for(biovar in names(bioclim_year_sel)){
+    clim_lu_cells_year[, biovar] <- bioclim_year_sel[[biovar]] %>% 
+      terra::extract(y = clim_lu_cells_year) %>% 
+      pull(biovar)
+  }
+  
+  # seasonal climate variables of year i:
+  sclim_year <- rast(grep(paste0("(spring|summer|autumn|winter)", "_", years[i], ".tif"), sclim_files, value = TRUE))
+  # reduce to selected variables:
+  sclim_year_sel <- sclim_year[[grep(pattern = "(spring|summer|autumn|winter)", x = selvar_final, value = TRUE)]]
+  # extract values of each variable at each grid cell:
+  for(sclimvar in names(sclim_year_sel)){
+    clim_lu_cells_year[, sclimvar] <- sclim_year_sel[[sclimvar]] %>% 
+      terra::extract(y = clim_lu_cells_year) %>% 
+      pull(sclimvar)
+  }
+  
+  # merge data for all years:
+  if(i == 1){
+    clim_lu_cells_all <- clim_lu_cells_year
+  } else{
+    clim_lu_cells_all <- rbind(clim_lu_cells_all, clim_lu_cells_year)
+  }
+}
+
+clim_lu_cells_all
+clim_lu_cells_all_df <- st_drop_geometry(clim_lu_cells_all)
+
+# add factual 3-year summaries used as covariates for initial occupancy:
+load(file.path("data", "US_grid_env_data.RData"))
+fact_3yrs <- clim_lu_cells_sf %>% 
+  select(c(cellID, year, contains("3yrs"))) %>% 
+  st_drop_geometry()
+
+# add static land use at level of 1995:
+load(file = file.path("data", "US_grid_env_data_cf_1995soc.RData"))
+lu_1995_df <- clim_lu_cells_sf_cf_year %>% 
+  select(c(cellID, year, !matches("(bio)|(pr_mean)|(3yrs)"))) %>% 
+  st_drop_geometry()
+
+clim_lu_cells_cf_1995 <- clim_lu_cells_all_df %>% 
+  left_join(fact_3yrs) %>%  
+  left_join(lu_1995_df)
+
+# write to file:
+save(clim_lu_cells_cf_1995, file = file.path("data", paste0("US_grid_env_data_cf_1995_all.RData")))
+# to use in 5_0_DOM_y_predictions_routes_counterfactual_data.R 
