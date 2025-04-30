@@ -25,7 +25,7 @@ library(terra)
 # directories:
 # data stored as "pr.zip", "tasmin.zip", "tasmax.zip" here:
 #clim_path <- file.path("data", "Env_data", "ISIMIP_GSWP3_W5E5") # factual data
-clim_path <- file.path("data", "Counterfactual_env_data", "ISIMIP_GSWP3_W5E5") # counterfactual data
+#clim_path <- file.path("data", "Counterfactual_env_data", "ISIMIP_GSWP3_W5E5") # counterfactual data
 
 
 # register cores for parallel computation:
@@ -118,9 +118,7 @@ foreach(var = c("tasmin", "tasmax", "pr"),
                   crop(ext(c(-126, -66, 24, 50))) %>% # cut extent
                   project(y = "ESRI:102003", method = "average") %>% # project
                   mask(US_albers_sf) 
-                
-                #plot(dt_export)
-                
+
                 # directory to store results:
                 res_dir_proj <- file.path(clim_path, "ISIMIP_CLIM_ESRI102003")
                 if(!dir.exists(res_dir_proj)){dir.create(res_dir_proj)}
@@ -468,7 +466,9 @@ for(s in 1:4){
 
 
 
-# explore/plot seasonal variables: ----
+# explorations: ----
+# plot seasonal variables: 
+
 files <- list.files(seasonal_folder, full.names = TRUE)
 sclims_rast <- terra::rast(files[which(grepl("2000", files))]) # 2000
 sclims_rast_scaled <- terra::scale(sclims_rast)
@@ -493,4 +493,52 @@ plot(x = 1995:2019, y = colSums(values_df, na.rm = TRUE)/(colSums(values_df, na.
      )
 
 
-# future
+# explore/plot selected climatic variables of each year:
+
+files1 <- list.files(file.path("data", "Env_data", "ISIMIP_GSWP3_W5E5", "bioclim"), full.names = TRUE)
+files2 <- list.files(file.path("data", "Env_data", "ISIMIP_GSWP3_W5E5", "seasonal"), full.names = TRUE)
+
+dir.create("plots/clim_1995_2019")
+
+# variable selection:
+load(file = file.path("data", "selected_variables.RData")) # output of 1_2_variable_selection.R
+selvar_final
+sel_clim_var <- grep(pattern = "(bio)|(pr_mean)", x = selvar_final, value = TRUE) 
+
+sel_clim_files1 <- grep(pattern = paste0(paste0(sel_clim_var, "_"), collapse = "|"), x = files1, value = TRUE)
+sel_clim_files1_years <- grep(pattern = paste0(1995:2019, collapse = "|"), x = sel_clim_files1, value = TRUE)
+sel_clim_files1_years <- grep(pattern = "_1992_1995", x = sel_clim_files1_years, value = TRUE, invert = TRUE)
+
+sel_clim_files2 <- grep(pattern = paste0(sel_clim_var, collapse = "|"), x = files2, value = TRUE)
+sel_clim_files2_years <- grep(pattern = paste0(1995:2019, collapse = "|"), x = sel_clim_files2, value = TRUE)
+sel_clim_files2_years <- grep(pattern = "_1992_1995", x = sel_clim_files2_years, value = TRUE, invert = TRUE)
+
+sel_clim_files <- c(sel_clim_files1_years, sel_clim_files2_years)
+
+
+# scale variables:
+load(file = file.path("data", "route_env_dt_scale_pars.RData")) # output of 2_1_DOM_flocker_fit_fm.R
+env_scale_pars
+
+for(v in sel_clim_var){
+  
+  print(v)
+  
+  cl_rast <- terra::rast(grep(pattern = paste0(v, "_"), x = sel_clim_files, value = TRUE))
+  
+  # scale:
+  cl_rast_scaled <- scale(cl_rast, center = as.numeric(env_scale_pars$center[v]), scale = as.numeric(env_scale_pars$scale[v]))
+  
+  range <- range(values(cl_rast_scaled), na.rm = TRUE)
+  
+  for(y in 1:length(1995:2019)){
+    
+    print(y)
+    
+    jpeg(file = file.path("plots", "clim_1995_2019", paste0(names(cl_rast_scaled)[1], "_", (1995:2019)[y], ".jpg")), 
+         width = 800, height = 500, quality = 100)
+    terra::plot(cl_rast_scaled[[y]], main = paste(names(cl_rast_scaled)[1], (1995:2019)[y]), range = range)
+    dev.off()
+    
+  }
+}

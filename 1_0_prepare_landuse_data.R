@@ -48,8 +48,8 @@ library(sf)
 
 # directories:
 # ISIMIP  data:
-#lu_path <- file.path("data", "Env_data", "ISIMIP_land_use_and_irrigation")
-lu_path <- file.path("data", "Counterfactual_env_data", "ISIMIP_land_use_and_irrigation")
+lu_path <- file.path("data", "Env_data", "ISIMIP_land_use_and_irrigation")
+#lu_path <- file.path("data", "Counterfactual_env_data", "ISIMIP_land_use_and_irrigation")
 
 # load data: ----
 
@@ -129,7 +129,9 @@ for(f in 1:length(lu_files)){
     
     # extract one .tif-file per focal year:
     
-    for(y in 1990:2019){
+    #for(y in 1990:2019){ # xx
+    # for(y in 1901:1989){
+    for(y in 1850:1900){
       
       print(y)
       
@@ -173,7 +175,9 @@ for(f in 1:length(lu_files)){
         
         # extract one .tif-file per focal year:
         
-        for(y in 1990:2019){
+        #for(y in 1990:2019){ # xx
+        #for(y in 1901:1989){
+        for(y in 1850:1900){ 
           
           print(y)
           
@@ -231,23 +235,39 @@ for(luc in lu_classes){
 
 # explore/plot land use variables:
 files <- list.files(res_dir_proj, full.names = TRUE)
-lu_rast <- terra::rast(files[which(grepl("2010", files))]) # 2010
-dir.create("plots/land_use_classes_2010_2")
-for(i in 1:nlyr(lu_rast)){
-  jpeg(file = file.path("plots", "land_use_classes_2010_2", paste0(names(lu_rast)[i], ".jpg")), 
-       width = 800, height = 500, quality = 100)
-  terra::plot(lu_rast[[i]], main = names(lu_rast)[i])
-  dev.off()
-}
+dir.create("plots/land_use_1995_2010")
 
-# plot overall trend:
-var <- "secondary_nonforests"
-lu_rast <- terra::rast(files[which(grepl(paste0(var, "_[0-9]{4}_ESRI102003"), files))])
-values_df <- values(lu_rast, dataframe = TRUE) 
-#dim(values_df) # each column = one year
+# variable selection:
+load(file = file.path("data", "selected_variables.RData")) # output of 1_2_variable_selection.R
+selvar_final
+sel_lu_var <- c("urbanareas", "managed_pastures", "primary_nonforests", "secondary_nonforests", "sum_annual_crops")
 
-plot(x = 1990:2019, y = colSums(values_df, na.rm = TRUE)/(colSums(values_df, na.rm = TRUE)[1]), type = "o", 
-     main = var, ylim = c(-2, 2))
+sel_lu_files <- grep(pattern = paste0(sel_lu_var, collapse = "|"), x = files, value = TRUE)
+sel_lu_files_years <- grep(pattern = paste0(1995:2019, collapse = "_|_"), x = sel_lu_files, value = TRUE)
 
+# scale variables:
+load(file = file.path("data", "route_env_dt_scale_pars.RData")) # output of 2_1_DOM_flocker_fit_fm.R
+env_scale_pars
 
-# future land use
+for(v in sel_lu_var){
+  
+  print(v)
+  
+  lu_rast <- terra::rast(grep(pattern = v, x = sel_lu_files_years, value = TRUE))
+
+  # scale:
+  lu_rast_scaled <- scale(lu_rast, center = as.numeric(env_scale_pars$center[v]), scale = as.numeric(env_scale_pars$scale[v]))
+  
+  range <- range(values(lu_rast_scaled), na.rm = TRUE)
+  
+  for(y in 1:length(1995:2019)){
+    
+    print(y)
+    
+    jpeg(file = file.path("plots", "land_use_1995_2010", paste0(names(lu_rast_scaled)[1], "_", (1995:2019)[y], ".jpg")), 
+         width = 800, height = 500, quality = 100)
+    terra::plot(lu_rast_scaled[[y]], main = paste(names(lu_rast_scaled)[1], (1995:2019)[y]), range = range)
+    dev.off()
+
+  }
+  }
