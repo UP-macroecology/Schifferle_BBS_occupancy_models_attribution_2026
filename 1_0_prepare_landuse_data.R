@@ -48,8 +48,8 @@ library(sf)
 
 # directories:
 # ISIMIP  data:
-lu_path <- file.path("data", "Env_data", "ISIMIP_land_use_and_irrigation")
-#lu_path <- file.path("data", "Counterfactual_env_data", "ISIMIP_land_use_and_irrigation")
+#lu_path <- file.path("data", "Env_data", "ISIMIP_land_use_and_irrigation")
+lu_path <- file.path("data", "Counterfactual_env_data", "ISIMIP_land_use_and_irrigation")
 
 # load data: ----
 
@@ -209,10 +209,10 @@ for(f in 1:length(lu_files)){
 
 # summarise land use variables for three years before focal period as predictor for initial occupancy: ----
 
-start <- 1995 # start year
+start <- 1904 # 1995 start year
 
 lu_classes <- unique(gsub(x = list.files(res_dir_proj),
-                          pattern = "_[0-9]{4}_ESRI102003.tif", 
+                          pattern = "(?:_mean_[0-9]{4})?_[0-9]{4}_ESRI102003.tif", 
                           replacement = ""))
 
 # iterate over variables:

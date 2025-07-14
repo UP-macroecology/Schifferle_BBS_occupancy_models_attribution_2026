@@ -24,7 +24,7 @@ library(terra)
 
 # directories:
 # data stored as "pr.zip", "tasmin.zip", "tasmax.zip" here:
-#clim_path <- file.path("data", "Env_data", "ISIMIP_GSWP3_W5E5") # factual data
+clim_path <- file.path("data", "Env_data", "ISIMIP_GSWP3_W5E5") # factual data
 #clim_path <- file.path("data", "Counterfactual_env_data", "ISIMIP_GSWP3_W5E5") # counterfactual data
 
 
@@ -33,8 +33,11 @@ ncores <- 3
 cl <- makeCluster(ncores, setup_timeout = 0.5)
 registerDoParallel(cl)
 
-start <- 1995
-end <- 2019
+# start <- 1995
+# end <- 2019
+start <- 1904 # for counterfactuals: initial occ. for 1901-1903
+end <- 1994
+
 
 # load data:
 
@@ -61,15 +64,19 @@ foreach(var = c("tasmin", "tasmax", "pr"),
           print(var)
   
           # list files:
-          zipfiles <- utils::unzip(file.path(clim_path, paste0(var, ".zip")), list = TRUE)
+          #zipfiles <- utils::unzip(file.path(clim_path, paste0(var, ".zip")), list = TRUE)
+          #zipfiles <- utils::unzip(grep(paste0("counterclim_", var, ".zip"), list.files(clim_path, full.names = TRUE), value = TRUE), list = TRUE) # for counterfactual 1901-1990
           nc_files <- grep(x = zipfiles$Name, pattern = ".nc", value = TRUE) # every nc file contains daily values of 10 years
           
           # unzip files:
-          utils::unzip(file.path(clim_path, paste0(var, ".zip")), exdir = clim_path) # unzip the top directory
+          #utils::unzip(file.path(clim_path, paste0(var, ".zip")), exdir = clim_path) # unzip the top directory
+          #utils::unzip(grep(paste0("counterclim_", var, ".zip"), list.files(clim_path, full.names = TRUE), value = TRUE), exdir = clim_path) # unzip the top directory
           
           # iterate over files:
+          # update all nc-files in folder, not only the ones just unzipped:
+          nc_files <- list.files(clim_path, pattern = paste0(var, ".*.nc")) # every nc file contains daily values of 10 years
           
-          for(f in 1:length(nc_files)){
+          for(f in 1:10){#length(nc_files)){
             
             print(paste(f, nc_files[f]))
             
@@ -293,7 +300,7 @@ months_seasons_ls <- list(spring = stringr::str_pad(c(3:5), width = 2, pad = "0"
      winter = stringr::str_pad(c(12, 1:2), width = 2, pad = "0"))
 
 # iterate over years:
-foreach(year = 1995:2019, 
+foreach(year = start:end, #2019, # 1904:1994 for ISIMIP
         .packages = c("raster", "terra") , 
         .verbose = TRUE) %dopar% {
           
@@ -405,7 +412,7 @@ for(var in c("tasmin", "tasmax", "pr")){
     # save tifs:
     terra::writeRaster(mean_rast,
                        filename = file.path(seasonal_folder, 
-                                            paste0(var, "_mean_", names(months_seasons_ls)[s], "_1992_1995.tif")), 
+                                            paste0(var, "_mean_", names(months_seasons_ls)[s], "_", start -3, "_", start, ".tif")), 
                        overwrite = TRUE)
   }
 }
@@ -460,7 +467,7 @@ for(s in 1:4){
   # save tifs:
   terra::writeRaster(mean_rast,
                      filename = file.path(seasonal_folder, 
-                                          paste0("tas_mean_", names(months_seasons_ls)[s], "_1992_1995.tif")), 
+                                          paste0("tas_mean_", names(months_seasons_ls)[s], "_", start-3, "_", start, ".tif")), 
                      overwrite = TRUE)
 }
 
