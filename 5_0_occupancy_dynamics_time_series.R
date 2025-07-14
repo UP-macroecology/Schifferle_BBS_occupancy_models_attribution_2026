@@ -1,4 +1,5 @@
 # calculate time series of sum of routes with observed or predicted species presence:
+# median per year, CI per year, 100 draws of posterior per year
 
 # packages: --------------------------------------------------------------------
 
@@ -9,7 +10,7 @@ library(doParallel)
 library(bayestestR)
 
 # register cores for parallel computation:
-ncores <- 20 # models * 4 chains? 
+ncores <- 2
 cl <- makeCluster(ncores, setup_timeout = 0.5)
 registerDoParallel(cl)
 
@@ -25,7 +26,6 @@ source("0_functions.R")
 #                       "Schifferle_BBS_occupancy_models_2023")
 
 main_dir <- file.path("/mnt", "ibb_share", "zurell_transfer", "Schifferle_BBS_occupancy_models_2023")
-
 
 
 # save observations time series:
@@ -66,8 +66,6 @@ foreach(s = 1:length(final_species),
   .packages = c("dplyr", "collapse", "sf", "bayestestR"),
   .errorhandling = "pass", #"remove",
   .verbose = TRUE) %dopar% {
-
-#for(s in 1:length(final_species)){
   
   spec <- final_species[s]
   print(paste(s, spec))
@@ -108,7 +106,7 @@ foreach(s = 1:length(final_species),
   #save(preds_routes, file = file.path(res_dir, "fm_buffer750km", "y_preds_route_level_section_sum", paste0(spec, "_y_preds_route_level_section_sum.RData")))
   
   load(file.path(main_dir, "results", "fm_buffer750km", "y_preds_route_level_section_sum", 
-                 paste0(spec, "_y_preds_route_level_section_sum.RData"))) # output of
+                 paste0(spec, "_y_preds_route_level_section_sum.RData")))
   preds_routes # sites, years, draws
   
   # sum across routes for each year:
@@ -121,13 +119,29 @@ foreach(s = 1:length(final_species),
   ts_ci90_low <- unlist(lapply(ts_ci90, FUN = function(x) x$CI_low))
   ts_ci90_high <- unlist(lapply(ts_ci90, FUN = function(x) x$CI_high))
   
+  # add 100 draws of posterior distribution for each year:
+  n_draws <- 100
+  draws <- t(apply(preds_years, MAR = 1, FUN = function(x) sample(x = x, size = n_draws, replace = FALSE))) 
+  colnames(draws) <- paste0("draw", 1:n_draws)
+  draws <- draws %>% 
+    as_tibble() %>% 
+    mutate(year = 1995:2019) %>% 
+    select(year, everything())
+    
+  # draws %>% 
+  #   tidyr::pivot_longer(starts_with("draw"), names_to = "draw", values_to = "value") %>% 
+  #   ggplot(aes(x = year, y = value)) +
+  #   geom_point() +
+  #   geom_smooth(method = "lm")
+
   # assemble df:
-  ts_preds_fact <- tibble(year = 1995:2019, median_Nocc_f = ts_median, CI90low_f = ts_ci90_low, CI90high_f = ts_ci90_high)
+  ts_preds_fact <- tibble(year = 1995:2019, median_Nocc_f = ts_median, CI90low_f = ts_ci90_low, CI90high_f = ts_ci90_high) %>% 
+    left_join(draws)
   
   # # plot:
   # ggplot(ts_preds_fact) +
   #   geom_line(aes(x = year, y = median_Nocc_f)) +
-  #   geom_ribbon(aes(x = year, ymax = CI90high_f, ymin = CI90low_f), 
+  #   geom_ribbon(aes(x = year, ymax = CI90high_f, ymin = CI90low_f),
   #               alpha = 0.2, fill = "cornflowerblue") +
   #   ggtitle(spec) +
   #   theme_bw()
@@ -140,22 +154,10 @@ foreach(s = 1:length(final_species),
   print("counterfactual predictions")
   
   # directory with predictions for counterfactual scenarios:
-  cf_dir <- file.path(main_dir, "results", "attribution", "fm_y_preds_routes_cf_1995_all")
+  cf_dir <- file.path(main_dir, "results", "attribution", "fm_y_preds_routes_cf_1995_all") # output of 5_0_DOM_y_predictions_routes_counterfactual_sets_1995.R
   
   # counterfactual prediction for this species:
   cf_files <- list.files(cf_dir, pattern = spec)
-  
-  # df to store results:
-  ts_preds_cfact <- tibble(year = 1995:2019, 
-                           median_Nocc_cf_clim = NA, 
-                           CI90low_cf_clim = NA, 
-                           CI90high_cf_clim = NA,
-                           median_Nocc_cf_1995soc = NA, 
-                           CI90low_cf_1995soc = NA, 
-                           CI90high_cf_1995soc = NA,
-                           median_Nocc_cf_clim_1995soc = NA, 
-                           CI90low_cf_clim_1995soc = NA, 
-                           CI90high_cf_clim_1995soc = NA)
   
   # iterate over counterfactual scenarios:
   
@@ -179,22 +181,41 @@ foreach(s = 1:length(final_species),
     ts_ci90_low <- unlist(lapply(ts_ci90, FUN = function(x) x$CI_low))
     ts_ci90_high <- unlist(lapply(ts_ci90, FUN = function(x) x$CI_high))
     
+    # add 100 draws of posterior distribution for each year:
+    n_draws <- 100
+    draws <- t(apply(preds_years, MAR = 1, FUN = function(x) sample(x = x, size = n_draws, replace = FALSE))) 
+    colnames(draws) <- paste0("draw", 1:n_draws)
+    draws <- draws %>% 
+      as_tibble() %>% 
+      mutate(year = 1995:2019) %>% 
+      select(year, everything())
+    
     if(scen == "counterclim"){
-      ts_preds_cfact$median_Nocc_cf_clim <- ts_median
-      ts_preds_cfact$CI90low_cf_clim <- ts_ci90_low
-      ts_preds_cfact$CI90high_cf_clim <- ts_ci90_high
+
+      ts_preds_cfact_clim <- tibble(year = 1995:2019, median_Nocc_cf_clim = ts_median, 
+                                    CI90low_cf_clim = ts_ci90_low, CI90high_cf_clim = ts_ci90_high) %>% 
+        left_join(draws)
+      
     } else if(scen == "1995soc"){
-      ts_preds_cfact$median_Nocc_cf_1995soc <- ts_median
-      ts_preds_cfact$CI90low_cf_1995soc <- ts_ci90_low
-      ts_preds_cfact$CI90high_cf_1995soc <- ts_ci90_high
+      
+      ts_preds_cfact_1995soc <- tibble(year = 1995:2019, median_Nocc_cf_1995soc = ts_median, 
+                               CI90low_cf_1995soc = ts_ci90_low, CI90high_cf_1995soc = ts_ci90_high) %>% 
+        left_join(draws)
+      
+      
     } else {
-      ts_preds_cfact$median_Nocc_cf_clim_1995soc <- ts_median
-      ts_preds_cfact$CI90low_cf_clim_1995soc <- ts_ci90_low
-      ts_preds_cfact$CI90high_cf_clim_1995soc <- ts_ci90_high
+      
+      ts_preds_cfact_clim_1995soc <- tibble(year = 1995:2019, median_Nocc_cf_clim_1995soc = ts_median, 
+                                            CI90low_cf_clim_1995soc = ts_ci90_low, CI90high_cf_clim_1995soc = ts_ci90_high) %>% 
+        left_join(draws)
+      
     }
   }
+  
+  # add to list:
+  ts_preds_cfact <- list(ts_preds_cfact_clim, ts_preds_cfact_1995soc, ts_preds_cfact_clim_1995soc)
+  names(ts_preds_cfact) <- c("cf_clim", "cf_1995soc", "cf_clim_1995soc")
   
   save(ts_preds_cfact, file = file.path(cfact_dir, paste0(spec, "_ts_sum_occ_routes_cf_preds.RData")))
   
 }
-
