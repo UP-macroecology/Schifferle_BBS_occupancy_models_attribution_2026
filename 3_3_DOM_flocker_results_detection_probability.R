@@ -123,7 +123,7 @@ for(i in 1:length(final_species)){
 
 #write.csv(det_prob_df, file.path("data", "detection_probability_fm.csv"))
 summary(det_prob_df)
-
+det_prob_df <- read.csv(file.path("data", "detection_probability_fm.csv"))
 
 # explore detection probability and traits: ------------------------------------
 
@@ -140,6 +140,16 @@ det_prob_traits %>%
 
 plot(det_prob_traits$det_prob_median_mean ~ det_prob_traits$Mass)
 summary(lm(det_prob_median_mean ~ Trophic.Level + Trophic.Niche + Mass + Primary.Lifestyle + Habitat, data = det_prob_traits))
+
+ggplot(det_prob_traits) +
+  geom_point(aes(x = log(Mass), y = det_prob_median_mean*100)) +
+  geom_smooth(aes(x = log(Mass), y = det_prob_median_mean*100), method = "lm") +
+  ylab("mean detection probability") +
+  xlab("log(body mass) [g]") +
+  theme_bw() +
+  theme(text = element_text(size = 18))
+
+
 
 # boxplots for categorial traits:
 

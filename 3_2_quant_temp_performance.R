@@ -39,11 +39,14 @@
 library(sf)
 library(dplyr)
 library(ggplot2)
+library(gridExtra)
 
 # directories: ----
 
 results_dir <- file.path("M:", "Documents", "DEBTs", "analysis", "Schifferle_BBS_occupancy_models_2023", 
                          "results", "temp_val_buffer_750_10yrs")
+# results_dir <- file.path("//NAS-2-P-SN-01.ibb.uni-potsdam.de/users$/schifferle1", "Documents", "DEBTs", "analysis", "Schifferle_BBS_occupancy_models_2023",
+#                          "results", "temp_val_buffer_750_10yrs")
 
 #intermediate_time_series_dir <- file.path(results_dir, "temp_eval", "10_years", "pred_occ_sum")
 #intermediate_time_series_dir <- file.path(results_dir, "temp_eval", "10_years", "pred_y_sum")
@@ -308,7 +311,9 @@ for(i in 1:nrow(temp_val_metrics)){
 # if trend is negative (better predictions further into the future), no problem
 
 summary(temp_val_metrics)
-
+temp_val_metrics %>% 
+  filter(C_temp_val  > 0.9) %>% 
+  pull(species)
 
 # some explorations: ----
 
@@ -340,8 +345,6 @@ plot(mape ~ mse, data = temp_val_metrics)
 # plot time series with metrics: -----
 
 # predicted y against observations summed over years:
-
-library(gridExtra)
 
 buffer_km <- 750
 
@@ -391,7 +394,7 @@ for(i in 1:length(final_species)){
       ylab("N routes with presence") +
       theme_bw() +
       theme(text = element_text(size = 20)) +
-      geom_vline(xintercept = 2009, linetype = "dashed") +
+      geom_vline(xintercept = 2009.5, linetype = "dashed") +
       ggtitle(spec) +
       expand_limits(x = 2026) + 
       # add metrics table:
@@ -421,7 +424,7 @@ specs_thresh <- temp_val_metrics %>%
   # mean absolute error below 10 % or observations in 95 % prediction credible interval or correlation between obs and preds > 0.5:
   filter((mape < 0.1 | obs_in_CI95) | (cor_p > 0.5)) %>% 
   # and no large deviations:
-  # no sign. positive trend in mean absolute error and coorelation is not significantly negative 
+  # no sign. positive trend in mean absolute error and correlation is not significantly negative 
   filter(!(trend_mae > 0 & p_trend_mae <= 0.05) & !(p_cor_p_neg <= 0.05)) %>% 
   pull(species) # 81 species left
 

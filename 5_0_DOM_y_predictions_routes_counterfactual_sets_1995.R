@@ -192,7 +192,9 @@ foreach(#spec = c("Cassin's Sparrow", "Brown Creeper", "Bobolink", "Brewer's Spa
           # either counterfactual values for all climate, all land use or all variables at a time:
 
           #scenarios <- c("counterclim", "1995soc", "counterclim_1995soc")
-          scenarios <- "1995soc"
+          #scenarios <- "1995soc"
+          scenarios <- c("counterclim", "counterclim_1995soc")
+          
           for(v in scenarios){
             
             print(v)

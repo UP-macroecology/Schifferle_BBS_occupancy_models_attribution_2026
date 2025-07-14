@@ -402,4 +402,22 @@ training_routes <- function(species, buffer_km, BBS_spec_data = bbs_dt_occ,
    }
   out # Z matrix
   
-  }
+ }
+ 
+ 
+ # get sum of routes with species observations for each year between 1995 and 2019:
+ 
+ obs_time_series <- function(spec){
+   
+   rel_routes <- training_routes(species = spec, buffer_km = 750, output = "RTENOs")
+   occ_dt_spec <- BBS_pres_abs_spec(species = spec) %>%
+     filter(RTENO %in% rel_routes)
+   
+   # route-level presence:
+   # sum all routes for each year (temporal trend)
+   obs_temp_trend <- occ_dt_spec %>% #xx
+     group_by(Year) %>%
+     summarise(pres_sum = sum(presence, na.rm = TRUE))
+   
+   return(obs_temp_trend) 
+ }

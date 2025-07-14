@@ -335,3 +335,13 @@ df_all %>%
   ylab("cells summed across US") +
   theme(legend.title = element_blank(), text = element_text(size = 25))
 
+# how many routes were surveyed each year: ----
+occ_dt_spec %>% 
+  select(RTENO, Year, presence) %>% 
+  #filter(presence == 1) %>% 
+  filter(!is.na(presence)) %>% 
+  group_by(Year) %>% 
+  summarise(n = n()) %>% View
+  ggplot() +
+  geom_line(aes(x= Year, y = n))
+  

@@ -36,8 +36,8 @@ load(file = file.path("data", "species_ecoregions.RData")) # spec_eco_df; output
 # cross validation:
 CV_eval_summary <- read.csv(file = file.path(results_dir,  "CV_buffer750km", "CV_eval", "CV_eval_summary.csv")) # output of 3_1_DOM_CV_evaluation_metrics.R
 # temporal validation:
-load(file = file.path(results_dir, "temp_val_buffer_750_10yrs", "temp_eval", "10_years", "C_temp_val_10yrs_2.RData")) # C_temp_val_df; output of 3_1_DOM_temp_val_eval.R
-C_temp_val_df
+load(file = file.path(results_dir, "temp_val_buffer_750_10yrs", "temp_eval", "10_years", "temp_val_metrics_final.RData")) # C_temp_val_df; output of 3_1_DOM_temp_val_eval.R
+temp_val_metrics
 
 
 # merge data:
@@ -49,7 +49,7 @@ spec_traits_df <- spec_eco_df %>%
 
 spec_traits_perf_df <- spec_traits_df %>% 
   left_join(CV_eval_summary) %>% 
-  left_join(C_temp_val_df)
+  left_join(temp_val_metrics)
 
 
 # explorations: ----
@@ -107,21 +107,48 @@ cor.test(spec_traits_perf_df$occ_spat_auc_mean, spec_traits_perf_df$y_temp_C, us
 
 # scatterplot spatialtemp. performance all routes vs. only routes with change:
 jpeg(file = file.path("plots", "performance_explorations", "CV_all_vs_change_routes.jpg"), 
-     width = 1000, height = 900, quality = 100)
+     width = 1400, height = 1000, quality = 100)
 ggplot(data = CV_eval_summary) +
-  geom_point(aes(x = y_spattemp_C, y = y_spattemp_C_c), size = 2) +
+  geom_point(aes(x = y_spat_auc_mean, y = y_spat_auc_mean_c), size = 2) +
   geom_abline(intercept = 0, slope = 1, linetype = "dashed") +
   ylim(c(0.5, 1)) +
   xlim(0.5, 1) +
   geom_text_repel(data = CV_eval_summary,
-                  aes(x = y_spattemp_C, y = y_spattemp_C_c, label = species),
-                  size = 5,
+                  aes(x = y_spat_auc_mean, y = y_spat_auc_mean_c, label = species),
+                  size = 6,
+                  force = 0.5,
+                  max.overlaps = 12) +
+  ylab("mean yearly spat.temp. AUC, routes with change") +
+  xlab("mean yearly spat.temp. AUC, all routes") +
+  theme_bw() +
+  theme(text = element_text(size = 30))
+dev.off()
+
+# same, but spatial only and add information which species passed temporal validation criteria:
+# species okay in time:
+load(file.path("M:", "Documents", "DEBTs", "analysis", "Schifferle_BBS_occupancy_models_2023",
+               "results", "temp_val_buffer_750_10yrs", "temp_eval", "10_years", "spec_set_temp_val_ok1.RData"))
+spec_temp_okay <- specs_thresh
+
+jpeg(file = file.path("plots", "performance_explorations", "spat_CV_all_vs_change_routes_plus_temp.jpg"), 
+     width = 1400, height = 1000, quality = 100)
+CV_eval_summary %>% 
+  mutate(temp_val_fine = ifelse(species %in% spec_temp_okay, "yes", "no")) %>% 
+  ggplot() +
+  geom_point(aes(x = y_spat_auc_mean, y = y_spat_auc_mean_c, colour = as.factor(temp_val_fine)), size = 3) +
+  geom_abline(intercept = 0, slope = 1, linetype = "dashed") +
+  ylim(c(0.5, 0.85)) +
+  xlim(0.6, 1) +
+  scale_colour_manual(values = c("grey70", "dodgerblue3"), name = "temporal performance fine:") +
+  geom_text_repel(data = CV_eval_summary,
+                  aes(x = y_spat_auc_mean, y = y_spat_auc_mean_c, label = species),
+                  size = 6,
                   force = 0.5,
                   max.overlaps = 10) +
-  ylab("y spat.temp. C-index routes with change") +
-  xlab("y spat.temp. C-index all routes") +
+  ylab("mean yearly AUC, routes with change") +
+  xlab("mean yearly AUC, all routes") +
   theme_bw() +
-  theme(text = element_text(size = 35))
+  theme(text = element_text(size = 30), legend.position = "top")
 dev.off()
 
 
@@ -151,14 +178,14 @@ ggplot(data = spec_traits_perf_df) +
   theme(text = element_text(size = 20))
 dev.off()
 
-# spec_traits_perf_df %>% 
-#   filter(trend_corr == 1 | C_ind_10yrs_preds >= 0.7) %>% 
-#   filter(y_spattemp_C >= 0.7) %>% 
-#   filter(y_temp_C >= 0.7 | trend_corr_CV == 1) %>% 
-#   filter(y_spattemp_C_c >= 0.6) %>% 
+# spec_traits_perf_df %>%
+#   filter(trend_corr == 1 | C_ind_10yrs_preds >= 0.7) %>%
+#   filter(y_spattemp_C >= 0.7) %>%
+#   filter(y_temp_C >= 0.7 | trend_corr_CV == 1) %>%
+#   filter(y_spattemp_C_c >= 0.6) %>%
 #   filter(y_temp_C_c >= 0.6) %>%
 #   pull(species)
-# 
+# # 
 # species_fine <- spec_traits_perf_df %>% 
 #   filter(y_spat_auc_mean >= 0.7) %>% 
 #   filter((y_temp_C >= 0.7 | trend_corr_CV > 0) & 
@@ -184,26 +211,28 @@ dev.off()
 #          trend_corr, trend_diff, keep) %>% 
 #   View
 # 
-# species_fine2 <- spec_traits_perf_df %>% 
-#   filter(y_spattemp_C >= 0.7) %>% 
-#   filter(y_temp_C >= 0.8 | (y_temp_C >= 0.6 | trend_corr_CV > 0) | 
-#            (C_ind_10yrs_preds >= 0.8 | (C_ind_10yrs_preds >= 0.6 | trend_corr > 0))) %>% 
+# species_fine2 <- spec_traits_perf_df %>%
+#   filter(y_spattemp_C >= 0.7) %>%
+#   filter(y_temp_C >= 0.8 | (y_temp_C >= 0.7 | trend_corr_CV > 0) |
+#            (C_ind_10yrs_preds >= 0.8 | (C_ind_10yrs_preds >= 0.7 | trend_corr > 0))) %>%
 #   pull(species)
-# # 142
-# species_fine3 <- spec_traits_perf_df %>% 
-#   filter(y_spattemp_C >= 0.7) %>% 
+# # 136
+# 
+# species_fine3 <- spec_traits_perf_df %>%
+#   filter(y_spattemp_C >= 0.7) %>%
 #   filter((y_temp_C >= 0.8 | (y_temp_C >= 0.7 | trend_corr_CV > 0)) &
-#            (C_ind_10yrs_preds >= 0.8 | (C_ind_10yrs_preds >= 0.7 | trend_corr > 0))) %>% 
+#            (C_ind_10yrs_preds >= 0.8 | (C_ind_10yrs_preds >= 0.7 | trend_corr > 0))) %>%
 #   pull(species)
-# species_fine3 # 136
-# # one temp val good, or the other: 136
-# # both: 77
-# species_fine4 <- spec_traits_perf_df %>% 
-#   filter(y_spattemp_C >= 0.7) %>% 
-#   filter(y_temp_C >= 0.8 | C_ind_10yrs_preds >= 0.8 | 
-#            ((y_temp_C >= 0.6 | trend_corr_CV > 0) & (C_ind_10yrs_preds >= 0.6 | trend_corr > 0))) %>% 
+# species_fine3 # 77
+# 
+# # # one temp val good, or the other: 136
+# # # both: 77
+# species_fine4 <- spec_traits_perf_df %>%
+#   filter(y_spattemp_C >= 0.7) %>%
+#   filter(y_temp_C >= 0.8 | C_ind_10yrs_preds >= 0.8 |
+#            ((y_temp_C >= 0.6 | trend_corr_CV > 0) & (C_ind_10yrs_preds >= 0.6 | trend_corr > 0))) %>%
 #   pull(species)
-# species_fine4 # 82
+# species_fine4 # 86
 # # either one C very good
 # # or the other C very good
 # # or either one C medium or trend captured and either other C medium or trend captured
@@ -718,3 +747,4 @@ dt %>%
 
 
 ## ((Elton traits xx)): ----
+

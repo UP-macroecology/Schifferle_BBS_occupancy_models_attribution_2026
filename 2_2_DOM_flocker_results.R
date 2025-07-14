@@ -872,7 +872,7 @@ ggplot(routes_sel_sf) +
           col = "yellow")
 
 
-# fitted values for initial occ, col., ext., occ. prob: ------------------------
+# fitted values for initial occ, col., ext., det. prob: ------------------------
 
 # get values from model:
 
@@ -1217,9 +1217,50 @@ dim(ll1) # 4000, 476
 #   geom_density(aes(x = draw, colour = route)) +
 #   theme(legend.position = "none")
 
+# find mostly irrelevant predictors: ----
+# check whether there are predictors that seem irrelevant for most species:
 
+results_dir <- file.path("results", "full_model", "final_run_750km")
 
+spec_irrel_pars_lst <- vector(mode = "list", length = length(final_species_eco_sorted))
 
+for(i in 1:length(final_species_eco_sorted)){
+  
+  print(i)
+  
+  spec <- final_species_eco_sorted[i]
+  
+  load(file = file.path(results_dir, paste0("out_", spec, "_fm_buffer750.RData")))
+  out
+  
+  interv <- bayesplot::mcmc_intervals_data(out, prob_outer = 0.95)
+  
+  par_names <- interv %>% 
+    filter(ll < 0 & hh > 0) %>% 
+    pull(parameter) %>% 
+    as.character()
+  
+  irrel_pars_spec <- gsub(pattern = "b_((occ)|(colo)|(ex))_", replacement = "", x = par_names) %>% 
+    gsub(pattern = "_3yrs", replacement = "", .) %>% 
+    gsub(pattern = "(Intercept)|(I)|(E2)", replacement = "", .) %>% 
+    table
+  
+  spec_irrel_pars_lst[[i]] <- names(which(irrel_pars_spec == 6)) # they need to be irrelevant for occ, colo and ex (linear and quadratic)
+}
+
+spec_irrel_pars_lst
+
+irrel_sum <- unlist(spec_irrel_pars_lst) %>% 
+  table %>% 
+  sort(decreasing = TRUE)
+# which ones are not in here (= relevant for every species):
+selvar <- c("bio1", "bio2", "bio3", "bio7", "bio14", "bio15", 
+  "pr_spring", "pr_summer","pr_autumn", "pr_winter", "sum_annual_crops", "secdf","pastr", "urban")
+which(!selvar %in% names(irrel_sum))
+# no predictor is relevant for every species
+# bio14 and bio15 are irrelevant for > 2/3 of species
+# Precipitation of Driest Month & Precipitation Seasonality 
+# for 4 most irrelevant predictors I failed to scale them xx
 
 # misc: ----
 
@@ -1236,3 +1277,5 @@ dim(ll1) # 4000, 476
 # library(bayesplot)
 # ppc_dens_overlay(y = y_array, # xx must be vector, doesn't work for repeated surveys!
 #                  yrep = prediction_sites_uncond) # use output of predict_flocker for posterior predictive checking
+
+

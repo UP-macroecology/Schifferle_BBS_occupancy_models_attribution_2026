@@ -28,10 +28,10 @@ print(tempdir())
 #dir <- file.path("/import", "ecoc9z", "data-zurell", "schifferle", "BBS_occupancy_models_2023")
 dir <- getwd()
 
-# results_dir <- file.path("//NAS-2-P-SN-01.ibb.uni-potsdam.de", "users$", "schifferle1", "Documents", "DEBTs", "analysis", 
-#                          "Schifferle_BBS_occupancy_models_2023", "results", "CV_cluster") 
+# results_dir <- file.path("//NAS-2-P-SN-01.ibb.uni-potsdam.de", "users$", "schifferle1", "Documents", "DEBTs", "analysis",
+#                          "Schifferle_BBS_occupancy_models_2023", "results", "CV_cluster")
 results_dir <- file.path("M:", "Documents", "DEBTs", "analysis", "Schifferle_BBS_occupancy_models_2023", 
-                         "results", "CV_buffer750km") 
+                         "results", "CV_buffer750km")
 
 # directory to store CV evaluation metrics:
 if(!dir.exists(file.path(results_dir, "CV_eval"))){
@@ -92,111 +92,113 @@ for(i in 1:length(final_species)){
   
   print(paste(i, spec))
   
-  # load model predictions of each test fold:
-  res_lists_folds <- vector(mode = "list", length = 5)
-  
-  # test whether species data are there:
-  skip_to_next <- FALSE
-  tryCatch(print(load(file = file.path(results_dir, paste0("test_preds_", spec, "_CV_fold5.RData")))),
-           error = function(e) { skip_to_next <<- TRUE})
-  if(skip_to_next) { next }
-  
-  # # test whether script ran already for this species:
-  # if(file.exists(file.path(results_dir, "CV_eval", paste0("CV_eval_", spec, ".RData")))){
-  #   print(paste(spec, "ran alrady."))
-  #   next
+  # # load model predictions of each test fold:
+  # res_lists_folds <- vector(mode = "list", length = 5)
+  # 
+  # # test whether species data are there:
+  # skip_to_next <- FALSE
+  # tryCatch(print(load(file = file.path(results_dir, paste0("test_preds_", spec, "_CV_fold5.RData")))),
+  #          error = function(e) { skip_to_next <<- TRUE})
+  # if(skip_to_next) { next }
+  # 
+  # # # test whether script ran already for this species:
+  # # if(file.exists(file.path(results_dir, "CV_eval", paste0("CV_eval_", spec, ".RData")))){
+  # #   print(paste(spec, "ran alrady."))
+  # #   next
+  # # }
+  # 
+  # # check where to look for model output (did MCMC fitting work with less or only with more iterations?)
+  # if(file.exists(file.path(results_dir, "refit_2000_2000", paste0("out_", spec, "_CV_fold1.RData")))){
+  #   output_dir <- file.path(results_dir, "refit_2000_2000")
+  # } else {
+  #   output_dir <- results_dir
   # }
+  # 
+  # print(output_dir)
+  
+  # for(fold in 1:5){
+  #   
+  #   print(fold)
+  #   
+  #   # assemble fold results:
+  #   load(file = file.path(output_dir, paste0("test_preds_", spec, "_CV_fold", fold, ".RData")))
+  #   res_lists_folds[[fold]] <- res_list
+  # }
+  # 
+  # # find route IDs matching the predictions:
+  # 
+  # # relevant routes for the species, within distance of 750 km of presences:
+  # rel_routes <- training_routes(species = spec, buffer_km = 750, output = "RTENOs")
+  # 
+  # # load fold assignment (sorting important!):
+  # load(file.path("data", "CV_route_block_allocation", "block_size_500km", paste0(spec, ".RData")))
+  # 
+  # test_RTENOs <- c(sort(rel_routes[sb_US$folds_list[[1]][[2]]]), # test data fold 1
+  #                  sort(rel_routes[sb_US$folds_list[[2]][[2]]]),
+  #                  sort(rel_routes[sb_US$folds_list[[3]][[2]]]),
+  #                  sort(rel_routes[sb_US$folds_list[[4]][[2]]]),
+  #                  sort(rel_routes[sb_US$folds_list[[5]][[2]]]))
+  # 
+  # 
+  # # observations can be compared either to the predicted occupancy probability or to predictions of y, in the latter 
+  # # case, imperfect detection is taken into account
+  # 
+  # # observations:
+  # occ_dt_spec <- BBS_pres_abs_spec(species = spec)
+  # 
+  # 
+  # # spatio-temporal C index: ---
+  # 
+  # # how well do we overall discriminate between occupied and non-occupied sites:
+  # 
+  # # calculate overall Harrel's C index:
+  # 
+  # # 1) based on predictions of y (= occupancy (0/1) * detection prob.):
+  # 
+  # # proportion of draws where species is predicted to be detected on a route:
+  # y_preds_all_routes <- rbind(res_lists_folds[[1]]$y_preds_mean,
+  #                             res_lists_folds[[2]]$y_preds_mean,
+  #                             res_lists_folds[[3]]$y_preds_mean,
+  #                             res_lists_folds[[4]]$y_preds_mean,
+  #                             res_lists_folds[[5]]$y_preds_mean)
+  # 
+  # y_preds_obs_df <- as.data.frame(y_preds_all_routes) %>% 
+  #   cbind(test_RTENOs)
+  # colnames(y_preds_obs_df) <- c(years, "RTENO")
+  # 
+  # # add observations:
+  # y_preds_obs_df <- y_preds_obs_df %>% 
+  #   tidyr::pivot_longer(cols = !RTENO, names_to = "Year", values_to = "pred_y_mean") %>% 
+  #   mutate(Year = as.integer(Year)) %>% 
+  #   left_join(occ_dt_spec, by = c("RTENO", "Year")) %>% 
+  #   select(c(RTENO, Year, pred_y_mean, Count10:Count50, presence))
+  # 
+  # # save:
+  # save(y_preds_obs_df, file = file.path(results_dir, "CV_eval", "obs_preds", 
+  #                                       paste0(spec, "_obs_ymean_preds.RData")))
+  # 
+  load(file = file.path(results_dir, "CV_eval", "obs_preds", paste0(spec, "_obs_ymean_preds.RData")))
+  y_preds_obs_df
+  
+  # routes with occupancy change (evaluate also only with regard to those):
+  routes_occ_change <- y_preds_obs_df %>%
+    filter(complete.cases(.)) %>%
+    group_by(RTENO) %>%
+    summarise(occ_change = length(unique(presence))-1) %>% # 1 = occupancy change on that route, 0 = no change
+    filter(occ_change == 1) %>%
+    pull(RTENO)
 
-  # check where to look for model output (did MCMC fitting work with less or only with more iterations?)
-  if(file.exists(file.path(results_dir, "refit_2000_2000", paste0("out_", spec, "_CV_fold1.RData")))){
-    output_dir <- file.path(results_dir, "refit_2000_2000")
-  } else {
-    output_dir <- results_dir
-  }
-  
-  print(output_dir)
-  
-  for(fold in 1:5){
-    
-    print(fold)
-    
-    # assemble fold results:
-    load(file = file.path(output_dir, paste0("test_preds_", spec, "_CV_fold", fold, ".RData")))
-    res_lists_folds[[fold]] <- res_list
-  }
-  
-  # find route IDs matching the predictions:
-  
-  # relevant routes for the species, within distance of 750 km of presences:
-  rel_routes <- training_routes(species = spec, buffer_km = 750, output = "RTENOs")
-  
-  # load fold assignment (sorting important!):
-  load(file.path("data", "CV_route_block_allocation", "block_size_500km", paste0(spec, ".RData")))
-  
-  test_RTENOs <- c(sort(rel_routes[sb_US$folds_list[[1]][[2]]]), # test data fold 1
-                   sort(rel_routes[sb_US$folds_list[[2]][[2]]]),
-                   sort(rel_routes[sb_US$folds_list[[3]][[2]]]),
-                   sort(rel_routes[sb_US$folds_list[[4]][[2]]]),
-                   sort(rel_routes[sb_US$folds_list[[5]][[2]]]))
-  
-  
-  # observations can be compared either to the predicted occupancy probability or to predictions of y, in the latter 
-  # case, imperfect detection is taken into account
-  
-  # observations:
-  occ_dt_spec <- BBS_pres_abs_spec(species = spec)
-  
-  
-  # spatio-temporal C index: ---
-  
-  # how well do we overall discriminate between occupied and non-occupied sites:
-  
-  # calculate overall Harrel's C index:
-  
-  # 1) based on predictions of y (= occupancy (0/1) * detection prob.):
-  
-  # proportion of draws where species is predicted to be detected on a route:
-  y_preds_all_routes <- rbind(res_lists_folds[[1]]$y_preds_mean,
-                              res_lists_folds[[2]]$y_preds_mean,
-                              res_lists_folds[[3]]$y_preds_mean,
-                              res_lists_folds[[4]]$y_preds_mean,
-                              res_lists_folds[[5]]$y_preds_mean)
-  
-  y_preds_obs_df <- as.data.frame(y_preds_all_routes) %>% 
-    cbind(test_RTENOs)
-  colnames(y_preds_obs_df) <- c(years, "RTENO")
-  
-  # add observations:
-  y_preds_obs_df <- y_preds_obs_df %>% 
-    tidyr::pivot_longer(cols = !RTENO, names_to = "Year", values_to = "pred_y_mean") %>% 
-    mutate(Year = as.integer(Year)) %>% 
-    left_join(occ_dt_spec, by = c("RTENO", "Year")) %>% 
-    select(c(RTENO, Year, pred_y_mean, Count10:Count50, presence))
-  
-  # save:
-  save(y_preds_obs_df, file = file.path(results_dir, "CV_eval", "obs_preds", 
-                                        paste0(spec, "_obs_ymean_preds.RData")))
-  
-  
-  # # routes with occupancy change (evaluate also only with regard to those):
-  # routes_occ_change <- y_preds_obs_df %>% 
-  #   filter(complete.cases(.)) %>% 
-  #   group_by(RTENO) %>% 
-  #   summarise(occ_change = length(unique(presence))-1) %>% # 1 = occupancy change on that route, 0 = no change
-  #   filter(occ_change == 1) %>% 
-  #   pull(RTENO)
-  # 
-  # y_preds_obs_df_co <- y_preds_obs_df %>% 
-  #   filter(RTENO %in% routes_occ_change)
-  # 
-  # # all routes:
-  # y_Cind <- Hmisc::rcorr.cens(x = y_preds_obs_df$pred_y_mean, S = y_preds_obs_df$presence, outx=FALSE) # xx
-  # y_auc_overall <- pROC::roc(response = y_preds_obs_df$presence, predictor = y_preds_obs_df$pred_y_mean)$auc
-  # 
-  # # only routes with change in occupancy:
-  # y_Cind_co <- Hmisc::rcorr.cens(x = y_preds_obs_df_co$pred_y_mean, S = y_preds_obs_df_co$presence, outx=FALSE) # xx
-  # y_auc_overall_co <- pROC::roc(response = y_preds_obs_df_co$presence, predictor = y_preds_obs_df_co$pred_y_mean)$auc
-  
+  y_preds_obs_df_co <- y_preds_obs_df %>%
+    filter(RTENO %in% routes_occ_change)
+
+  # all routes:
+  y_Cind <- Hmisc::rcorr.cens(x = y_preds_obs_df$pred_y_mean, S = y_preds_obs_df$presence, outx=FALSE) # xx
+  y_auc_overall <- pROC::roc(response = y_preds_obs_df$presence, predictor = y_preds_obs_df$pred_y_mean)$auc
+
+  # only routes with change in occupancy:
+  y_Cind_co <- Hmisc::rcorr.cens(x = y_preds_obs_df_co$pred_y_mean, S = y_preds_obs_df_co$presence, outx=FALSE) # xx
+  y_auc_overall_co <- pROC::roc(response = y_preds_obs_df_co$presence, predictor = y_preds_obs_df_co$pred_y_mean)$auc
+
   # 2) based on predictions of occupancy probability:
   
   # proportion of draws where species is detected on a route:
@@ -384,62 +386,63 @@ for(i in 1:length(final_species)){
   # 
   # 
   # 
-  # # temporal C indices: ---
-  # 
-  # 
-  # # do we get trends right?
-  # 
-  # # sum predicted detections across all routes for each year
-  # # vs.
-  # # sum observations across all routes for each year
-  # 
-  # # all routes:
-  # 
-  # y_preds_obs_df_temp <- y_preds_obs_df %>% 
-  #   group_by(Year) %>% 
-  #   summarise(sum_obs = sum(presence, na.rm = TRUE),
-  #             sum_preds = sum(pred_y_mean)) # xx
-  # 
-  # 
-  # 
-  # C_Ind_y_temp <- Hmisc::rcorr.cens(x = y_preds_obs_df_temp$sum_preds,
-  #                                   S = y_preds_obs_df_temp$sum_obs, outx=FALSE)
-  # 
-  # # only routes with occupancy change:
-  # 
-  # y_preds_obs_df_temp_co <- y_preds_obs_df_co %>% 
-  #   group_by(Year) %>% 
-  #   summarise(sum_obs = sum(presence, na.rm = TRUE),
-  #             sum_preds = sum(pred_y_mean)) # xx
-  # 
-  # C_Ind_y_temp_co <- Hmisc::rcorr.cens(x = y_preds_obs_df_temp_co$sum_preds,
-  #                                   S = y_preds_obs_df_temp_co$sum_obs, outx=FALSE)
-  # 
-  # 
+  # temporal C indices: ---
+
+
+  # do we get trends right?
+
+  # sum predicted detections across all routes for each year
+  # vs.
+  # sum observations across all routes for each year
+
+  # all routes:
+
+  y_preds_obs_df_temp <- y_preds_obs_df %>%
+    group_by(Year) %>%
+    summarise(sum_obs = sum(presence, na.rm = TRUE),
+              sum_preds = sum(pred_y_mean)) # xx
+
+
+
+  C_Ind_y_temp <- Hmisc::rcorr.cens(x = y_preds_obs_df_temp$sum_preds,
+                                    S = y_preds_obs_df_temp$sum_obs, outx=FALSE)
+
+  # only routes with occupancy change:
+
+  y_preds_obs_df_temp_co <- y_preds_obs_df_co %>%
+    group_by(Year) %>%
+    summarise(sum_obs = sum(presence, na.rm = TRUE),
+              sum_preds = sum(pred_y_mean)) # xx
+
+  C_Ind_y_temp_co <- Hmisc::rcorr.cens(x = y_preds_obs_df_temp_co$sum_preds,
+                                    S = y_preds_obs_df_temp_co$sum_obs, outx=FALSE)
+
+
   # # plot time series:
   # # plot predicted y against observations summed over years:
-  # 
+  #
   # # # directory to save plots:
   # # if(!dir.exists(file.path(results_dir, "CV_eval", "plots_temp_performance"))){
   # #   dir.create(file.path(results_dir, "CV_eval", "plots_temp_performance"), recursive = TRUE)
   # # }
-  # # 
-  # # jpeg(file = file.path(results_dir, "CV_eval", "plots_temp_performance", paste0("CV_temp_C_", spec, ".jpg")), 
-  # #      width = 1000, height = 700, quality = 100)
-  # # print(
-  # #   ggplot(y_preds_obs_df_temp, aes(x = Year)) +
-  # #     geom_line(aes(y = sum_obs)) +
-  # #     geom_point(aes(y = sum_obs), size = 3) +
-  # #     geom_line(aes(y = sum_preds/100), color = "cornflowerblue") + # / 100 because proportion was saved as percent to be integer
-  # #     geom_point(aes(y = sum_preds/100), color = "cornflowerblue", size = 3) +
-  # #     geom_smooth(aes(x = Year, y = sum_obs), method = "lm", color = "black") +
-  # #     geom_smooth(aes(x = Year, y = sum_preds/100), method = "lm", color = "cornflowerblue") +
-  # #     ylab("N routes with presence") +
-  # #     theme_bw() +
-  # #     theme(text = element_text(size = 20)) +
-  # #     ggtitle(paste(spec, "C index temp. CV", round(C_Ind_y_temp["C Index"],2)))
-  # # )
-  # # dev.off()
+  # #
+  # # # jpeg(file = file.path(results_dir, "CV_eval", "plots_temp_performance", paste0("CV_temp_C_", spec, "2.jpg")),
+  # # #      width = 1000, height = 700, quality = 100)
+  # print(
+  #   ggplot(y_preds_obs_df_temp, aes(x = Year)) +
+  #     geom_line(aes(y = sum_obs)) +
+  #     geom_point(aes(y = sum_obs), size = 3) +
+  #     geom_line(aes(y = sum_preds/100), color = "cornflowerblue") + # / 100 because proportion was saved as percent to be integer
+  #     geom_point(aes(y = sum_preds/100), color = "cornflowerblue", size = 3) +
+  #     #geom_smooth(aes(x = Year, y = sum_obs), method = "lm", color = "black") +
+  #     #geom_smooth(aes(x = Year, y = sum_preds/100), method = "lm", color = "cornflowerblue") +
+  #     ylab("N routes with presence") +
+  #     theme_bw() +
+  #     theme(text = element_text(size = 20)) +
+  #     #ggtitle(paste(spec, "C index temp. CV", round(C_Ind_y_temp["C Index"],2)))
+  #   ggtitle(paste0(spec, ", C-index ", round(C_Ind_y_temp["C Index"],2)))
+  # )
+  # # # dev.off()
   # 
   # 
   # # same for comparing observations with occupancy probability:
@@ -621,6 +624,12 @@ CV_eval_summary
 CV_eval_summary <- read.csv(file = file.path(results_dir, "CV_eval", "CV_eval_summary.csv"))
 summary(CV_eval_summary)
 
+CV_eval_summary %>% 
+  filter(y_temp_C_c > 0.9) %>% 
+  pull(species)
+
+
+
 load(file.path(results_dir, "spec_set_temp_val_ok1.RData")) # xx changed
 
 CV_eval_summary %>% 
@@ -720,10 +729,10 @@ for(i in 1:nrow(CV_temp_metrics)){
   print(CV_temp_metrics[i,])
 }
 
-save(CV_temp_metrics, file = file.path(results_dir, "CV_eval", "CV_temp_metrics.RData"))
-
+#save(CV_temp_metrics, file = file.path(results_dir, "CV_eval", "CV_temp_metrics.RData"))
+load(file = file.path(results_dir, "CV_eval", "CV_temp_metrics.RData"))
 CV_temp_metrics
-
+summary(CV_temp_metrics)
 
 # plots: ----
 

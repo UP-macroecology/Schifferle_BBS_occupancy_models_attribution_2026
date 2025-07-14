@@ -1,4 +1,4 @@
-# maps / time series to compare DOM predictions for factual as well as for
+# time series (and maps) to compare DOM predictions for factual as well as for
 # counterfactual environmental data:
 
 # packages: --------------------------------------------------------------------
@@ -52,101 +52,9 @@ US_cells_sf <- read_sf(file.path("data", "cell_centroids_US_ESRI102003.shp")) # 
 US_cells_sf # 4149 cells
 
 
-
-# compare maps of predictions for factual data vs. counterfactual data: --------
-
-# occupancy map 1995 factual, counterfactual, difference
-
-spec <- final_species[123]
-
-# find cells within 750 km buffer around presences:
-spec_pres_buffer_sf <- training_routes(species = spec, buffer_km = 750, output = "buffer")
-
-cells_in_buffer_sf <- clim_lu_cells_sf %>%
-  st_filter(., spec_pres_buffer_sf)
-
-# predictions to factual data:
-load(file.path(res_dir, "fm_preds_US", paste0(spec, "_US_occ_preds.RData")))
-
-# mean occupancy:
-occ_start_stop_sf <- cells_in_buffer_sf %>% 
-  filter(year == 1995) %>% # same cellIDs in each year, doesn't matter which
-  select(cellID) %>% 
-  mutate(occ_mean_1995 = apply(Z[,1,], MARGIN = 1, FUN = mean),
-         occ_mean_2019 = apply(Z[,25,], MARGIN = 1, FUN = mean))
-
-# predictions to counterfactual data:
-
-for(i in selvar_final){
-  
-  print(i)
-  
-  load(file.path(res_dir, "fm_preds_US", "fm_preds_US_counterfactual", 
-                 paste0(spec, "_occ_preds_cf_", i, ".RData")))
-  
-  occ_start_stop_sf <- occ_start_stop_sf %>% 
-    mutate("occ_mean_cf_{i}_1995" := apply(Z_cf[,1,], MARGIN = 1, FUN = mean) / 100,
-           "occ_mean_cf_{i}_2019" := apply(Z_cf[,25,], MARGIN = 1, FUN = mean) / 100,
-           # difference between factal and counterfactual:
-           "diff_cf_{i}_1995" := occ_mean_1995 - !!as.name(paste0("occ_mean_cf_",i,"_1995")),
-           "diff_cf_{i}_2019" := occ_mean_2019 - !!as.name(paste0("occ_mean_cf_",i,"_2019")))
-}
-
-occ_start_stop_sf
-
-
-# convert to raster:
-occ_start_stop_rast <- occ_start_stop_sf %>% 
-  mutate(x = st_coordinates(.)[,1],
-         y = st_coordinates(.)[,2]) %>% 
-  select(x, y, everything(), -cellID) %>% 
-  st_drop_geometry() %>% 
-  rast(., type='xyz', crs=crs(clim_lu_cells_sf))
-
-# occ. and difference in two plots:
-
-# 1) plot mean occupancy factual vs. counterfactual scenarios:
-
-ggplot() +
-  geom_spatraster(data = occ_start_stop_rast %>% select(starts_with("occ"))) +
-  #geom_sf(data = elev_dt, aes(colour = Contour), linewidth = 0.2) +
-  facet_wrap(~lyr, ncol = 7) +
-  scale_fill_viridis_c(na.value = "transparent", option = "plasma", limits = c(0, 1)) +
-  scale_colour_gradientn(colours = c(terrain.colors(8)[-8], "grey80"),
-                         transform = "sqrt", guide = "none") +
-  labs(fill = "occ. prob.") +
-  theme_bw() +
-  theme(plot.margin = unit(c(0.25, 0.25, 0.25, 0.25), "cm"))
-
-# 2) plot differences:
-
-limit_df <- occ_start_stop_sf %>% 
-  select(starts_with("diff")) %>% 
-  st_drop_geometry()
-limit <-abs(max(range(limit_df)))  * c(-1, 1) # to center colour scale
-
-ggplot() +
-  geom_spatraster(data = occ_start_stop_rast %>% select(starts_with("diff"))) +
-  #geom_sf(data = elev_dt, aes(colour = Contour), linewidth = 0.2) +
-  facet_wrap(~lyr, ncol = 7) + 
-  scale_fill_distiller("diff.", type = "div", 
-                       palette = "RdBu", limit = limit, na.value = "transparent",
-                       transform = LightLogR::symlog_trans(base = 2, thr = 0.01),
-                       breaks = c(-0.5, -0.1, 0, 0.1, 0.5)) +
-  #scale_colour_gradientn(colours = c(terrain.colors(8)[-8], "grey80"),
-   #                      transform = "sqrt", guide = "none") +
-  labs(fill = "difference") +
-  theme_bw() +
-  ggtitle(spec) +
-  theme(plot.margin = unit(c(0.25, 0.25, 0.25, 0.25), "cm"))
-
-
-
 # compare time series of sum of occupied routes: -------------------------------
 # observations vs. factual vs. counterfactual:
 
-
-#res_dir <- file.path("M:", "Documents", "DEBTs", "analysis", "Schifferle_BBS_occupancy_models_2023", "results")
 #res_dir <- file.path("T:", "Schifferle_BBS_occupancy_models_2023", "results")
 res_dir <- file.path("//NAS-2-P-SN-01.ibb.uni-potsdam.de", "daten$", "AG26", "Transfer", 
                      "Schifferle_BBS_occupancy_models_2023", "results")
@@ -165,7 +73,7 @@ plot_dir <- file.path("plots", "attribution", "fm_y_preds_routes_cf_1995_all")
 if(!dir.exists(plot_dir)){dir.create(plot_dir, recursive = TRUE)} # xx
 
 
-for(s in 1:5){#length(final_species)){ # 108
+for(s in 108:length(final_species)){ # 108!
   
   spec <- final_species[s]
   
@@ -192,12 +100,12 @@ for(s in 1:5){#length(final_species)){ # 108
     output_dir <- file.path(res_dir, "fm_buffer750km")
   }
   
-  # load(file.path(output_dir, paste0("postproc_", spec, "_fm_buffer750.RData")))
-  # # sum across route sections:
-  # preds_routes <- apply(res_list$y_preds, MAR = c(1,3,4), FUN = max) # as soon as one predicted presence -> 1
-  # # save this:
-  # save(preds_routes, file = file.path(res_dir, "fm_buffer750km", "y_preds_route_level_section_sum", paste0(spec, "_y_preds_route_level_section_sum.RData")))
-  # 
+  #load(file.path(output_dir, paste0("postproc_", spec, "_fm_buffer750.RData")))
+  # sum across route sections:
+  #preds_routes <- apply(res_list$y_preds, MAR = c(1,3,4), FUN = max) # as soon as one predicted presence -> 1
+  # save this:
+  #save(preds_routes, file = file.path(res_dir, "fm_buffer750km", "y_preds_route_level_section_sum", paste0(spec, "_y_preds_route_level_section_sum.RData")))
+
   load(file.path(res_dir, "fm_buffer750km", "y_preds_route_level_section_sum", paste0(spec, "_y_preds_route_level_section_sum.RData")))
   
   # sum across routes for each year:
@@ -288,7 +196,7 @@ for(s in 1:5){#length(final_species)){ # 108
     geom_text_repel(
       aes(color = scenario, label = name_lab),
       fontface = "bold", 
-      size = 6,
+      size = 6, #6
       direction = "y", xlim = c(2020, NA), hjust = 0,
       segment.size = .7, segment.alpha = .5, segment.linetype = 1,
       #box.padding = .4,
@@ -297,7 +205,7 @@ for(s in 1:5){#length(final_species)){ # 108
     ) +
     scale_x_continuous(expand = c(0, 0), limits = c(1995, 2027)) +
     theme(legend.position = "none", panel.grid = element_blank(),
-          text = element_text(size = 20)) +
+          text = element_text(size = 25)) +
     scale_linetype_manual(values = line_type) +
     scale_colour_manual(values = cols)
    p 
@@ -512,90 +420,90 @@ dev.off()
 
 
 
-# (extract predictions for route locations from predictions to whole US): --------
+# compare maps of predictions for factual data vs. counterfactual data: --------
 
-# -> not needed, less error-prone is to directly predict to routes (5_0_DOM_y_predictions_routes_counterfactual_data.R)
+# occupancy map 1995 factual, counterfactual, difference
 
-# # for each species, find cells with routes (=with observations):
-# spec <- final_species[123]
-# 
-# # find cells within 750 km buffer around presences:
-# spec_pres_buffer_sf <- training_routes(species = spec, buffer_km = 750, output = "buffer")
-# cells_in_buffer_sf <- clim_lu_cells_sf %>%
-#   st_filter(., spec_pres_buffer_sf)
-# 
-# # route locations:
-# routes_in_buffer <- training_routes(species = spec, buffer_km = 750, output = "RTENO") 
-# routes_in_buffer_sf <- routes_sel_sf %>% 
-#   filter(RTENO_BBS %in% routes_in_buffer)
-# # plot(st_geometry(routes_sel_sf))
-# # plot(st_geometry(routes_in_buffer_sf), col = "blue", add = TRUE)
-# 
-# routes_in_buffer_sf # route centroid
-# cells_in_buffer_sf # cell centroid
-# 
-# # convert cell centroids to raster to then extract values for route locations:
-# test <- cells_in_buffer_sf %>% 
-#   filter(year == 1995) %>%  # arbitrary
-#   mutate(x = st_coordinates(.)[,1],
-#          y = st_coordinates(.)[,2]) %>% 
-#   select(x, y, cellID) %>% 
-#   st_drop_geometry() %>% 
-#   rast(., type='xyz', crs=crs(clim_lu_cells_sf))
-# plot(test) # cellIDs
-# plot(st_geometry(routes_in_buffer_sf), col = "blue", add = TRUE) # route cemtroids
-# 
-# 
-# # compare to original raster:
-# lu <- rast(file.path("data", "Env_data", "ISIMIP_land_use_and_irrigation",
-#                      "ISIMIP_LU_ESRI102003", "managed_pastures_1995_ESRI102003.tif"))
-# 
-# # all cells, not only those in buffer:
-# test_all <- clim_lu_cells_sf %>% 
-#   filter(year == 1995) %>%  # arbitrary
-#   mutate(x = st_coordinates(.)[,1],
-#          y = st_coordinates(.)[,2]) %>% 
-#   select(x, y, cellID) %>% 
-#   st_drop_geometry() %>% 
-#   rast(., type='xyz', crs=crs(clim_lu_cells_sf))
-# 
-# plot(lu)
-# plot(st_geometry(cells_in_buffer_sf), add = TRUE)
-# # which are the cells in which we have a cell-in-buffer-centroid?
-# rel_cells <- extract(lu, cells_in_buffer_sf %>% filter(year == 1995), cells = TRUE)
-# rel_cells # including cell numbers
-# # Z predictions refer to cell numbers of buffered raster:
-# 
-# # load predictions across US to factual data:
-# load(file.path(res_dir, "fm_preds_US", paste0(spec, "_US_occ_preds.RData")))
-# dim(Z) # 2636 cells, 25, 1000
-# nrow(rel_cells) # 2636
-# 
-# # predictions for first year:
-# f_preds1 <- Z[,1,1]
-# # we have 2636 predictions, but now we only want those for which we have matching observations:
-# # convert predictions to raster, extract route locations:
-# preds_sf <- cells_in_buffer_sf %>% filter(year == 1995) %>% 
-#   select(cellID) %>% 
-#   cbind(f_preds1)
-# plot(preds_sf[2])
-# preds_rast <- preds_sf %>% 
-#   mutate(x = st_coordinates(.)[,1],
-#          y = st_coordinates(.)[,2]) %>% 
-#   select(x, y, f_preds1) %>% 
-#   st_drop_geometry() %>% 
-#   rast(., type='xyz', crs=crs(clim_lu_cells_sf))
-# 
-# plot(preds_rast)
-# plot(st_geometry(routes_in_buffer_sf), add = TRUE)
-# preds_at_route_locations <- extract(preds_rast, routes_in_buffer_sf)
-# preds_at_route_locations
-# nrow(preds_at_route_locations) # 373
-# nrow(routes_in_buffer_sf) # 373
-# 
-# # compare to predictions to route locations:
-# load(file.path(res_dir, "fm_buffer750km", paste0("postproc_", spec, "_fm_buffer750.RData")))
-# preds_at_route_locations %>% 
-#   mutate(pred_routes = round(res_list$occ_posterior[,1,1], 3)) %>%
-#   mutate(diff = f_preds1 - pred_routes) %>% View
-# # difference seems only in rounding?
+spec <- final_species[123]
+
+# find cells within 750 km buffer around presences:
+spec_pres_buffer_sf <- training_routes(species = spec, buffer_km = 750, output = "buffer")
+
+cells_in_buffer_sf <- clim_lu_cells_sf %>%
+  st_filter(., spec_pres_buffer_sf)
+
+# predictions to factual data:
+load(file.path(res_dir, "fm_preds_US", paste0(spec, "_US_occ_preds.RData")))
+
+# mean occupancy:
+occ_start_stop_sf <- cells_in_buffer_sf %>% 
+  filter(year == 1995) %>% # same cellIDs in each year, doesn't matter which
+  select(cellID) %>% 
+  mutate(occ_mean_1995 = apply(Z[,1,], MARGIN = 1, FUN = mean),
+         occ_mean_2019 = apply(Z[,25,], MARGIN = 1, FUN = mean))
+
+# predictions to counterfactual data:
+
+for(i in selvar_final){
+  
+  print(i)
+  
+  load(file.path(res_dir, "fm_preds_US", "fm_preds_US_counterfactual", 
+                 paste0(spec, "_occ_preds_cf_", i, ".RData")))
+  
+  occ_start_stop_sf <- occ_start_stop_sf %>% 
+    mutate("occ_mean_cf_{i}_1995" := apply(Z_cf[,1,], MARGIN = 1, FUN = mean) / 100,
+           "occ_mean_cf_{i}_2019" := apply(Z_cf[,25,], MARGIN = 1, FUN = mean) / 100,
+           # difference between factal and counterfactual:
+           "diff_cf_{i}_1995" := occ_mean_1995 - !!as.name(paste0("occ_mean_cf_",i,"_1995")),
+           "diff_cf_{i}_2019" := occ_mean_2019 - !!as.name(paste0("occ_mean_cf_",i,"_2019")))
+}
+
+occ_start_stop_sf
+
+
+# convert to raster:
+occ_start_stop_rast <- occ_start_stop_sf %>% 
+  mutate(x = st_coordinates(.)[,1],
+         y = st_coordinates(.)[,2]) %>% 
+  select(x, y, everything(), -cellID) %>% 
+  st_drop_geometry() %>% 
+  rast(., type='xyz', crs=crs(clim_lu_cells_sf))
+
+# occ. and difference in two plots:
+
+# 1) plot mean occupancy factual vs. counterfactual scenarios:
+
+ggplot() +
+  geom_spatraster(data = occ_start_stop_rast %>% select(starts_with("occ"))) +
+  #geom_sf(data = elev_dt, aes(colour = Contour), linewidth = 0.2) +
+  facet_wrap(~lyr, ncol = 7) +
+  scale_fill_viridis_c(na.value = "transparent", option = "plasma", limits = c(0, 1)) +
+  scale_colour_gradientn(colours = c(terrain.colors(8)[-8], "grey80"),
+                         transform = "sqrt", guide = "none") +
+  labs(fill = "occ. prob.") +
+  theme_bw() +
+  theme(plot.margin = unit(c(0.25, 0.25, 0.25, 0.25), "cm"))
+
+# 2) plot differences:
+
+limit_df <- occ_start_stop_sf %>% 
+  select(starts_with("diff")) %>% 
+  st_drop_geometry()
+limit <-abs(max(range(limit_df)))  * c(-1, 1) # to center colour scale
+
+ggplot() +
+  geom_spatraster(data = occ_start_stop_rast %>% select(starts_with("diff"))) +
+  #geom_sf(data = elev_dt, aes(colour = Contour), linewidth = 0.2) +
+  facet_wrap(~lyr, ncol = 7) + 
+  scale_fill_distiller("diff.", type = "div", 
+                       palette = "RdBu", limit = limit, na.value = "transparent",
+                       transform = LightLogR::symlog_trans(base = 2, thr = 0.01),
+                       breaks = c(-0.5, -0.1, 0, 0.1, 0.5)) +
+  #scale_colour_gradientn(colours = c(terrain.colors(8)[-8], "grey80"),
+  #                      transform = "sqrt", guide = "none") +
+  labs(fill = "difference") +
+  theme_bw() +
+  ggtitle(spec) +
+  theme(plot.margin = unit(c(0.25, 0.25, 0.25, 0.25), "cm"))
+
