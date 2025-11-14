@@ -127,6 +127,10 @@ det_prob_df <- read.csv(file.path("data", "detection_probability_fm.csv"))
 
 # explore detection probability and traits: ------------------------------------
 
+# species for which model performance was acceptable:
+load(file = file.path("data", "species_DOM_val_okay.RData"))
+spec_okay
+
 load(file.path("data", "BBS_data_merged.RData"))
 
 det_prob_traits <- bbs_dt %>% 
@@ -239,7 +243,9 @@ ggplot(det_prob_traits,
   theme_bw()
 
 # spatial AUC and detection probability:
-ggplot(det_prob_traits) +
+det_prob_traits %>% 
+  filter(perf_fine == 1) %>% 
+  ggplot() +
   geom_point(aes(x = det_prob_median_mean, y = occ_spat_auc_mean)) +
   xlab("mean detection probability across route sections") +
   ylab("mean spatial AUC") +
@@ -253,13 +259,31 @@ load(file.path("M:", "Documents", "DEBTs", "analysis", "Schifferle_BBS_occupancy
 temp_val_metrics
 
 det_prob_traits %>% 
+  filter(perf_fine == 1) %>%
   left_join(temp_val_metrics) %>% 
   ggplot() +
-  geom_point(aes(x = det_prob_median_mean, y = rmse)) +
+  geom_point(aes(x = det_prob_median_mean, y = mape)) +
   xlab("mean detection probability across route sections") +
-  #ylab("mean absolute percentage error time series") +
+  ylab("mean absolute percentage error time series") +
   #ylab("temporal C index") +
-  ylab("root mean squared error") +
-  geom_smooth(aes(x = det_prob_median_mean, y = rmse), method = "lm") +
+  #ylab("root mean squared error") +
+  geom_smooth(aes(x = det_prob_median_mean, y = mape), method = "lm") +
   theme_bw() +
   theme(text = element_text(size = 16))
+
+
+# median detection probability and family:
+det_prob_traits %>% 
+  ggplot() +
+  geom_boxplot(aes(x = forcats::fct_reorder(Family, det_prob_median_mean), 
+                   y = det_prob_median_mean, 
+                   fill = perf_fine))+
+  coord_flip() +
+  theme_bw()
+
+det_prob_traits %>% 
+  ggplot() +
+  geom_boxplot(aes(x = forcats::fct_reorder(Family, det_prob_median_mean), 
+                   y = det_prob_median_mean))+
+  coord_flip() +
+  theme_bw()

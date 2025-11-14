@@ -133,7 +133,7 @@ for(i in 1:length(vars)){
 }
 
 
-# detrending using ATTRICI Python package (Mengel et al. 2021): ----------------
+# detrending using ATTRICI tool (Mengel et al. 2021): ----------------
 
 # (requires CDO installation on the HPC)
 # cloned bootstrapping branch (recommended by Matthias Mengel): https://github.com/ISI-MIP/attrici/tree/bootstrapping

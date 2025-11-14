@@ -1,11 +1,14 @@
 # use DOMs to predict detections (y) for ISIMIP:
 # obsclim + histsoc and 
 # counterclim + histsoc
+# obsclim + 1901soc
 # 1901 - 2019
 # for selected BBS routes
 
 # obsclim + histsoc or counterclim + histsoc:
 obsclim <- TRUE
+# histsoc or 1901soc
+histsoc <- FALSE
 
 
 # packages: --------------------------------------------------------------------
@@ -33,8 +36,11 @@ registerDoParallel(cl)
 # directories: -----------------------------------------------------------------
 
 # logfiles:
-log_dir <- file.path("logfiles", "ISIMIP", ifelse(obsclim, "obsclim_histsoc", "counterclim_histsoc"))
+log_dir <- file.path("logfiles", "ISIMIP", ifelse(obsclim, 
+                                                  ifelse(histsoc, "obsclim_histsoc", "obsclim_1901soc"),
+                                                  "counterclim_histsoc"))
 if(!dir.exists(log_dir)){dir.create(log_dir, recursive = TRUE)}
+
 
 # directory with results, fitted models:
 
@@ -42,7 +48,9 @@ if(!dir.exists(log_dir)){dir.create(log_dir, recursive = TRUE)}
 res_dir <- file.path("/mnt", "ibb_share", "zurell_transfer", "Schifferle_BBS_occupancy_models_2023", "results")
 
 # directory to store predictions:
-preds_dir <- file.path(res_dir, "fm_preds_ISIMIP", ifelse(obsclim, "obsclim_histsoc", "counterclim_histsoc")) 
+preds_dir <- file.path(res_dir, "fm_preds_ISIMIP", ifelse(obsclim, 
+                                                          ifelse(histsoc, "obsclim_histsoc", "obsclim_1901soc"), 
+                                                          "counterclim_histsoc")) 
 if(!dir.exists(preds_dir)){dir.create(preds_dir, recursive = TRUE)}
 
 
@@ -51,11 +59,15 @@ if(!dir.exists(preds_dir)){dir.create(preds_dir, recursive = TRUE)}
 # routes-years:
 load(file = file.path("data", "BBS_for_occ_selection.RData")) # route_sel_dt; output of 1_3_match_BBS_to_env_data.R 
 
-if(obsclim == TRUE){
+if(obsclim & histsoc){
   load(file = file.path("data", "route_sel_env_dt_ISIMIP_obsclim.RData")) 
+} else if (obsclim & !histsoc){
+  load(file = file.path("data", "route_sel_env_dt_ISIMIP_obsclim_1901soc.RData")) 
+  route_sel_env_dt_ISIMIP <- route_sel_env_dt_ISIMIP_obsclim_1901soc
 } else{
   load(file = file.path("data", "route_sel_env_dt_ISIMIP_counterclim.RData"))
 }  # route_sel_env_dt_ISIMIP; output of 1_3_match_routes_env_data_ISIMIP.R 
+
 
 # route-year-species information (only surveyed)
 load(file = file.path("data", "BBS_for_occ_spec_records.RData")) # bbs_dt_occ; output of 1_0_reformat_BBS_data.R
@@ -199,7 +211,9 @@ foreach(spec = final_species[1:5],#length(final_species)], # xx
           # save predictions:
           
           # use counterfactual data also for predictions of initial occupancy:
-          save(y_preds_route, file = file.path(preds_dir,  paste0(spec, "_y_preds_", ifelse(obsclim, "obsclim_histsoc", "counterclim_histsoc"), ".RData")))
+          save(y_preds_route, file = file.path(preds_dir,  paste0(spec, "_y_preds_", ifelse(obsclim, 
+                                                                                            ifelse(histsoc, "obsclim_histsoc", "obsclim_1901soc"),
+                                                                                            "counterclim_histsoc"), ".RData")))
           
           sink(type="message")
           sink(type="output")

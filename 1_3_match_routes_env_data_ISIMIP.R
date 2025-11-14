@@ -11,6 +11,7 @@
 
 library(dplyr)
 library(sf)
+library(terra)
 
 # obsclim or counterclim:
 #env_path <- file.path("data", "Env_data")
@@ -159,6 +160,52 @@ if(env_path  == file.path("data", "Env_data")){
 }
 
 
+
+# 1901soc - extract land use data: ----
+
+
+# store values of year i in sf:
+routes_sel_year_sf <- routes_sel_sf %>%
+  mutate(Year = 1901)
+
+# land use variables of year i:
+lu_year <- rast(lu_files[which(grepl(paste0("[a-z]_1901_ESRI102003.tif$"), lu_files))])
+# reduce to selected variables:
+lu_year_sel <- lu_year[[selvar_final[!grepl(pattern = "bio|pr_|mean", x = selvar_final)]]] # xx
+# extract values of each land use class at each relevant route location:
+for(luvar in names(lu_year_sel)){
+  routes_sel_year_sf[, luvar] <- lu_year_sel[[luvar]] %>% 
+    terra::extract(y = routes_sel_year_sf) %>% 
+    pull(luvar)
+}
+routes_sel_year_sf 
+# as data frame:
+route_sel_env_dt1901 <- routes_sel_year_sf %>% 
+  st_drop_geometry()
+
+# match to obsclim data:
+load(file = file.path("data", "route_sel_env_dt_ISIMIP_obsclim.RData"))
+route_sel_env_dt_ISIMIP
+# land use variables:
+lu_vars <- selvar_final[!grepl(pattern = "bio|pr_|mean", x = selvar_final)]
+
+route_sel_env_dt_ISIMIP_obsclim_1901soc <- route_sel_env_dt_ISIMIP %>% 
+  # replace histsoc with 1901soc:
+  select(-matches(lu_vars)) %>% 
+  left_join(route_sel_env_dt1901, by = "RTENO_BBS") %>% 
+  mutate(urbanareas_3yrs = urbanareas,
+         managed_pastures_3yrs = managed_pastures,
+         primary_nonforests_3yrs = primary_nonforests,
+         secondary_nonforests_3yrs = secondary_nonforests,
+         sum_annual_crops_3yrs = sum_annual_crops) %>% 
+  select(-Year.y) %>% 
+  rename(Year = Year.x)
+colnames(route_sel_env_dt_ISIMIP_obsclim_1901soc)
+
+# save:
+save(route_sel_env_dt_ISIMIP_obsclim_1901soc, file = file.path("data", "route_sel_env_dt_ISIMIP_obsclim_1901soc.RData"))
+write.csv(route_sel_env_dt_ISIMIP, file = file.path("data", "route_sel_env_dt_ISIMIP_obsclim_1901soc.csv"),
+          row.names = FALSE)
 
 # some explorations: ----
 

@@ -132,6 +132,7 @@ for(i in 1:nrow(high_k_overview_df)){
   }
 
 save(high_k_overview_df, file = file.path("data", "high_k_routes_overview.RData"))
+load(file = file.path("data", "high_k_routes_overview.RData"))
 summary(high_k_overview_df)
 
 

@@ -118,6 +118,10 @@ foreach(s = 1:length(final_species),
   ts_ci90 <- apply(preds_years, MAR = 1, FUN = bayestestR::ci, ci = 0.9, method = "ETI")
   ts_ci90_low <- unlist(lapply(ts_ci90, FUN = function(x) x$CI_low))
   ts_ci90_high <- unlist(lapply(ts_ci90, FUN = function(x) x$CI_high))
+  # 80% credible interval
+  ts_ci80 <- apply(preds_years, MAR = 1, FUN = bayestestR::ci, ci = 0.8, method = "ETI")
+  ts_ci80_low <- unlist(lapply(ts_ci80, FUN = function(x) x$CI_low))
+  ts_ci80_high <- unlist(lapply(ts_ci80, FUN = function(x) x$CI_high))
   
   # add 100 draws of posterior distribution for each year:
   n_draws <- 100
@@ -135,13 +139,18 @@ foreach(s = 1:length(final_species),
   #   geom_smooth(method = "lm")
 
   # assemble df:
-  ts_preds_fact <- tibble(year = 1995:2019, median_Nocc_f = ts_median, CI90low_f = ts_ci90_low, CI90high_f = ts_ci90_high) %>% 
+  ts_preds_fact <- tibble(year = 1995:2019, 
+                          median_Nocc = ts_median, 
+                          CI90low = ts_ci90_low, 
+                          CI90high = ts_ci90_high,
+                          CI80low = ts_ci80_low, 
+                          CI80high = ts_ci80_high) %>% 
     left_join(draws)
   
   # # plot:
   # ggplot(ts_preds_fact) +
-  #   geom_line(aes(x = year, y = median_Nocc_f)) +
-  #   geom_ribbon(aes(x = year, ymax = CI90high_f, ymin = CI90low_f),
+  #   geom_line(aes(x = year, y = median_Nocc)) +
+  #   geom_ribbon(aes(x = year, ymax = CI90high, ymin = CI90low),
   #               alpha = 0.2, fill = "cornflowerblue") +
   #   ggtitle(spec) +
   #   theme_bw()
@@ -180,6 +189,10 @@ foreach(s = 1:length(final_species),
     ts_ci90 <- apply(preds_years, MAR = 1, FUN = bayestestR::ci, ci = 0.9, method = "ETI")
     ts_ci90_low <- unlist(lapply(ts_ci90, FUN = function(x) x$CI_low))
     ts_ci90_high <- unlist(lapply(ts_ci90, FUN = function(x) x$CI_high))
+    # 80% credible interval
+    ts_ci80 <- apply(preds_years, MAR = 1, FUN = bayestestR::ci, ci = 0.8, method = "ETI")
+    ts_ci80_low <- unlist(lapply(ts_ci80, FUN = function(x) x$CI_low))
+    ts_ci80_high <- unlist(lapply(ts_ci80, FUN = function(x) x$CI_high))
     
     # add 100 draws of posterior distribution for each year:
     n_draws <- 100
@@ -192,21 +205,33 @@ foreach(s = 1:length(final_species),
     
     if(scen == "counterclim"){
 
-      ts_preds_cfact_clim <- tibble(year = 1995:2019, median_Nocc_cf_clim = ts_median, 
-                                    CI90low_cf_clim = ts_ci90_low, CI90high_cf_clim = ts_ci90_high) %>% 
+      ts_preds_cfact_clim <- tibble(year = 1995:2019, 
+                                    median_Nocc = ts_median, 
+                                    CI90low = ts_ci90_low, 
+                                    CI90high = ts_ci90_high,
+                                    CI80low = ts_ci80_low, 
+                                    CI80high = ts_ci80_high) %>% 
         left_join(draws)
       
     } else if(scen == "1995soc"){
       
-      ts_preds_cfact_1995soc <- tibble(year = 1995:2019, median_Nocc_cf_1995soc = ts_median, 
-                               CI90low_cf_1995soc = ts_ci90_low, CI90high_cf_1995soc = ts_ci90_high) %>% 
+      ts_preds_cfact_1995soc <- tibble(year = 1995:2019, 
+                                       median_Nocc = ts_median,
+                                       CI90low = ts_ci90_low, 
+                                       CI90high = ts_ci90_high,
+                                       CI80low = ts_ci80_low, 
+                                       CI80high = ts_ci80_high) %>% 
         left_join(draws)
       
       
     } else {
       
-      ts_preds_cfact_clim_1995soc <- tibble(year = 1995:2019, median_Nocc_cf_clim_1995soc = ts_median, 
-                                            CI90low_cf_clim_1995soc = ts_ci90_low, CI90high_cf_clim_1995soc = ts_ci90_high) %>% 
+      ts_preds_cfact_clim_1995soc <- tibble(year = 1995:2019, 
+                                            median_Nocc = ts_median, 
+                                            CI90low = ts_ci90_low, 
+                                            CI90high = ts_ci90_high,
+                                            CI80low = ts_ci80_low, 
+                                            CI80high = ts_ci80_high) %>% 
         left_join(draws)
       
     }

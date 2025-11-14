@@ -36,7 +36,7 @@ load(file = file.path("data", "species_ecoregions.RData")) # spec_eco_df; output
 # cross validation:
 CV_eval_summary <- read.csv(file = file.path(results_dir,  "CV_buffer750km", "CV_eval", "CV_eval_summary.csv")) # output of 3_1_DOM_CV_evaluation_metrics.R
 # temporal validation:
-load(file = file.path(results_dir, "temp_val_buffer_750_10yrs", "temp_eval", "10_years", "temp_val_metrics_final.RData")) # C_temp_val_df; output of 3_1_DOM_temp_val_eval.R
+load(file = file.path(results_dir, "temp_val_buffer_750_10yrs", "temp_eval", "10_years", "temp_val_metrics_final.RData")) # output of 3_1_DOM_temp_evaluation_metrics.R
 temp_val_metrics
 
 
@@ -748,3 +748,44 @@ dt %>%
 
 ## ((Elton traits xx)): ----
 
+## temporal performance according to criteria set and species: ----
+
+load(file = file.path("data", "species_DOM_val_okay.RData"))
+spec_okay
+
+
+final_val_expl_df <- tibble(species = final_species) %>% 
+  mutate(val_okay = factor(ifelse(species %in% spec_okay, "yes", "no"))) %>% 
+  # add traits and phylogenetic information:
+  left_join(bbs_dt %>% 
+              select(English_Common_Name, Family, ORDER, HWI, Mass, Habitat, Migration, Trophic.Level, Trophic.Niche, Primary.Lifestyle, Range.Size, Centroid.Latitude, Centroid.Longitude) %>% distinct,
+            by = c(species = "English_Common_Name"))
+final_val_expl_df
+
+ggplot(final_val_expl_df) +
+  geom_boxplot(aes(x = val_okay, y = Range.Size)) +
+  theme_bw()
+# range size. centroid latitude and longitude not important
+# HWI and Mass not important
+
+final_val_expl_df %>% 
+  group_by(Family, val_okay) %>% 
+  summarise(n = n()) %>% 
+  ggplot() +
+  geom_linerange(aes(x = Family, 
+                     ymin = 0, ymax = n)) +
+  geom_point(aes(y = n, x = Family, colour = val_okay)) +
+  coord_flip() +
+  theme_bw()
+
+final_val_expl_df %>% 
+  group_by(Primary.Lifestyle, val_okay) %>% 
+  summarise(n = n()) %>% 
+  ggplot() +
+  geom_linerange(aes(x = Primary.Lifestyle, 
+                     ymin = 0, ymax = n)) +
+  geom_point(aes(y = n, x = Primary.Lifestyle, colour = val_okay)) +
+  coord_flip() +
+  theme_bw()
+# Habitat, Migration, Trophic.Level, Trophic.Niche, Primary.Lifestyle
+# no clear difference!
