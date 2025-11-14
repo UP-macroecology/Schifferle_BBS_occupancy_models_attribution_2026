@@ -1,8 +1,12 @@
 # calculate evaluation measures for cross validation 
 # (model predictions generated with 2_1_DOM_flocker_CV.R)
 
-#  calculate Harrel's C indices
-# - spatially, temporally
+# spatio-temporal: AUC, C-index (same here xx)
+# spatial: mean yearly AUC, C-index  (same here xx)
+# (discarded: temporal: C-index, correlation of linear trends)
+
+# based on predictions of y (occ. prob. * det. prob.) and of occ. prob.
+# for all sites and only for sites with change
 
 
 # packages: ----
@@ -11,10 +15,10 @@ library(dplyr)
 library(flocker)
 library(sf)
 library(ggplot2)
+library(ggrepel)
 library(cmdstanr)
 #set_cmdstan_path(path = NULL)#set_cmdstan_path("C:/Users/schifferle1/Documents/cmdstan-2.34.1") # xx
 set_cmdstan_path("C:/Users/schifferle1/Documents/cmdstan-2.34.1")
-library(ggrepel)
 
 
 # functions: ----
@@ -28,10 +32,8 @@ print(tempdir())
 #dir <- file.path("/import", "ecoc9z", "data-zurell", "schifferle", "BBS_occupancy_models_2023")
 dir <- getwd()
 
-# results_dir <- file.path("//NAS-2-P-SN-01.ibb.uni-potsdam.de", "users$", "schifferle1", "Documents", "DEBTs", "analysis",
-#                          "Schifferle_BBS_occupancy_models_2023", "results", "CV_cluster")
-results_dir <- file.path("M:", "Documents", "DEBTs", "analysis", "Schifferle_BBS_occupancy_models_2023", 
-                         "results", "CV_buffer750km")
+results_dir <- file.path("//NAS-2-P-SN-01.ibb.uni-potsdam.de", "users$", "schifferle1", "Documents", "DEBTs", "analysis",
+                         "Schifferle_BBS_occupancy_models_2023", "results", "CV_buffer750km")
 
 # directory to store CV evaluation metrics:
 if(!dir.exists(file.path(results_dir, "CV_eval"))){
@@ -84,13 +86,16 @@ years <- min(route_sel_dt$Year):max(route_sel_dt$Year)
 load(file = file.path("data", "species_set_analysis.RData"))
 final_species
 
-# evaluation metrics calculation: ----
+
+# calculate evaluation metrics for single species: ----
 
 for(i in 1:length(final_species)){
 
   spec <- final_species[i]
   
   print(paste(i, spec))
+  
+  # prepare data (calculate time series from predictions):
   
   # # load model predictions of each test fold:
   # res_lists_folds <- vector(mode = "list", length = 5)
@@ -147,14 +152,6 @@ for(i in 1:length(final_species)){
   # occ_dt_spec <- BBS_pres_abs_spec(species = spec)
   # 
   # 
-  # # spatio-temporal C index: ---
-  # 
-  # # how well do we overall discriminate between occupied and non-occupied sites:
-  # 
-  # # calculate overall Harrel's C index:
-  # 
-  # # 1) based on predictions of y (= occupancy (0/1) * detection prob.):
-  # 
   # # proportion of draws where species is predicted to be detected on a route:
   # y_preds_all_routes <- rbind(res_lists_folds[[1]]$y_preds_mean,
   #                             res_lists_folds[[2]]$y_preds_mean,
@@ -177,10 +174,43 @@ for(i in 1:length(final_species)){
   # save(y_preds_obs_df, file = file.path(results_dir, "CV_eval", "obs_preds", 
   #                                       paste0(spec, "_obs_ymean_preds.RData")))
   # 
+  
+  # # predictions of occupancy probability:
+  # # proportion of draws where species is detected on a route:
+  # occ_preds_all_routes <- rbind(res_lists_folds[[1]]$occ_posterior_mean,
+  #                               res_lists_folds[[2]]$occ_posterior_mean,
+  #                               res_lists_folds[[3]]$occ_posterior_mean,
+  #                               res_lists_folds[[4]]$occ_posterior_mean,
+  #                               res_lists_folds[[5]]$occ_posterior_mean)
+  # 
+  # occ_preds_obs_df <- as.data.frame(occ_preds_all_routes) %>% 
+  #   cbind(test_RTENOs)
+  # colnames(occ_preds_obs_df) <- c(years, "RTENO")
+  # 
+  # # add observations:
+  # occ_preds_obs_df <- occ_preds_obs_df %>% 
+  #   tidyr::pivot_longer(cols = !RTENO, names_to = "Year", values_to = "pred_occ_mean") %>% 
+  #   mutate(Year = as.integer(Year)) %>% 
+  #   left_join(occ_dt_spec, by = c("RTENO", "Year")) %>% 
+  #   select(c(RTENO, Year, pred_occ_mean, Count10:Count50, presence))
+  # 
+  # # save:
+  # save(occ_preds_obs_df, file = file.path(results_dir, "CV_eval", "obs_preds", 
+  #                                         paste0(spec, "_obs_occmean_preds.RData")))
+  
+  
+  # spatio-temporal evaluation: ---
+
+  # how well do we overall discriminate between occupied and non-occupied sites:
+
+  # calculate overall Harrel's C index and AUC:
+
+  # 1) based on predictions of y (= occupancy (0/1) * detection prob.):
+  
   load(file = file.path(results_dir, "CV_eval", "obs_preds", paste0(spec, "_obs_ymean_preds.RData")))
   y_preds_obs_df
   
-  # routes with occupancy change (evaluate also only with regard to those):
+  # only routes with change in detection status:
   routes_occ_change <- y_preds_obs_df %>%
     filter(complete.cases(.)) %>%
     group_by(RTENO) %>%
@@ -201,38 +231,12 @@ for(i in 1:length(final_species)){
 
   # 2) based on predictions of occupancy probability:
   
-  # proportion of draws where species is detected on a route:
-  occ_preds_all_routes <- rbind(res_lists_folds[[1]]$occ_posterior_mean,
-                                res_lists_folds[[2]]$occ_posterior_mean,
-                                res_lists_folds[[3]]$occ_posterior_mean,
-                                res_lists_folds[[4]]$occ_posterior_mean,
-                                res_lists_folds[[5]]$occ_posterior_mean)
-  
-  # occ_preds_all_routes <- rbind(res_lists_folds[[1]]$occ_posterior_median,
-  #                               res_lists_folds[[2]]$occ_posterior_median,
-  #                               res_lists_folds[[3]]$occ_posterior_median,
-  #                               res_lists_folds[[4]]$occ_posterior_median,
-  #                               res_lists_folds[[5]]$occ_posterior_median)
-  
-  occ_preds_obs_df <- as.data.frame(occ_preds_all_routes) %>% 
-    cbind(test_RTENOs)
-  colnames(occ_preds_obs_df) <- c(years, "RTENO")
-  
-  # add observations:
-  occ_preds_obs_df <- occ_preds_obs_df %>% 
-    tidyr::pivot_longer(cols = !RTENO, names_to = "Year", values_to = "pred_occ_mean") %>% 
-    mutate(Year = as.integer(Year)) %>% 
-    left_join(occ_dt_spec, by = c("RTENO", "Year")) %>% 
-    select(c(RTENO, Year, pred_occ_mean, Count10:Count50, presence))
-  
-  # save:
-  save(occ_preds_obs_df, file = file.path(results_dir, "CV_eval", "obs_preds", 
-                                        paste0(spec, "_obs_occmean_preds.RData")))
-  
+  load(file = file.path(results_dir, "CV_eval", "obs_preds", paste0(spec, "_obs_occmean_preds.RData")))
+  occ_preds_obs_df
+
   # # all routes:
   # occ_Cind <- Hmisc::rcorr.cens(x = occ_preds_obs_df$pred_occ_mean, S = occ_preds_obs_df$presence, outx=FALSE)
   # occ_auc_overall <- pROC::roc(response = occ_preds_obs_df$presence, predictor = occ_preds_obs_df$pred_occ_mean)$auc
-  # 
   # 
   # # only routes with change in occupancy:
   # 
@@ -242,8 +246,8 @@ for(i in 1:length(final_species)){
   # occ_Cind_co <- Hmisc::rcorr.cens(x = occ_preds_obs_df_co$pred_occ_mean, S = occ_preds_obs_df_co$presence, outx=FALSE) # xx
   # occ_auc_overall_co <- pROC::roc(response = occ_preds_obs_df_co$presence, predictor = occ_preds_obs_df_co$pred_occ_mean)$auc
   # 
-  # 
-  # # spatial C index: ---
+
+  # # spatial evaluation: ---
   # 
   # # do we get differences between sites right?
   # 
@@ -383,11 +387,9 @@ for(i in 1:length(final_species)){
   # occ_rank_corr_spat_co
   # rownames(occ_auc_spat_co) <- NULL
   # occ_auc_spat_co
-  # 
-  # 
-  # 
-  # temporal C indices: ---
 
+
+  # temporal evaluation (discarded for CV): ---
 
   # do we get trends right?
 
@@ -401,8 +403,6 @@ for(i in 1:length(final_species)){
     group_by(Year) %>%
     summarise(sum_obs = sum(presence, na.rm = TRUE),
               sum_preds = sum(pred_y_mean)) # xx
-
-
 
   C_Ind_y_temp <- Hmisc::rcorr.cens(x = y_preds_obs_df_temp$sum_preds,
                                     S = y_preds_obs_df_temp$sum_obs, outx=FALSE)
@@ -465,9 +465,11 @@ for(i in 1:length(final_species)){
   # 
   # C_Ind_occ_temp_co <- Hmisc::rcorr.cens(x = occ_preds_obs_df_temp_co$sum_preds,
   #                                     S = occ_preds_obs_df_temp_co$sum_obs, outx=FALSE)
-  # 
-  # # overall trend captured?
-  # 
+
+  
+  # # is overall trend in time series captured?
+  # # based on linear trend
+  
   # # all routes:
   # 
   # lm_obs <- lm(sum_obs  ~ Year, data = y_preds_obs_df_temp)
@@ -521,9 +523,9 @@ for(i in 1:length(final_species)){
   # p_slope_diff_p_o_co <- summary(lm_error)$coefficients[2,4] # slope significance
   # intercept_diff_p_o_co <- lm_error$coefficients[1] # intercept
   # 
-  # 
-  # 
+
   # # save evaluation outputs:
+  #
   # CV_eval <- list(y_Cind, y_Cind_co, y_auc_overall, y_auc_overall_co, 
   #                 occ_Cind, occ_Cind_co, occ_auc_overall, occ_auc_overall_co,
   #                 y_rank_corr_spat, y_rank_corr_spat_co, y_auc_spat, y_auc_spat_co, 
@@ -551,7 +553,7 @@ for(i in 1:length(final_species)){
 }
 
 
-# assemble C-values for all species: ---- xx
+# assemble evaluation metrics for all species: ---- 
 
 CV_eval_summary <- data.frame("species" = final_species,
                               "y_spattemp_C" = NA,
@@ -624,36 +626,26 @@ CV_eval_summary
 CV_eval_summary <- read.csv(file = file.path(results_dir, "CV_eval", "CV_eval_summary.csv"))
 summary(CV_eval_summary)
 
-CV_eval_summary %>% 
-  filter(y_temp_C_c > 0.9) %>% 
-  pull(species)
-
-
-
-load(file.path(results_dir, "spec_set_temp_val_ok1.RData")) # xx changed
 
 CV_eval_summary %>% 
   select(species, y_spat_C_mean, y_spat_C_mean_c, y_spat_auc_mean, y_spat_auc_mean_c, 
          occ_spat_C_mean, occ_spat_C_mean_c, occ_spat_auc_mean, occ_spat_auc_mean_c) %>% 
   View
 
-CV_eval_summary %>% 
-  select(species, y_spat_C_mean, y_spat_C_mean_c, y_spat_auc_mean, y_spat_auc_mean_c, 
-         occ_spat_C_mean, occ_spat_C_mean_c, occ_spat_auc_mean, occ_spat_auc_mean_c) %>% 
-  filter(species %in% specs_thresh4) %>% 
-  View
 
 
-# xx calculate correlation and error metrics: ----
+
+# (discarded: temporal validation of cross-validation predictions:) ----
+# calculate correlation and error metrics of observed and predicted time series (yearly sum across the US):
 
 CV_temp_metrics <- data.frame("species" = final_species, 
-                               "cor_p" = NA,
-                               "cor_s" = NA,
-                               "mean_error" = NA,
-                               "mean_square_error" = NA,
-                               "root_mean_square_error" = NA,
-                               "mean_abs_error" = NA,
-                               "mean_n_routes_obs" = NA,
+                              "cor_p" = NA,
+                              "cor_s" = NA,
+                              "mean_error" = NA,
+                              "mean_square_error" = NA,
+                              "root_mean_square_error" = NA,
+                              "mean_abs_error" = NA,
+                              "mean_n_routes_obs" = NA,
                               "slope_abs_error" = NA, 
                               "p_slope_abs_error" = NA,
                               "intercept_abs_error" = NA,
@@ -734,12 +726,13 @@ load(file = file.path(results_dir, "CV_eval", "CV_temp_metrics.RData"))
 CV_temp_metrics
 summary(CV_temp_metrics)
 
+
 # plots: ----
 
 ## maps comparing mean CV predictions and observations: ----
 
 obs_preds_sf <- y_preds_obs_df %>%
-  left_join(occ_preds_obs_df[c("RTENO", "Year", "pred_occ_mean")]) %>%
+  left_join(occ_preds_obs_df[c("RTENO", "Year", "pred_occ_mean")]) %>% # xx
   left_join(routes_sel_sf, by = c(RTENO = "RTENO_BBS")) %>%
   st_as_sf()
 

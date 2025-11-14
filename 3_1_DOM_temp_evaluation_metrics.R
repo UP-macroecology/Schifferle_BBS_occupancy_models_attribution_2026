@@ -1,38 +1,6 @@
-# quantify temporal predictive performance of DOMs
-# use model fitted to 15 years of training data to predict following 10 years
+# quantify temporal predictive performance of DOMs with different metrics
+# based on model fitted to 15 years of training data and predictions for following 10 years
 
-# merge with 3_1_DOM_temp_val_eval.R xx
-
-# metrics:
-
-# - mean absolute error
-# - trend in absolute error (slope of lm)
-# - intercept of lm absolute error ~ Year
-# - p value of trend
-
-# - mean error (difference prediction - observation)
-# - trend in mean error (slope of lm)
-# - intercept of lm mean error ~ Year
-# - p value of trend mean error
-
-# - mean squared error
-# - root mean squared error
-
-# - scaled absolute error
-# - scaled mean error
-
-
-# - Pearson correlation
-# - p value Pearson correlation significantly > 0
-# - p value Pearson correlation significantly < 0
-# - Spearman correlation
-# - p value Spearman correlation significantly > 0
-# - p value Spearman correlation significantly < 0
-
-# - mean number of routes with presences observed (for scaling?):
-
-# - Harrel's C index for 10 years (compare time series of number of routes with detections across US to
-# time series of predicted occupancy probability across US) xx
 
 # packages: --------------------------------------------------------------------
 
@@ -43,18 +11,13 @@ library(gridExtra)
 
 # directories: ----
 
-results_dir <- file.path("M:", "Documents", "DEBTs", "analysis", "Schifferle_BBS_occupancy_models_2023", 
+results_dir <- file.path("//NAS-2-P-SN-01.ibb.uni-potsdam.de/users$/schifferle1", "Documents", "DEBTs", "analysis", "Schifferle_BBS_occupancy_models_2023",
                          "results", "temp_val_buffer_750_10yrs")
-# results_dir <- file.path("//NAS-2-P-SN-01.ibb.uni-potsdam.de/users$/schifferle1", "Documents", "DEBTs", "analysis", "Schifferle_BBS_occupancy_models_2023",
-#                          "results", "temp_val_buffer_750_10yrs")
 
-#intermediate_time_series_dir <- file.path(results_dir, "temp_eval", "10_years", "pred_occ_sum")
-#intermediate_time_series_dir <- file.path(results_dir, "temp_eval", "10_years", "pred_y_sum")
-intermediate_time_series_dir <- file.path(results_dir, "temp_eval", "10_years", "pred_z_sum")
+# directory to save time series calculated from predictions:
 
-if(!dir.exists(intermediate_time_series_dir)){
-  dir.create(intermediate_time_series_dir)
-}
+intermediate_time_series_dir <- file.path(results_dir, "temp_eval", "10_years", "pred_occ_sum")
+if(!dir.exists(intermediate_time_series_dir)){dir.create(intermediate_time_series_dir)}
 
 
 # functions: ----
@@ -81,7 +44,7 @@ n_train_years <- 15
 years <- min(route_sel_dt$Year):max(route_sel_dt$Year) 
 
 
-# save time series of summed observations and mean summed predictions: ----
+# save time series of summed observations and mean summed y predictions: ----
 
 # for(i in 1:length(final_species)){
 #   
@@ -97,61 +60,42 @@ years <- min(route_sel_dt$Year):max(route_sel_dt$Year)
 # 
 #   print(output_dir)
 # 
-#   # observations:
+#   # observations: ---
 # 
 #   # relevant routes for the species, within distance of 750 km of presences:
 #   rel_routes <- training_routes(species = spec, buffer_km = 750, output = "RTENOs")
 #   occ_dt_spec <- BBS_pres_abs_spec(species = spec) %>%
 #     filter(RTENO %in% rel_routes)
-# #
-# # # mean detections across a route - discarded:
-# #   # sum all routes for each year (temporal trend)
-# #   obs_temp_trend <- occ_dt_spec %>%
-# #     mutate(mean_obs = rowMeans(across(paste0("Count", seq(10, 50, 10))))) %>%
-# #     group_by(Year) %>%
-# #     summarise(pres_sum = sum(mean_obs, na.rm = TRUE))
-# #
-# # route-level presence:
-#  # sum all routes for each year (temporal trend)
-# obs_temp_trend <- occ_dt_spec %>% #xx
-#  group_by(Year) %>% #xx
-#  summarise(pres_sum = sum(presence, na.rm = TRUE)) #xx
-# 
-# 
-#   # model predictions:
+#   
+#   # route-level presence:
+#   # sum all routes for each year (temporal trend)
+#   obs_temp_trend <- occ_dt_spec %>%
+#     group_by(Year) %>%
+#     summarise(pres_sum = sum(presence, na.rm = TRUE))
+#   
+#   # model predictions: ---
+#   
 #   load(file.path(output_dir, paste0("preds_", spec, "_temp_val_10yrs_buffer_750.RData")))
-# 
-#   ## mean across route sections: - discarded.
-#   #preds_routes <- apply(res_list$y_preds, MAR = c(1,3,4), FUN = mean) # xx
-#   #sum across route sections:
+#   
+#   # sum across route sections:
+#   dim(res_list$y_preds) # routes - sections - years - draws
 #   preds_routes <- apply(res_list$y_preds, MAR = c(1,3,4), FUN = max) # as soon as one predicted presence -> 1
 #   # sum across routes for each year:
-#   preds_years <- apply(preds_routes, MAR = c(2,3), FUN = sum, na.rm = TRUE) # xx
+#   preds_years <- apply(preds_routes, MAR = c(2,3), FUN = sum, na.rm = TRUE) 
 #   # mean:
 #   preds_years_mean <- apply(preds_years, MAR = 1, FUN = mean)
 #   # sd:
 #   preds_years_sd <- apply(preds_years, MAR = 1, FUN = sd)
-#   # 95% range: xx
+#   # 95% range: 
 #   preds_years_0025_0975 <- apply(preds_years, MAR = 1, FUN = function(x) quantile(x, probs = c(0.025, 0.975)))
 # 
-#   # # Z:
-#   # # sum across routes for each year:
-#   # preds_years <- apply(res_list$occ_posterior, MAR = c(2,3), FUN = sum, na.rm = TRUE) # xx
-#   # # mean:
-#   # preds_years_mean <- apply(preds_years, MAR = 1, FUN = mean)
-#   # # sd:
-#   # preds_years_sd <- apply(preds_years, MAR = 1, FUN = sd)
-#   # # 95% range: xx
-#   # preds_years_0025_0975 <- apply(preds_years, MAR = 1, FUN = function(x) quantile(x, probs = c(0.025, 0.975)))
-#   # 
-#   # 
 #   obs_temp_trend$preds_years_mean <- preds_years_mean
 #   obs_temp_trend$preds_years_sd <- preds_years_sd
 #   obs_temp_trend$preds_years_0025 <- preds_years_0025_0975[1,]
 #   obs_temp_trend$preds_years_0975 <- preds_years_0025_0975[2,]
 # 
-# 
-#   # plot observations, predictions:
+#   # plot observations, predictions: ---
+#   
 #   ggplot(obs_temp_trend, aes(x = Year)) +
 #     geom_line(aes(y = pres_sum)) +
 #     geom_point(aes(y = pres_sum), size = 3) +
@@ -167,10 +111,9 @@ years <- min(route_sel_dt$Year):max(route_sel_dt$Year)
 # 
 #   # save:
 #   save(obs_temp_trend, file = file.path(intermediate_time_series_dir,
-#                                         paste0(spec, "_y_sum_series.RData")))
+#                                         paste0(spec, "_occ_sum_series.RData")))
 # 
 #   }
-
 
 
 
@@ -190,7 +133,7 @@ temp_val_metrics <- data.frame("species" = final_species,
                                "int_mse" = NA, # intercept of lm mse ~ Year
                                "p_trend_mse" = NA, # p value of trend
                                "rmse" = NA, # root mean squared error
-                               "mape" = NA, # mean absolute percent error
+                               "mape" = NA, # mean absolute percentage error
                                "mase" = NA, # mean absolute scaled error
                                "cor_p" = NA, # correlation predictions - observations
                                "p_cor_p_pos" = NA, # p value Pearson correlation significantly > 0
@@ -211,7 +154,7 @@ for(i in 1:nrow(temp_val_metrics)){
   
   print(paste(i, spec))
   
-  load(file = file.path(results_dir, "temp_eval", "10_years", "pred_occ_sum", paste0(spec, "_occ_sum_series.RData"))) # change y to occ
+  load(file = file.path(results_dir, "temp_eval", "10_years", "pred_occ_sum", paste0(spec, "_occ_sum_series.RData"))) 
   
   # only test data:
   obs_temp_trend_test <- obs_temp_trend[16:25,] %>% 
@@ -307,40 +250,8 @@ for(i in 1:nrow(temp_val_metrics)){
 
 #save(temp_val_metrics, file = file.path(results_dir, "temp_eval", "10_years", "temp_val_metrics_final.RData"))
 
-# note: only positive trends in error important
-# if trend is negative (better predictions further into the future), no problem
+# note: only positive trends in error important, a negative trend (= better predictions further into the future) is fine
 
-summary(temp_val_metrics)
-temp_val_metrics %>% 
-  filter(C_temp_val  > 0.9) %>% 
-  pull(species)
-
-# some explorations: ----
-
-load(file.path(results_dir, "temp_eval", "10_years", "temp_val_metrics_final.RData"))
-
-# correlations among evaluation metrics:
-M <- cor(temp_val_metrics %>% 
-           select(-species) %>% 
-           select(mae, me, mse, rmse, mape, mase, cor_p, cor_s, C_temp_val), 
-         method = "p")
-corrplot::corrplot(M, method = "square", order = "hclust",
-         addCoef.col = "black",
-         diag = FALSE,
-         tl.cex = 1,#1
-         number.cex = 0.8, # 0.8
-         number.digits= 2)
-
-# highly correlated are:
-# - cor_p and cor_s and C_temp_val
-# - mae, mse, rmse, (mase)
-
-plot(mae ~ mase, data = temp_val_metrics)
-plot(mae ~ mape, data = temp_val_metrics)
-plot(mase ~ C_temp_val, data = temp_val_metrics)
-plot(mase ~ rmse, data = temp_val_metrics)
-plot(mape ~ rmse, data = temp_val_metrics)
-plot(mape ~ mse, data = temp_val_metrics)
 
 # plot time series with metrics: -----
 
@@ -410,6 +321,34 @@ for(i in 1:length(final_species)){
 }
 
 
+# explorations: ----
+
+load(file.path(results_dir, "temp_eval", "10_years", "temp_val_metrics_final.RData"))
+
+
+# correlations among evaluation metrics:
+M <- cor(temp_val_metrics %>% 
+           select(-species) %>% 
+           select(mae, me, mse, rmse, mape, mase, cor_p, cor_s, C_temp_val), 
+         method = "p")
+corrplot::corrplot(M, method = "square", order = "hclust",
+                   addCoef.col = "black",
+                   diag = FALSE,
+                   tl.cex = 1,#1
+                   number.cex = 0.8, # 0.8
+                   number.digits= 2)
+
+# highly correlated are:
+# - cor_p and cor_s and C_temp_val
+# - mae, mse, rmse, (mase)
+
+plot(mae ~ mase, data = temp_val_metrics)
+plot(mae ~ mape, data = temp_val_metrics)
+plot(mase ~ C_temp_val, data = temp_val_metrics)
+plot(mase ~ rmse, data = temp_val_metrics)
+plot(mape ~ rmse, data = temp_val_metrics)
+plot(mape ~ mse, data = temp_val_metrics)
+
 # find suitable thresholds ----
 
 # that keep species for which model works okay and flags species
@@ -429,91 +368,3 @@ specs_thresh <- temp_val_metrics %>%
   pull(species) # 81 species left
 
 save(specs_thresh, file = file.path(results_dir, "temp_eval", "10_years", "spec_set_temp_val_ok1.RData"))
-
-
-# # some explorations: ----
-# 
-# # species for which correlation is significantly larger than zero:
-# # keep? (but some in discard categories as well)
-# temp_val_metrics %>%
-#   filter(p_cor_p_pos <= 0.05) %>%
-#   pull(species) # 14
-# 
-# # species for which C-index is larger than 0.7:
-# temp_val_metrics %>%
-#   filter(C_temp_val >= 0.7) %>%
-#   pull(species) # 14
-# 
-# # trend overall:
-# 
-# specs_trend_fine <- temp_val_metrics %>%
-#   filter(p_cor_p_pos <= 0.05 | cor_p > 0.5 | C_temp_val >= 0.7) %>%
-#   pull(species) # 20
-# 
-# # discard species with significant positive trend in mean absolute error:
-# specs_trend_wrong <- temp_val_metrics %>%
-#   filter(trend_mae > 0 & p_trend_mae <= 0.05) %>%
-#   pull(species) # 6
-# 
-# # discard species for which correlation is significantly negative:
-# temp_val_metrics %>%
-#   filter(p_cor_p_neg <= 0.05) %>%
-#   pull(species) # 6
-# # trend overall:
-# specs_trend_fine[!specs_trend_fine %in% specs_trend_wrong] # 19
-# 
-# # overall error:
-# 
-# # mean absolute percent error < 5%
-# temp_val_metrics %>%
-#   filter(mape < 0.05) %>%
-#   pull(species) # 8
-# # mean absolute percent error < 10%
-# temp_val_metrics %>%
-#   filter(mape < 0.1) %>%
-#   pull(species) # 56
-# 
-# # mean absolute scaled error < 1 (= model better than naive forecast)
-# temp_val_metrics %>%
-#   filter(mase < 1) %>%
-#   pull(species) # 33
-# 
-# 
-# # is observation within prediction 95 % credible interval?:
-# temp_val_metrics %>%
-#   filter(obs_in_CI95) %>%
-#   pull(species) # 39
-# 
-# temp_val_metrics %>%
-#   filter(mape < 0.1 | obs_in_CI95) %>%
-#   pull(species) # 72
-# 
-# # add to visual inspection:
-# 
-# # visually inspected time series
-# load(file = file.path(results_dir, "temp_eval", "10_years", "temp_val_visual.RData"))
-# vis_val
-# 
-# specs_thresh <- temp_val_metrics %>%
-#   filter((mape < 0.1 | obs_in_CI95) | (p_cor_p_pos <= 0.05 | cor_p > 0.5 | C_temp_val >= 0.7)) %>%
-#   filter(!(trend_mae > 0 & p_trend_mae <= 0.05) & !(p_cor_p_neg <= 0.05)) %>%
-#   pull(species) # 82
-# 
-# vis_val$keep_thresholds <- 0
-# vis_val$keep_thresholds[which(vis_val$species %in% specs_thresh)] <- 1
-# 
-# # rf trial:
-# 
-# temp_eval_dt <- vis_val %>%
-#   left_join(temp_val_metrics) %>%
-#   filter(complete.cases(.))
-# test_rf <- ranger::ranger(keep ~ mape + mase + mae + mse + rmse + trend_mae + p_trend_mae +
-#                             cor_p + p_cor_p_pos + p_cor_p_neg + C_temp_val + obs_in_CI95, data = temp_eval_dt[, -1], importance = "impurity")
-# sort(test_rf$variable.importance, decreasing = TRUE)
-# temp_eval_dt_all <- vis_val %>%
-#   left_join(temp_val_metrics)
-# 
-# rf_preds <- predict(test_rf, data = temp_eval_dt_all)
-# rf_preds$predictions
-# cbind(vis_val, rf_preds$predictions) %>%
-#   mutate(diff = abs(keep - rf_preds$predictions)) %>%  View
