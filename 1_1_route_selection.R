@@ -335,10 +335,66 @@ routes_sf %>%
   filter(RTENO_BBS %in% sel_routes_final) %>% 
   group_by(RTENO_BBS) %>%  # merge lines if routes in shapefile consist of multiple adjacent lines
   summarise %>% 
-  st_write(file.path("data", "route_selection_1991_2019_surv_beg_end_max_5y_miss_v2_spat_thin_100km_max_30_r_per_BCR.shp"),
+  st_write(file.path("data", "route_selection_1995_2019_surv_beg_end_max_5y_miss_v2_spat_thin_100km_max_30_r_per_BCR.shp"),
            append = FALSE)
 # save selected routes as shapefile - centroids:
 routes_sel_sf_centr %>% 
   filter(RTENO_BBS %in% sel_routes_final) %>% 
-  st_write(file.path("data", "route_selection_1991_2019_surv_beg_end_max_5y_miss_v2_spat_thin_100km_max_30_r_per_BCR_centroids.shp"),
+  st_write(file.path("data", "route_selection_1995_2019_surv_beg_end_max_5y_miss_v2_spat_thin_100km_max_30_r_per_BCR_centroids.shp"),
            append = FALSE)
+
+# plot map of selected routes: ----
+
+library(ggplot2)
+
+routes_sel_sf <- read_sf(file.path("data", "route_selection_1995_2019_surv_beg_end_max_5y_miss_v2_spat_thin_100km_max_30_r_per_BCR_centroids.shp")) # output of 1_1_route_selection.R
+
+# conterminous US:
+US_albers_sf <- read_sf(file.path("data", "US_outline_ESRI102003.shp")) # output of 1_0_prepare_nioclim_data.R
+
+# Bird Conservation Regions, clipped to conterminous US:
+# xx or rather ecoregions?
+bcr_sf <- read_sf(file.path("data", "BCR_Terrestrial", "BCR_Terrestrial_master_International.shp")) %>% 
+  st_transform(crs = "ESRI:102003") %>% 
+  st_intersection(US_albers_sf) %>% 
+  # add centroid coordinate for label placement:
+  mutate(X = st_coordinates(st_centroid(.))[,1],
+         Y = st_coordinates(st_centroid(.))[,2],
+         Label2 = gsub(pattern = " ", replacement = "\n", x = Label))
+
+route_map <- ggplot() +
+  # ecoregions as background map:
+  geom_sf(data = bcr_sf, aes(fill = Label), show.legend = TRUE, alpha = 0.5) +
+ 
+ # geom_text(data = bcr_sf, aes(x = X, y = Y, label = Label2), 
+  #          check_overlap = FALSE, size = 4, fontface = "italic", colour = "grey30") +
+  geom_sf(data = routes_sel_sf, aes(colour = "black"), size = 2) +
+  scale_fill_manual(values = pals::glasbey()) +
+  scale_colour_identity(name = NULL, labels = c(black = "selected BBS route"), guide = "legend") +
+  theme_light() +
+  theme(#legend.position = "inside",
+        #legend.position.inside = c(0.21, 0.1),
+    legend.position = "bottom",
+    legend.box = "vertical",
+    text = element_text(size = 20),
+    axis.title.x=element_blank(),
+    axis.title.y=element_blank()) +
+  ggspatial::annotation_scale(location = "bl") +
+  ggspatial::annotation_north_arrow(location = "bl", 
+                         pad_x = unit(0.9, "in"), pad_y = unit(0.3, "in"),
+                         style = ggspatial::north_arrow_fancy_orienteering) +
+  guides(
+    fill = guide_legend(title = "Bird Conservation Region", position = "bottom", 
+                        theme = theme(legend.text = element_text(face = "italic"),
+                                      legend.title.position = "top"),
+                        ncol = 3),
+    colour = guide_legend(position = "bottom")
+  )
+route_map
+
+ggsave(filename = file.path("plots", "route_selection_BCRs_no_labels.svg"), 
+       plot = route_map,
+       device = "svg",
+       width = 32,
+       height = 29.7, # A4
+       units = "cm")

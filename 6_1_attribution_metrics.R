@@ -240,3 +240,89 @@ for(s in 1:nrow(attr_metr_df)){
 
 #save(attr_metr_df, file = file.path(main_dir, "results", "attribution", "attribution_metrics_final.RData"))
 
+
+# manuscript figure illustrating trend calculation: ----
+
+#spec <- "Black-throated Green Warbler"
+spec <- "Dickcissel"
+
+# observations time series:
+load(file.path(obs_dir, paste0(spec, "_obs_ts_sum_occ_routes.RData")))
+
+# time series predictions factual:
+load(file.path(fact_dir, paste0(spec, "_ts_sum_occ_routes_f_preds.RData")))
+
+# time series predictions counterfactual:
+load(file.path(cfact_dir, paste0(spec, "_ts_sum_occ_routes_cf_preds.RData")))
+
+# determine overall linear trend:
+
+## factual:
+lm_df_f <- ts_preds_fact %>% 
+  select(year, starts_with("draw")) %>% 
+  tidyr::pivot_longer(starts_with("draw"), names_to = "draw", values_to = "value") %>% 
+  mutate(value_scaled = value - ts_preds_fact$median_Nocc[1],
+         year_scaled = year - 1995,
+         scenario = "fact")
+
+## climate counterfactual:
+lm_df_clim <- ts_preds_cfact$cf_clim %>% 
+  select(year, starts_with("draw")) %>% 
+  tidyr::pivot_longer(starts_with("draw"), names_to = "draw", values_to = "value") %>% 
+  mutate(value_scaled = value - ts_preds_cfact$cf_clim$median_Nocc[1],
+         year_scaled = year - 1995,
+         scenario = "clim")
+
+## land use counterfactual:
+lm_df_lu <- ts_preds_cfact$cf_1995soc %>% 
+  select(year, starts_with("draw")) %>% 
+  tidyr::pivot_longer(starts_with("draw"), names_to = "draw", values_to = "value") %>% 
+  mutate(value_scaled = value - ts_preds_cfact$cf_1995soc$median_Nocc[1],
+         year_scaled = year - 1995,
+         scenario = "lu")
+
+## climate + land use counterfactual:
+lm_df_climlu <- ts_preds_cfact$cf_clim_1995soc %>% 
+  select(year, starts_with("draw")) %>% 
+  tidyr::pivot_longer(starts_with("draw"), names_to = "draw", values_to = "value") %>% 
+  mutate(value_scaled = value - ts_preds_cfact$cf_clim_1995soc$median_Nocc[1],
+         year_scaled = year - 1995,
+         scenario = "climlu")
+
+lm_df_all <- rbind(lm_df_f, lm_df_clim, lm_df_lu, lm_df_climlu) %>% 
+  mutate(scenario = factor(scenario))
+
+plot_dir <- file.path("plots", "attribution", "explorations", "lm_posterior_draws_scaled_no_int") # xx
+
+
+trend_calc_plot <- lm_df_all %>%
+        mutate(scenario = factor(scenario, levels = c("fact", "clim", "lu", "climlu")),
+               scenario = recode(scenario, fact = "factual", clim = "counterfactual\nclimate",
+                                 lu = "counterfactual\nland use", climlu = "counterfactual\nclimate + land use")) %>%
+        ggplot(aes(x = year_scaled, y = value_scaled, colour = scenario, fill = scenario)) +
+        geom_point(size = 1.5, position = position_jitter(width = 0.3), alpha = 0.2, shape = 19) +
+        geom_smooth(method = "lm", formula = y ~ x + 0, se = TRUE) +
+        labs(y = "scaled number of occupied routes",
+             x = "scaled year") +
+        scale_colour_manual(values = c("counterfactual\nclimate + land use" = "#046865",
+                                       "counterfactual\nland use" = "#B7410E",
+                                       "counterfactual\nclimate" = "#0D98BA",
+                                       "factual" = "#85CB33")) +
+        scale_fill_manual(values = c("counterfactual\nclimate + land use" = "#046865",
+                                     "counterfactual\nland use" = "#B7410E",
+                                     "counterfactual\nclimate" = "#0D98BA",
+                                     "factual" = "#85CB33")) +
+        guides(fill = guide_legend(title = "Scenario"),
+               colour = guide_legend(title = "Scenario")) +
+        theme_bw() +
+        theme(text = element_text(size = 20),
+              legend.key.height =  unit(1, units = "cm"),
+              legend.key.width =  unit(1, units = "cm"),
+              legend.key.spacing.y = unit(0.5, units = "cm"))
+trend_calc_plot
+ggsave(filename = file.path("plots", "attribution", "explorations", "lm_posterior_draws_scaled_no_int", "trend_calculation_example.svg"), 
+       plot = trend_calc_plot,
+       device = "svg",
+       width = 29.7,
+       height = 18, # A4
+       units = "cm")

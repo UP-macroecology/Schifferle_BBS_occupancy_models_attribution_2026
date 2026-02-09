@@ -52,7 +52,7 @@ rel_imp_df <- attr_metr_df %>%
   mutate(ORDER = factor(ORDER, levels = names(sort(table(ORDER), decreasing = TRUE))))
 
 plot_df <- rel_imp_df %>%
-  select(species, imp_clim, imp_lu, imp_climlu, trend_change_clim, trend_change_lu, trend_change_climlu, Scientific_Name, ORDER, Family) %>% 
+  select(species, fact, imp_clim, imp_lu, imp_climlu, trend_change_clim, trend_change_lu, trend_change_climlu, Scientific_Name, ORDER, Family) %>% 
   # trend categories: absolute / relative winner / loser without driver:
   mutate(trend_change_clim2 = gsub(pattern = " climate change", replacement = "", x = trend_change_clim),
          trend_change_lu2 = gsub(pattern = " land use change", replacement = "", x = trend_change_lu),
@@ -74,7 +74,11 @@ plot_df2 <-   plot_df %>%
   # order by global change impact:
   # and by value corresponding to global change impact:
   left_join(plot_df %>% filter(scenario == "climate + land use") %>% select(species, value_global = value)) %>% 
-  arrange(trend_change_climlu , desc(value_global), ORDER, Family) %>% 
+  #arrange(trend_change_climlu , desc(value_global), ORDER, Family) %>% 
+  
+  # alternative: order by factual linear occupancy trend:
+  arrange(fact, trend_change_climlu, desc(value_global), ORDER, Family) %>% 
+  
   mutate(plot_order = row_number(),
          species = factor(species)) %>% 
   mutate(value = ifelse(value < 0, 0, value)) %>% # one species with negative values, does not make sense for relative impact
@@ -133,7 +137,165 @@ ggplot(plot_df2, aes(x = forcats::fct_reorder(Scientific_Name, desc(plot_order))
 dev.off()
 
 
+
 # version for manuscript:
+
+# # bird icon:
+# library(rphylopic)
+# uuid <- get_uuid(name = "Contopus virens", n = 1)
+# img <- get_phylopic(uuid = uuid)
+
+
+lollipop <- ggplot(plot_df2, aes(x = forcats::fct_reorder(Scientific_Name, desc(plot_order)), # Scientific_Name
+                     y = value)) +
+
+  
+  geom_linerange(aes(x = forcats::fct_reorder(Scientific_Name, desc(plot_order)), 
+                     ymin = pmax(0, min_infl), ymax = max_infl),
+                 colour = "gray30",
+                 linewidth = 0.3, show.legend = FALSE) +
+  geom_point(aes(shape = scenario, fill = impact, size = scenario), color = "black", stroke = 0.3) +
+  scale_size_manual(values = c("climate change" = 3.2, "land use change" = 2.8, "climate & land use change" = 2.7), guide = "none") +
+  scale_shape_manual(values = c("climate change" = 21, "land use change" = 24, "climate & land use change" = 22)) +
+  scale_fill_manual(values = c("relative loser" = "#abd9e9",
+                               "absolute loser" =  "#2c7bb6",
+                               "absolute winner" = "#d7191c",
+                               "relative winner" = "#fdae61",
+                               "no change" = "gray70"), drop = FALSE, na.value = NA) +
+  scale_y_continuous(limits = c(-0.005, 0.45), expand = c(0,0)) +
+  labs(x = "Species", y = "Relative importance") +
+  theme_light() +
+  coord_flip() +
+  theme(
+    panel.grid.major.y = element_blank(),
+    #axis.ticks.y = element_blank(),
+    axis.text.y = element_text(family = "serif", vjust = 0.3, face = "italic", size = 14,
+                               margin = margin(t = 0, r = 0, b = 0, l = 0)),
+    axis.title.y = element_text(margin = margin(0, 10, 0, 0)),
+    axis.text.x = element_text(size = 16),
+    text = element_text(size = 20),
+    legend.box.background = element_rect(fill = "white", colour = NA),
+    legend.position = "inside",
+    legend.justification.inside = c(0.95, 0.99),
+    legend.title = element_text(margin = margin(b = 10), size = 18, face = "bold"),
+    legend.key.spacing.y = unit(3, "pt"),
+  ) +
+  guides(shape = guide_legend("driver", 
+                              override.aes = list(size = 3), order = 1,
+                              theme(legend.text = element_text(vjust = 0.8, size = 16))),
+         fill = guide_legend("occupancy trend change", 
+                             override.aes = list(shape = 21, size = 4), order = 2,
+                             theme(legend.text = element_text(vjust = 0.6, size = 16)))) #+
+  # add bird icon:
+  #add_phylopic(x = 5, y = 0.42, img = img, height = 7)
+
+  # geom_rect(data = data_bar,
+  #           aes(xmin = xmin, xmax = xmax, ymin = ymin, ymax = ymax, fill = fill_var),
+  #           alpha = 0.5, inherit.aes = FALSE)
+  lollipop
+
+ggsave(filename = file.path("plots", "attribution", "summary_plots", "lollipop_rel_importance_manuscript2.svg"), 
+       plot = lollipop,
+       device = "svg",
+       width = 25,
+       height = 35,
+       units = "cm")
+
+
+# add factual linear trend information:
+
+lollipop2 <- ggplot(plot_df2, aes(x = forcats::fct_reorder(Scientific_Name, desc(plot_order)), # species
+                                 y = value)) +
+  
+  # add rectangles depicting factual trend category:
+  geom_rect(aes(ymin = -0.01, ymax = 0, xmin = 0, xmax = 45.5), fill = "#7DC4C9") +
+  geom_rect(aes(ymin = -0.01, ymax = 0, xmin = 45.5, xmax = 49.5), fill = "#EDE6F2") +
+  geom_rect(aes(ymin = -0.01, ymax = 0, xmin = 49.5, xmax = 80.5), fill = "#EFCA08") +
+  
+  # lines
+  geom_linerange(aes(x = forcats::fct_reorder(Scientific_Name, desc(plot_order)),
+                     ymin = pmax(0, min_infl), ymax = max_infl),
+                 colour = "gray80",
+                 linewidth = 0.3, show.legend = FALSE) +
+  
+  geom_linerange(aes(x = forcats::fct_reorder(Scientific_Name, desc(plot_order)), 
+                     ymin = 0, ymax = min_infl),
+                 colour = "gray80",
+                 linewidth = 0.3, show.legend = FALSE, linetype = "dashed") +
+  
+  
+  geom_point(aes(shape = scenario, fill = impact, size = scenario), color = "black", stroke = 0.3) +
+  scale_size_manual(values = c("climate change" = 3.2, "land use change" = 2.8, "climate & land use change" = 2.7), guide = "none") +
+  scale_shape_manual(values = c("climate change" = 21, "land use change" = 24, "climate & land use change" = 22)) +
+  scale_fill_manual(values = c("relative loser" = "#abd9e9",
+                               "absolute loser" =  "#2c7bb6",
+                               "absolute winner" = "#d7191c",
+                               "relative winner" = "#fdae61",
+                               "no change" = "gray70"), drop = FALSE, na.value = NA) +
+  
+  scale_y_continuous(limits = c(-0.01, 0.45), expand = c(0,0)) +
+  labs(x = "Species", y = "Relative importance") +
+  theme_light() +
+  coord_flip() +
+  theme(
+    panel.grid.major.y = element_blank(),
+    #axis.ticks.y = element_blank(),
+    axis.text.y = element_text(family = "serif", vjust = 0.3, face = "italic", size = 14,
+                               margin = margin(t = 0, r = 0, b = 0, l = 0)),
+    axis.title.y = element_text(margin = margin(0, 10, 0, 0)),
+    axis.text.x = element_text(size = 16),
+    text = element_text(size = 20),
+    legend.box.background = element_rect(fill = "white", colour = NA),
+    legend.position = "inside",
+    legend.justification.inside = c(0.95, 0.01),
+    legend.title = element_text(margin = margin(b = 10), size = 18, face = "bold"),
+    legend.key.spacing.y = unit(3, "pt"),
+  ) +
+  guides(shape = guide_legend("driver",
+                              override.aes = list(size = 3), order = 1,
+                              theme(legend.text = element_text(vjust = 0.8, size = 16))),
+         fill = guide_legend("occupancy trend change",
+                             override.aes = list(shape = 21, size = 4), order = 2,
+                             theme(legend.text = element_text(vjust = 0.6, size = 16))))
+
+
+lollipop2
+ggsave(filename = file.path("plots", "attribution", "summary_plots", "lollipop_rel_importance_manuscript2.svg"), 
+       plot = lollipop2,
+       device = "svg",
+       width = 25,
+       height = 35,
+       units = "cm")
+
+
+# add oberserved trend to legend:
+
+lollipop3 <- lollipop2 +
+  guides(a = guide_custom(title = "observed trend",
+                          grid::rectGrob(gp = gpar(fill="#EFCA08", col=NA)),
+                          width = unit(0.5, "cm"), height = unit(0.5, "cm"),
+                          order = 3),
+         b = guide_custom(title = NULL,
+                          grid::rectGrob(gp = gpar(fill="#EDE6F2", col=NA)),
+                          width = unit(0.5, "cm"), height = unit(0.5, "cm"),
+                          order = 4),
+         c = guide_custom(title = NULL,
+                          grid::rectGrob(gp = gpar(fill="#7DC4C9", col=NA)),
+                          width = unit(0.5, "cm"), height = unit(0.5, "cm"),
+                          order = 5)) +
+  labs(tag = "increase\n\nstable\n\ndecrease") +
+  theme(plot.tag.position = c(0.825, 0.13),
+        plot.tag = element_text(hjust = 0, size = 16))
+
+# requires manual adjustments of legend item:
+ggsave(filename = file.path("plots", "attribution", "summary_plots", "lollipop_rel_importance_manuscript3.svg"), 
+       plot = lollipop3,
+       device = "svg",
+       width = 25,
+       height = 35,
+       units = "cm")
+
+
 
 
 
@@ -160,9 +322,9 @@ p <- boxplot_overall_df %>%
     y = influence, fill = scenario)) +
   # add half-violin from {ggdist} package
   ggdist::stat_halfeye(adjust = 1, # density: bandwidth multiplied with this
-                       justification = -0.8, 
+                       justification = -0.8,
                        .width = 0, point_colour = NA,
-                       width = 0.4) +
+                       width = 0.4) + # does not work with ggplot2 version 4; downgrade via remotes::install_version("ggplot2", version = "3.5.2", repos = "https://cran.r-project.org")
   geom_boxplot(width = 0.4, alpha = 0.5, linewidth = 1) +
   #ggdist::stat_dots(side = "left", justification = 1.1) +
   geom_point(aes(fill = scenario), shape = 21, size = 4, alpha = .5, position = position_jitter(seed = 1, width = .15)) +
@@ -178,7 +340,7 @@ p <- boxplot_overall_df %>%
         axis.title.y = element_text(size = 40, margin = margin(r = 10)) # vertical
   ) +
   guides(fill = "none")
-
+p
 
 # jpeg(file = file.path("plots", "attribution", "summary_plots",
 #                       "density_driver_raincloud_plot_vertical.jpeg"),
@@ -191,6 +353,33 @@ p
 
 # version for manuscript:
 
+boxplot_rel_imp <- boxplot_overall_df %>%
+  ggplot(aes(x = scenario, y = influence, fill = scenario)) +
+  # add half-violin from {ggdist} package
+  ggdist::stat_halfeye(adjust = 1, # density: bandwidth multiplied with this
+                       justification = -0.8,
+                       .width = 0, point_colour = NA,
+                       width = 0.3) + # does not work with ggplot2 version 4; downgrade via remotes::install_version("ggplot2", version = "3.5.2", repos = "https://cran.r-project.org")
+  geom_boxplot(width = 0.3, alpha = 0.5, linewidth = 1) +
+  geom_point(aes(fill = scenario), shape = 21, size = 2, alpha = .5, position = position_jitter(seed = 1, width = .15)) +
+  viridis::scale_fill_viridis(discrete = TRUE) +
+  theme_bw() +
+  labs(y = "Relative importance") +
+  theme(axis.text.x = element_text(size = 14, margin = margin(t = 5)), 
+        axis.title.y = element_text(size = 16), # vertical, margin = margin(r = 10)
+        axis.text.y = element_text(size = 14),
+        axis.title.x = element_blank(),
+        plot.margin = margin(0, 0, 0, 1)
+  ) +
+  guides(fill = "none")
+
+ggsave(filename = file.path("plots", "attribution", "summary_plots", "boxplot_rel_importance_manuscript.svg"), 
+       plot = boxplot_rel_imp,
+       device = "svg",
+       width = 16,
+       height = 16,
+       units = "cm")
+
 
 # plots traits and relative importance: ------------------------------------
 
@@ -200,347 +389,15 @@ p
 
 # reformat data:
 
-boxplot_df <- rel_imp_df %>%
-  tidyr::pivot_longer(cols = starts_with("imp"), names_to = "scenario", values_to = "value") %>% 
-  mutate(scenario = factor(scenario, levels = c("imp_clim", "imp_lu", "imp_climlu")),
-         scenario = recode(scenario, imp_clim = "climate", imp_lu = "land use", imp_climlu = "climate + land use")) %>% 
-  # add traits:
-  left_join(bbs_dt %>% select(English_Common_Name, Habitat, Migration, Trophic.Level, Trophic.Niche, Primary.Lifestyle) %>% distinct,
-            by = c(species = "English_Common_Name")) %>% 
-  mutate(Migration = forcats::fct_recode(Migration, 
-                                         "partially migratory" = "Part.migratory",
-                                         "migratory" = "Migratory",
-                                         "sedentary" = "Sedentary")) %>% 
-  mutate(trend_change_clim = case_when(trend_change_clim == "absolute climate change winner" ~ "absolute climate\nchange winner",
-                                       trend_change_clim == "relative climate change winner" ~ "relative climate\nchange winner",
-                                       trend_change_clim == "no change" ~ "no change",
-                                       trend_change_clim == "absolute climate change loser" ~ "absolute climate\nchange loser",
-                                       trend_change_clim == "relative climate change loser" ~ "relative climate\nchange loser",
-                                       .default = NA),
-         trend_change_clim = factor(trend_change_clim, levels = c("absolute climate\nchange winner", "relative climate\nchange winner", "no change", "relative climate\nchange loser", "absolute climate\nchange loser")),
-         trend_change_lu = case_when(trend_change_lu == "absolute land use change winner" ~ "absolute land use\nchange winner",
-                                     trend_change_lu == "relative land use change winner" ~ "relative land use\nchange winner",
-                                     trend_change_lu == "no change" ~ "no change",
-                                     trend_change_lu == "absolute land use change loser" ~ "absolute land use\nchange loser",
-                                     trend_change_lu == "relative land use change loser" ~ "relative land use\nchange loser",
-                                .default = NA),
-         trend_change_lu = factor(trend_change_lu, levels = c("absolute land use\nchange winner", "relative land use\nchange winner", "no change", "relative land use\nchange loser", "absolute land use\nchange loser")),
-  ) 
 
 
-## raincloud plot without differentiation between winners / losers: ----
+boxplot_df %>% 
+  select(species, Scientific_Name, ORDER, Family) %>% 
+  distinct() %>%  View
 
 
-# fct. for raincloud plots:
-raincloud_plot_fct <- function(trait = "Migration", subset = NA, driver = "climate"){
-  
-  if(any(!is.na(subset))){
-    plot_df <- plot_df %>% 
-      filter(!!sym(trait) %in% subset)
-  }
-  
-  labels <- plot_df %>% group_by(!!sym(trait)) %>% summarise(n = n()) %>% 
-    mutate(label = paste0(!!sym(trait), "\nN = ", n)) %>% 
-    pull(label)
-  
-  plot_df %>%
-    ggplot(aes(x = !!sym(trait), y = value, fill = !!sym(trait))) +
-    # add half-violin from {ggdist} package
-    ggdist::stat_halfeye(adjust = .5, justification = -0.8, 
-                         .width = 0, point_colour = NA,
-                         width = 0.4) +
-    geom_boxplot(width = 0.4, alpha = 0.5, linewidth = 1) +
-    #ggdist::stat_dots(side = "left", justification = 1.1) +
-    geom_point(aes(fill = !!sym(trait)), shape = 21, size = 4, alpha = .5, position = position_jitter(seed = 1, width = .2)) +
-    viridis::scale_fill_viridis(discrete = TRUE) +
-    theme_bw() +
-    theme(
-      legend.position = "none",
-    ) +
-    scale_x_discrete(labels = labels) +
-    theme_bw() +
-    labs(#title = "Climate change impact and migratory\nstrategy", 
-      #y = expression("Relative impact" ~ (MAPE [counterfactual] - MAPE [factual])),
-      y = paste("Relative", driver, "change impact"),
-      x = "") +
-    theme(text = element_text(size = 40),
-          axis.title.y = element_text(margin = margin(r = 10))) +
-    guides(fill = "none") +
-    ggtitle(paste(trait))
-}
-
-
-### climate change: ----
-
-plot_df <- boxplot_df %>% 
-  filter(scenario == "climate")
-
-# migration:
-
-jpeg(file = file.path("plots", "attribution", "summary_plots", "trait_boxplots",
-                      "rel_imp_climate_migration_raincloud_plot.jpg"),
-     width = 850, height = 1000, quality = 100)
-raincloud_plot_fct(trait = "Migration")
-dev.off()
-
-# habitat:
-
-jpeg(file = file.path("plots", "attribution", "summary_plots", "trait_boxplots",
-                      "rel_imp_climate_habitat_raincloud_plot.jpg"),
-     width = 850, height = 1000, quality = 100)
-raincloud_plot_fct(trait = "Habitat", subset = names(table(plot_df$Habitat)[which(table(plot_df$Habitat) >= 5)]))
-
-dev.off()
-
-# trophic level:
-
-jpeg(file = file.path("plots", "attribution", "summary_plots", "trait_boxplots",
-                      "rel_imp_climate_trophic_level_raincloud_plot.jpg"),
-     width = 850, height = 1000, quality = 100)
-raincloud_plot_fct(trait = "Trophic.Level", 
-                   subset = names(table(plot_df$Trophic.Level)[which(table(plot_df$Trophic.Level) >= 5)]))
-dev.off()
-
-# trophic niche:
-
-jpeg(file = file.path("plots", "attribution", "summary_plots", "trait_boxplots",
-                      "rel_imp_climate_trophic_niche_raincloud_plot.jpg"),
-     width = 850, height = 1000, quality = 100)
-raincloud_plot_fct(trait = "Trophic.Niche", 
-                   subset = names(table(plot_df$Trophic.Niche)[which(table(plot_df$Trophic.Niche) >= 5)]))
-dev.off()
-
-# primary lifestyle:
-jpeg(file = file.path("plots", "attribution", "summary_plots", "trait_boxplots",
-                      "rel_imp_climate_primary_lifestyle_raincloud_plot.jpg"),
-     width = 850, height = 1000, quality = 100)
-raincloud_plot_fct(trait = "Primary.Lifestyle", 
-                   subset = names(table(plot_df$Primary.Lifestyle)[which(table(plot_df$Primary.Lifestyle) >= 5)]))
-dev.off()
-
-
-### land use change: ----
-
-plot_df <- boxplot_df %>% 
-  filter(scenario == "land use")
-
-
-# migration:
-jpeg(file = file.path("plots", "attribution", "summary_plots", "trait_boxplots",
-                      "rel_imp_lu_migration_raincloud_plot.jpg"),
-     width = 850, height = 1000, quality = 100)
-raincloud_plot_fct(trait = "Migration", driver = "land use")
-dev.off()
-
-# habitat:
-
-jpeg(file = file.path("plots", "attribution", "summary_plots", "trait_boxplots",
-                      "rel_imp_lu_habitat_raincloud_plot.jpg"),
-     width = 850, height = 1000, quality = 100)
-raincloud_plot_fct(trait = "Habitat", driver = "land use", subset = names(table(plot_df$Habitat)[which(table(plot_df$Habitat) >= 5)]))
-
-dev.off()
-
-# trophic level:
-
-jpeg(file = file.path("plots", "attribution", "summary_plots", "trait_boxplots",
-                      "rel_imp_lu_trophic_level_raincloud_plot.jpg"),
-     width = 850, height = 1000, quality = 100)
-raincloud_plot_fct(trait = "Trophic.Level", driver = "land use",
-                   subset = names(table(plot_df$Trophic.Level)[which(table(plot_df$Trophic.Level) >= 5)]))
-dev.off()
-
-# trophic niche:
-
-jpeg(file = file.path("plots", "attribution", "summary_plots", "trait_boxplots",
-                      "rel_imp_lu_trophic_niche_raincloud_plot.jpg"),
-     width = 850, height = 1000, quality = 100)
-raincloud_plot_fct(trait = "Trophic.Niche", driver = "land use",
-                   subset = names(table(plot_df$Trophic.Niche)[which(table(plot_df$Trophic.Niche) >= 5)]))
-dev.off()
-
-# primary lifestyle:
-jpeg(file = file.path("plots", "attribution", "summary_plots", "trait_boxplots",
-                      "rel_imp_lu_primary_lifestyle_raincloud_plot.jpg"),
-     width = 850, height = 1000, quality = 100)
-raincloud_plot_fct(trait = "Primary.Lifestyle", driver = "land use",
-                   subset = names(table(plot_df$Primary.Lifestyle)[which(table(plot_df$Primary.Lifestyle) >= 5)]))
-dev.off()
-
-
-## boxplots differentiating between winners / losers: ----
-
-
-# fct. for boxplots differentiating between winners / losers:
-
-# coloured stripe placement may need to be adjusted xx
-
-boxplot_fct <- function(trait = "Migration", subset = NA, driver = "climate"){
-  
-  if(any(!is.na(subset))){
-    plot_df <- plot_df %>% 
-      filter(!!sym(trait) %in% subset)
-  }
-  
-  # winner / loser category:
-  if(driver == "climate"){x_axis <- "trend_change_clim"} 
-  else if (driver == "land use") {x_axis <- "trend_change_lu"} 
-  else {x_axis <- "trend_change_climlu"}
-  
-  plot_df %>% 
-    ggplot(aes(x = !!sym(x_axis), 
-               y = value, fill = !!sym(trait))) +
-    geom_boxplot(width = 0.6, position = position_dodge(0.75)) +
-    stat_summary(fun.data = get_box_stats, geom = "text", hjust = 0.5, vjust = 0.9, size = 7,
-                 position = position_dodge(width = .75)) +
-    viridis::scale_fill_viridis(discrete = TRUE, begin = 0.4, option = "D") +
-    theme_bw() +
-    labs(title = paste(driver, "change impact"), 
-         y = expression(MAPE [counterfactual] - MAPE [factual]), 
-         x = "",
-         subtitle = "numbers = number of species") +
-    theme(text = element_text(size = 26),
-          axis.text.x = element_text(margin=margin(t=20), colour = "black"),
-          legend.key.spacing.y = unit(0.3, 'cm'),
-          legend.key.size = unit(1.2, 'cm'),
-          legend.title = element_text(margin = margin(b = 10))) +
-    guides(fill = guide_legend(trait)) +
-    coord_cartesian(clip='off') +
-    annotation_custom(
-      grob=muh_grob, xmin = 0, xmax = 1, ymin = -0.03, ymax = -0.065)
-}
-
-### climate change: ----
-
-
-# display boxes for winner / loser categories - climate change version:
-muh_grob <- grid::rectGrob(
-  x = 1:5, y= 0, gp=gpar(
-    fill = c("#d7191c","#fdae61", "gray90", "#abd9e9","#2c7bb6"),
-    col = "white",
-    alpha=0.8))
-
-
-# fct. to display number of species in each group:
-get_box_stats <- function(y) {
-  return(data.frame(y = 0.03 + max(y), # y position of label
-                    label = length(y))
-  )
-}
-
-plot_df <- boxplot_df %>% 
-  filter(scenario == "climate")
-
-# migration:
-
-jpeg(file = file.path("plots", "attribution", "summary_plots", "trait_boxplots",
-                      "rel_imp_climate_migration_boxplots.jpg"),
-     width = 1500, height = 1000, quality = 100)
-boxplot_fct(trait = "Migration", subset = NA, driver = "climate")
-dev.off()
-
-# habitat
-jpeg(file = file.path("plots", "attribution", "summary_plots", "trait_boxplots",
-                      "rel_imp_climate_habitat_boxplots.jpg"),
-     width = 1500, height = 1000, quality = 100)
-boxplot_fct(trait = "Habitat", 
-            subset = names(table(plot_df$Habitat)[which(table(plot_df$Habitat) >= 5)]), 
-            driver = "climate")
-dev.off()
-
-# trophic level:
-
-jpeg(file = file.path("plots", "attribution", "summary_plots", "trait_boxplots",
-                      "rel_imp_climate_trophic_level_boxplots.jpg"),
-     width = 1500, height = 1000, quality = 100)
-boxplot_fct(trait = "Trophic.Level", 
-            subset = names(table(plot_df$Trophic.Level)[which(table(plot_df$Trophic.Level) >= 5)]), 
-            driver = "climate")
-dev.off()
-
-# trophic niche:
-
-jpeg(file = file.path("plots", "attribution", "summary_plots", "trait_boxplots",
-                      "rel_imp_climate_trophic_niche_boxplots.jpg"),
-     width = 1500, height = 1000, quality = 100)
-boxplot_fct(trait = "Trophic.Niche", 
-            subset = names(table(plot_df$Trophic.Niche)[which(table(plot_df$Trophic.Niche) >= 5)]), 
-            driver = "climate")
-dev.off()
-
-# primary lifestyle:
-
-jpeg(file = file.path("plots", "attribution", "summary_plots", "trait_boxplots",
-                      "rel_imp_climate_primary_lifestyle_boxplots.jpg"),
-     width = 1500, height = 1000, quality = 100)
-boxplot_fct(trait = "Primary.Lifestyle", 
-            subset = names(table(plot_df$Primary.Lifestyle)[which(table(plot_df$Primary.Lifestyle) >= 5)]), 
-            driver = "climate")
-dev.off()
-
-
-### land use change: ----
-
-# adjust:
-get_box_stats <- function(y) {
-  return(data.frame(y = 0.01 + max(y), # y position of label
-                    label = length(y))
-  )
-}
-
-# display boxes for winner / loser categories - land use change version:
-muh_grob <- grid::rectGrob(
-  x = 1:4, y= 1, gp=gpar(
-    fill = c("#fdae61", "gray90", "#abd9e9","#2c7bb6"),
-    col = "white",
-    alpha=0.8)) # xx 
-
-plot_df <- boxplot_df %>% 
-  filter(scenario == "land use")
-
-# migration:
-
-jpeg(file = file.path("plots", "attribution", "summary_plots", "trait_boxplots",
-                      "rel_imp_lu_migration_boxplots.jpg"),
-     width = 1500, height = 1000, quality = 100)
-boxplot_fct(trait = "Migration", subset = NA, driver = "land use")
-dev.off()
-
-# habitat
-jpeg(file = file.path("plots", "attribution", "summary_plots", "trait_boxplots",
-                      "rel_imp_lu_habitat_boxplots.jpg"),
-     width = 1500, height = 1000, quality = 100)
-boxplot_fct(trait = "Habitat", 
-            subset = names(table(plot_df$Habitat)[which(table(plot_df$Habitat) >= 5)]), 
-            driver = "land use")
-dev.off()
-
-# trophic level:
-
-jpeg(file = file.path("plots", "attribution", "summary_plots", "trait_boxplots",
-                      "rel_imp_lu_trophic_level_boxplots.jpg"),
-     width = 1500, height = 1000, quality = 100)
-boxplot_fct(trait = "Trophic.Level", 
-            subset = names(table(plot_df$Trophic.Level)[which(table(plot_df$Trophic.Level) >= 5)]), 
-            driver = "land use")
-dev.off()
-
-# trophic niche:
-
-jpeg(file = file.path("plots", "attribution", "summary_plots", "trait_boxplots",
-                      "rel_imp_lu_trophic_niche_boxplots.jpg"),
-     width = 1500, height = 1000, quality = 100)
-boxplot_fct(trait = "Trophic.Niche", 
-            subset = names(table(plot_df$Trophic.Niche)[which(table(plot_df$Trophic.Niche) >= 5)]), 
-            driver = "land use")
-dev.off()
-
-# primary lifestyle:
-
-jpeg(file = file.path("plots", "attribution", "summary_plots", "trait_boxplots",
-                      "rel_imp_lu_primary_lifestyle_boxplots.jpg"),
-     width = 1500, height = 1000, quality = 100)
-boxplot_fct(trait = "Primary.Lifestyle", 
-            subset = names(table(plot_df$Primary.Lifestyle)[which(table(plot_df$Primary.Lifestyle) >= 5)]), 
-            driver = "land use")
-dev.off()
+rel_imp_df %>% 
+  filter(species %in% c("Tufted Titmouse", "Carolina Chickadee", "Eastern Wood-Pewee", "Willow Flycatcher", "Acadian Flycatcher",
+                        "Dickcissel", "Yellow-throated Vireo", "Fish Crow")) %>% # Currie & Venne 2017
+  select(species, imp_clim, imp_lu, imp_climlu) %>% 
+  arrange(desc(imp_clim))
