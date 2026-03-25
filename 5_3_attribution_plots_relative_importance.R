@@ -1,45 +1,44 @@
 # plots regarding relative importance of climate and land use change for occupancy dynamics
-# based on difference in mean absolute percentage error between factual and counterfcatual predictions
+# based on difference in mean absolute percentage error between factual and counterfactual predictions
 
 # packages: --------------------------------------------------------------------
 
 library(dplyr)
 library(ggplot2)
-library(grid) # trait boxplots
+library(grid)
 
 
 # directories: -----------------------------------------------------------------
 
-main_dir <- file.path("//NAS-2-P-SN-01.ibb.uni-potsdam.de", "daten$", "AG26", "Transfer",
-                      "Schifferle_BBS_occupancy_models_2023")
+# project directory:
+dir <- file.path("//NAS-2-P-SN-01.ibb.uni-potsdam.de", "daten$", "AG26", "Transfer", 
+                 "Schifferle_BBS_occupancy_models_2023")
 
 
 # load data: -------------------------------------------------------------------
 
-# species for which models worked fine:
-load(file.path("data", "species_DOM_val_okay.RData")) # output of 6_2_attribution_plots_trend_categories.R
-spec_okay
+# species for attribution:
+load(file = file.path("data", "species_DOM_val_okay.RData")) # output of 4_0_DOMs_predictions_y_routes_scenarios.R
+spec_attr
 
 # attribution metrics:
-
-load(file = file.path(main_dir, "results", "attribution", "attribution_metrics_final.RData")) # output of 6_1_attribution_metrics.R
+load(file = file.path(dir, "results", "attribution", "attribution_metrics_final.RData")) # output of 5_1_attribution_metrics.R
 attr_metr_df
 
 # trend change categories: 
-load(file.path(main_dir, "results", "attribution", "trend_categories.RData")) # output of 6_2_attribution_plots_trend_categories.R
+load(file.path(dir, "results", "attribution", "trend_categories.RData")) # output of 5_2_attribution_plots_trend_categories.R
 flow_df
 
-# traits:
-load(file.path("data", "BBS_data_merged.RData")) # bbs_dt
+# species taxonomic information:
+load(file.path("data", "BBS_data_merged.RData")) # output of 1_0_dataprep_BBS_bird_data.R
+bbs_dt
 
 
-# lollipop plot: ---------------------------------------------------------------
-# relative importance of different drivers:
+# lollipop plot: relative importance of different drivers: ---------------------
 
 # reformat data:
 
 rel_imp_df <- attr_metr_df %>% 
-  filter(species %in% spec_okay) %>%
   select(-matches("(slope)|(p_)")) %>% 
   mutate(imp_clim = mape_cfclim - mape_fact,
          imp_lu = mape_cflu - mape_fact,
@@ -140,71 +139,7 @@ dev.off()
 
 # version for manuscript:
 
-# # bird icon:
-# library(rphylopic)
-# uuid <- get_uuid(name = "Contopus virens", n = 1)
-# img <- get_phylopic(uuid = uuid)
-
-
-lollipop <- ggplot(plot_df2, aes(x = forcats::fct_reorder(Scientific_Name, desc(plot_order)), # Scientific_Name
-                     y = value)) +
-
-  
-  geom_linerange(aes(x = forcats::fct_reorder(Scientific_Name, desc(plot_order)), 
-                     ymin = pmax(0, min_infl), ymax = max_infl),
-                 colour = "gray30",
-                 linewidth = 0.3, show.legend = FALSE) +
-  geom_point(aes(shape = scenario, fill = impact, size = scenario), color = "black", stroke = 0.3) +
-  scale_size_manual(values = c("climate change" = 3.2, "land use change" = 2.8, "climate & land use change" = 2.7), guide = "none") +
-  scale_shape_manual(values = c("climate change" = 21, "land use change" = 24, "climate & land use change" = 22)) +
-  scale_fill_manual(values = c("relative loser" = "#abd9e9",
-                               "absolute loser" =  "#2c7bb6",
-                               "absolute winner" = "#d7191c",
-                               "relative winner" = "#fdae61",
-                               "no change" = "gray70"), drop = FALSE, na.value = NA) +
-  scale_y_continuous(limits = c(-0.005, 0.45), expand = c(0,0)) +
-  labs(x = "Species", y = "Relative importance") +
-  theme_light() +
-  coord_flip() +
-  theme(
-    panel.grid.major.y = element_blank(),
-    #axis.ticks.y = element_blank(),
-    axis.text.y = element_text(family = "serif", vjust = 0.3, face = "italic", size = 14,
-                               margin = margin(t = 0, r = 0, b = 0, l = 0)),
-    axis.title.y = element_text(margin = margin(0, 10, 0, 0)),
-    axis.text.x = element_text(size = 16),
-    text = element_text(size = 20),
-    legend.box.background = element_rect(fill = "white", colour = NA),
-    legend.position = "inside",
-    legend.justification.inside = c(0.95, 0.99),
-    legend.title = element_text(margin = margin(b = 10), size = 18, face = "bold"),
-    legend.key.spacing.y = unit(3, "pt"),
-  ) +
-  guides(shape = guide_legend("driver", 
-                              override.aes = list(size = 3), order = 1,
-                              theme(legend.text = element_text(vjust = 0.8, size = 16))),
-         fill = guide_legend("occupancy trend change", 
-                             override.aes = list(shape = 21, size = 4), order = 2,
-                             theme(legend.text = element_text(vjust = 0.6, size = 16)))) #+
-  # add bird icon:
-  #add_phylopic(x = 5, y = 0.42, img = img, height = 7)
-
-  # geom_rect(data = data_bar,
-  #           aes(xmin = xmin, xmax = xmax, ymin = ymin, ymax = ymax, fill = fill_var),
-  #           alpha = 0.5, inherit.aes = FALSE)
-  lollipop
-
-ggsave(filename = file.path("plots", "attribution", "summary_plots", "lollipop_rel_importance_manuscript2.svg"), 
-       plot = lollipop,
-       device = "svg",
-       width = 25,
-       height = 35,
-       units = "cm")
-
-
-# add factual linear trend information:
-
-lollipop2 <- ggplot(plot_df2, aes(x = forcats::fct_reorder(Scientific_Name, desc(plot_order)), # species
+lollipop <- ggplot(plot_df2, aes(x = forcats::fct_reorder(Scientific_Name, desc(plot_order)),
                                  y = value)) +
   
   # add rectangles depicting factual trend category:
@@ -259,18 +194,10 @@ lollipop2 <- ggplot(plot_df2, aes(x = forcats::fct_reorder(Scientific_Name, desc
                              theme(legend.text = element_text(vjust = 0.6, size = 16))))
 
 
-lollipop2
-ggsave(filename = file.path("plots", "attribution", "summary_plots", "lollipop_rel_importance_manuscript2.svg"), 
-       plot = lollipop2,
-       device = "svg",
-       width = 25,
-       height = 35,
-       units = "cm")
-
+lollipop
 
 # add oberserved trend to legend:
-
-lollipop3 <- lollipop2 +
+lollipop2 <- lollipop +
   guides(a = guide_custom(title = "observed trend",
                           grid::rectGrob(gp = gpar(fill="#EFCA08", col=NA)),
                           width = unit(0.5, "cm"), height = unit(0.5, "cm"),
@@ -284,20 +211,16 @@ lollipop3 <- lollipop2 +
                           width = unit(0.5, "cm"), height = unit(0.5, "cm"),
                           order = 5)) +
   labs(tag = "increase\n\nstable\n\ndecrease") +
-  theme(plot.tag.position = c(0.825, 0.13),
+  theme(plot.tag.position = c(0.7, 0.097),
         plot.tag = element_text(hjust = 0, size = 16))
 
 # requires manual adjustments of legend item:
-ggsave(filename = file.path("plots", "attribution", "summary_plots", "lollipop_rel_importance_manuscript3.svg"), 
-       plot = lollipop3,
+ggsave(filename = file.path("plots", "attribution", "summary_plots", "lollipop_rel_importance_manuscript.svg"), 
+       plot = lollipop2,
        device = "svg",
        width = 25,
        height = 35,
        units = "cm")
-
-
-
-
 
 
 # boxplots summarising relative importance of climate vs. land use change: -----
@@ -345,11 +268,9 @@ p
 # jpeg(file = file.path("plots", "attribution", "summary_plots",
 #                       "density_driver_raincloud_plot_vertical.jpeg"),
 #      width = 1000, height = 1000, quality = 100)
-# jpeg(file = file.path("plots", "attribution", "summary_plots",
-#                       "density_driver_raincloud_plot_horizontal.jpeg"),
-#      width = 1150, height = 750, quality = 100)
 p
 #dev.off()
+
 
 # version for manuscript:
 
@@ -379,25 +300,3 @@ ggsave(filename = file.path("plots", "attribution", "summary_plots", "boxplot_re
        width = 16,
        height = 16,
        units = "cm")
-
-
-# plots traits and relative importance: ------------------------------------
-
-# rel. influence ~ trait, grouped by winner/loser category:
-
-# change order: same category next to each other, trait in legend
-
-# reformat data:
-
-
-
-boxplot_df %>% 
-  select(species, Scientific_Name, ORDER, Family) %>% 
-  distinct() %>%  View
-
-
-rel_imp_df %>% 
-  filter(species %in% c("Tufted Titmouse", "Carolina Chickadee", "Eastern Wood-Pewee", "Willow Flycatcher", "Acadian Flycatcher",
-                        "Dickcissel", "Yellow-throated Vireo", "Fish Crow")) %>% # Currie & Venne 2017
-  select(species, imp_clim, imp_lu, imp_climlu) %>% 
-  arrange(desc(imp_clim))

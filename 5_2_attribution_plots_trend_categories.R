@@ -1,42 +1,33 @@
-# alluvial plots for comparing factual and counterfactual occupancy trends
+# alluvial plots to compare factual and counterfactual occupancy trends
 # categories: absolute and relative winners and losers of change
+
 
 # packages: --------------------------------------------------------------------
 
 library(dplyr)
 library(ggplot2)
 library(ggalluvial) # alluvial plots
-library(ggnewscale) # to have multiple colour fill scales
+library(ggnewscale) # for multiple fill scales in one plot
+library(cowplot)
+library(rphylopic)
+library(grid)
 
 
 # directories: -----------------------------------------------------------------
 
-main_dir <- file.path("//NAS-2-P-SN-01.ibb.uni-potsdam.de", "daten$", "AG26", "Transfer",
-                      "Schifferle_BBS_occupancy_models_2023")
+# project directory:
+dir <- file.path("//NAS-2-P-SN-01.ibb.uni-potsdam.de", "daten$", "AG26", "Transfer", 
+                 "Schifferle_BBS_occupancy_models_2023")
 
 
 # load data: -------------------------------------------------------------------
 
-# species with fair model performance:
-
-# okay in time:
-load(file.path("//NAS-2-P-SN-01.ibb.uni-potsdam.de/users$/schifferle1", "Documents", "DEBTs", "analysis", "Schifferle_BBS_occupancy_models_2023",
-               "results", "temp_val_buffer_750_10yrs", "temp_eval", "10_years", "spec_set_temp_val_ok1.RData")) # output of 3_1_DOM_temp_evaluation_metrics.R
-spec_temp_okay <- specs_thresh
-# okay in space:
-CV_eval_summary <- read.csv(file = file.path("//NAS-2-P-SN-01.ibb.uni-potsdam.de/users$/schifferle1", "Documents", "DEBTs", "analysis", "Schifferle_BBS_occupancy_models_2023",
-                                             "results", "CV_buffer750km", "CV_eval", "CV_eval_summary.csv")) # 3_1_DOM_CV_evaluation_metrics.R
-spec_spat_okay <- CV_eval_summary %>%
-  filter(y_spat_auc_mean >= 0.7) %>%
-  pull(species)
-
-# okay in both:
-spec_okay <- intersect(spec_temp_okay, spec_spat_okay) # 80
-#save(spec_okay, file = file.path("data", "species_DOM_val_okay.RData"))
+# species for attribution:
+load(file = file.path("data", "species_DOM_val_okay.RData")) # output of 4_0_DOMs_predictions_y_routes_scenarios.R
+spec_attr
 
 # attribution metrics:
-
-load(file = file.path(main_dir, "results", "attribution", "attribution_metrics_final.RData")) # output of 6_1_attribution_metrics.R
+load(file = file.path(dir, "results", "attribution", "attribution_metrics_final.RData")) # output of 5_1_attribution_metrics.R
 
 
 # alluvial plots: --------------------------------------------------------------
@@ -44,14 +35,11 @@ load(file = file.path(main_dir, "results", "attribution", "attribution_metrics_f
 # https://r-charts.com/flow/ggalluvial/
 # change categories based on linear trend
 
-# restructure data for plotting:
-
+## restructure data for plotting: ----
 
 flow_df <- attr_metr_df %>% 
   # categorize relative impact (based on Langhammer et al. 2024):
   select(c(species, starts_with("slope"), starts_with("p_"))) %>% 
-  # only species with good model performance:
-  filter(species %in% spec_okay) %>% 
   ## factual vs. counterfactual climate:
   mutate(trend_change_clim = case_when(slope_fact > slope_cfclim & slope_fact > 0 & p_fact < 0.05 ~ "absolute climate change winner",
                                   slope_fact > slope_cfclim & slope_fact > 0 & p_fact >= 0.05 ~ "relative climate change winner",
@@ -104,7 +92,8 @@ flow_df <- attr_metr_df %>%
   select(-c(slope, p)) %>% 
   tidyr::pivot_wider(names_from = scenario, values_from = dynamics)
 
-#save(flow_df, file =  file.path(main_dir, "results", "attribution", "trend_categories.RData"))
+#save(flow_df, file =  file.path(dir, "results", "attribution", "trend_categories.RData"))
+
 
 ## climate change: ----
 
@@ -115,10 +104,10 @@ plot_df_clim <- flow_df %>%
 
 # version for presentation:
 
-jpeg(file = file.path("plots", "attribution", "summary_plots", "alluvial_climate_presentation.jpg"),
-     width = 910, height = 1200, quality = 100)
-svg(file = file.path("plots", "attribution", "summary_plots", "alluvial_climate_presentation.svg"),
-    width = 14, height = 18)
+# jpeg(file = file.path("plots", "attribution", "summary_plots", "alluvial_climate_presentation.jpg"),
+#      width = 910, height = 1200, quality = 100)
+# svg(file = file.path("plots", "attribution", "summary_plots", "alluvial_climate_presentation.svg"),
+#     width = 14, height = 18)
 
 plot_df_clim %>% 
   ggplot(aes(axis1 = cfclim, axis2 = fact, y = n)) +
@@ -137,7 +126,7 @@ plot_df_clim %>%
             aes(label = ifelse(test = after_stat(x) == "1",
                                yes = paste0(stratum, " (",
                                             flow_df %>%
-                                              filter(species %in% spec_okay) %>% 
+                                              filter(species %in% spec_attr) %>% 
                                               group_by(cfclim) %>% 
                                               summarise(n = n()) %>% 
                                               arrange(cfclim) %>%  
@@ -145,7 +134,7 @@ plot_df_clim %>%
                                               rev, ")"),
                                no = paste0(stratum, " (",
                                            flow_df %>%
-                                             filter(species %in% spec_okay) %>%
+                                             filter(species %in% spec_attr) %>%
                                              group_by(fact) %>%
                                              summarise(n = n()) %>%
                                              arrange(as.character(fact)) %>%
@@ -163,7 +152,7 @@ plot_df_clim %>%
   labs(title = "Change in area of occupancy",
        subtitle = "numbers = number of species",
        x = "", y = "") +
-  annotate("text", x = 1, y = 85, label = "Counterfactual\nclimate", hjust = 0.5, size = 10) + # y = 85 for spec_okay
+  annotate("text", x = 1, y = 85, label = "Counterfactual\nclimate", hjust = 0.5, size = 10) + # y = 85 for spec_attr
   annotate("text", x = 2, y = 85, label = "Observed\nclimate change", hjust = 0.5, size = 10) + # size = 9 for paper version
   guides(fill = "none") +
   theme_bw() +
@@ -177,11 +166,9 @@ plot_df_clim %>%
         legend.key.spacing.y = unit(0.2, "cm"), 
         legend.title = element_text(margin=margin(0,0,10,0)))
 
-dev.off()
+#dev.off()
 
 # version for manuscript:
-
-
 # climate and land use change side-by-side, common legend
 
 clim_plot <- plot_df_clim %>% 
@@ -203,7 +190,7 @@ clim_plot <- plot_df_clim %>%
             aes(label = ifelse(test = after_stat(x) == "1",
                                yes = paste0(stratum, " (",
                                             flow_df %>%
-                                              filter(species %in% spec_okay) %>% 
+                                              filter(species %in% spec_attr) %>% 
                                               group_by(cfclim) %>% 
                                               summarise(n = n()) %>% 
                                               arrange(cfclim) %>%  
@@ -211,7 +198,7 @@ clim_plot <- plot_df_clim %>%
                                               rev, ")"),
                                no = paste0(stratum, " (",
                                            flow_df %>%
-                                             filter(species %in% spec_okay) %>%
+                                             filter(species %in% spec_attr) %>%
                                              group_by(fact) %>%
                                              summarise(n = n()) %>%
                                              arrange(as.character(fact)) %>%
@@ -229,13 +216,13 @@ clim_plot <- plot_df_clim %>%
   labs(#title = "Change in area of occupancy",
        #subtitle = "numbers = number of species",
        x = "", y = "") +
-  annotate("text", x = 1, y = 85, label = "Counterfactual\nclimate", hjust = 0.5, size = 9) + # y = 85 for spec_okay
+  annotate("text", x = 1, y = 85, label = "Counterfactual\nclimate", hjust = 0.5, size = 9) + # y = 85 for spec_attr
   annotate("text", x = 2, y = 85, label = "Factual\nclimate", hjust = 0.5, size = 9) + # size = 9 for paper version
   coord_cartesian(clip = 'off') + # prevent annotations to get cut
   guides(fill = "none") +
   theme_bw() +
   theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
-        plot.margin = margin(40,15,10,5), # trbl # top margin to later have label when arranging multiple plots
+        plot.margin = margin(40,15,0,5), # trbl # top margin to later have label when arranging multiple plots
         panel.border = element_blank(),
         axis.ticks = element_blank(), axis.text = element_blank(),
         text = element_text(size = 24),
@@ -255,87 +242,6 @@ ggsave(filename = file.path("plots", "attribution", "summary_plots", "alluvial_c
        units = "cm")
 
 
-
-# lodes form: ---
-
-# rendering order unfortunate
-
-plot_df_lodes <- to_lodes_form(plot_df_clim,
-                               axes = c(1:2),
-                               id = trend_change_clim) %>%
-  mutate(x = factor(x, levels = c("cfclim", "fact"))) %>%
-  # same order as in plot_df_clim: order in df determines rendering order
-  mutate(trend_change_clim2 = rep(plot_df_clim$trend_change_clim, 2))
-
-
-# jpeg(file = file.path("plots", "attribution", "summary_plots", "alluvial_climate_presentation2.jpg"),
-#      width = 900, height = 1200, quality = 100)
-
-ggplot(plot_df_lodes, aes(x = x, stratum = stratum,
-                          alluvium = trend_change_clim,
-                          y = n#,
-                         # order = rep(c(1:9), 2)
-                 )
-                 ) + 
-  geom_flow(stat = "alluvium", aes(fill = trend_change_clim2),
-            color = "darkgray",width = 1/5, show.legend = TRUE) +
-  scale_fill_manual(values = c("relative climate change loser" = "#abd9e9",
-                               "absolute climate change loser" =  "#2c7bb6",
-                               "no change" = "gray90",
-                               "absolute climate change winner" = "#d7191c",
-                               "relative climate change winner" = "#fdae61"),
-                    drop = FALSE, na.value = NA, name = "impact of drivers") +
-  new_scale_fill() +
-  geom_stratum(aes(fill = stratum), width = 1/5, colour = "grey20") +
-  scale_fill_manual(values = c("positive\ntrend" = "#EFCA08", "negative\ntrend" =  "#7DC4C9", "stable" =  "#EDE6F2"), na.value = NA) +
-  # text in bars:
-  geom_text(stat = "stratum",
-            fontface = "italic",
-            size = 7,
-            aes(label = ifelse(test = after_stat(x) == "1",
-                               yes = paste0(stratum, " (",
-                                            plot_df_lodes %>%
-                                              filter(x == "cfclim") %>%
-                                              group_by(stratum) %>%
-                                              summarise(n = sum(n)) %>%
-                                              mutate(stratum = as.character(stratum)) %>%
-                                              arrange(stratum) %>%  #xx seltsam
-                                              pull(n), ")"),
-                               no = paste0(stratum, " (",
-                                           plot_df_lodes %>%
-                                             filter(x == "fact") %>%
-                                             group_by(stratum) %>%
-                                             summarise(n = sum(n)) %>%
-                                             mutate(stratum = as.character(stratum)) %>%
-                                             arrange(desc(stratum)) %>% # xx seltsam
-                                             pull(n), ")")))) +
-  # species numbers in flow:
-  geom_text(stat = "alluvium",
-            fontface = "italic",
-            aes(label = ifelse(test = after_stat(x) == "1",
-                               yes = plot_df_lodes %>% filter(x == "cfclim") %>% pull(n),
-                               no = "")),
-            size = 6, nudge_x = 0.15) +
-  scale_x_discrete(limits = c("cfclim", "fact"), expand = c(0.13, 0.0)) +
-  labs(title = "Change in area of occupancy",
-       subtitle = "numbers = number of species",
-       x = "", y = "") +
-  annotate("text", x = 1, y = 85, label = "Counterfactual\nclimate", hjust = 0.5, size = 8) + # y = 85 for spec_okay; 170 for all
-  annotate("text", x = 2, y = 85, label = "Observed\nclimate change", hjust = 0.5, size = 8) + # xx
-  guides(fill = "none") +
-  theme_bw() +
-  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
-        panel.border = element_blank(),
-        axis.ticks = element_blank(), axis.text = element_blank(),
-        text = element_text(size = 26),
-        plot.subtitle = element_text(margin = margin(0,0,30,0)),
-        legend.text = element_text(size = 24),
-        legend.position = "bottom", legend.direction = "vertical", legend.box.spacing = unit(-50, "pt"))
-
-#dev.off()
-
-
-
 ## land use change: ----
 
 plot_df_lu <- flow_df %>%
@@ -353,10 +259,10 @@ plot_df_lodes <- to_lodes_form(plot_df_lu, axes = c(1:2), id = trend_change_lu )
 
 # version for presentation:
 
-jpeg(file = file.path("plots", "attribution", "summary_plots", "alluvial_lu_presentation.jpg"),
-     width = 920, height = 1200, quality = 100)
-svg(file = file.path("plots", "attribution", "summary_plots", "alluvial_lu_presentation.svg"),
-    width = 14, height = 18)
+# jpeg(file = file.path("plots", "attribution", "summary_plots", "alluvial_lu_presentation.jpg"),
+#      width = 920, height = 1200, quality = 100)
+# svg(file = file.path("plots", "attribution", "summary_plots", "alluvial_lu_presentation.svg"),
+#     width = 14, height = 18)
 
 ggplot(plot_df_lodes, aes(x = x, stratum = stratum, alluvium = trend_change_lu, y = n)) +
   geom_flow(stat = "alluvium", aes(fill = trend_change_lu2),
@@ -400,8 +306,8 @@ ggplot(plot_df_lodes, aes(x = x, stratum = stratum, alluvium = trend_change_lu, 
   labs(title = "Change in area of occupancy",
        subtitle = "numbers = number of species",
        x = "", y = "") +
-  annotate("text", x = 1, y = 85, label = "Counterfactual\nland use", hjust = 0.5, size = 10) + # y = 85 for spec_okay; 170 for all
-  annotate("text", x = 2, y = 85, label = "Observed\nland use change", hjust = 0.5, size = 10) + # xx
+  annotate("text", x = 1, y = 85, label = "Counterfactual\nland use", hjust = 0.5, size = 10) + 
+  annotate("text", x = 2, y = 85, label = "Observed\nland use change", hjust = 0.5, size = 10) +
   guides(fill = "none") +
   theme_bw() +
   theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
@@ -414,7 +320,7 @@ ggplot(plot_df_lodes, aes(x = x, stratum = stratum, alluvium = trend_change_lu, 
         legend.key.spacing.y = unit(0.2, "cm"), 
         legend.title = element_text(margin=margin(0,0,10,0)))
 
-dev.off()
+#dev.off()
 
 
 # version for manuscript:
@@ -461,13 +367,13 @@ lu_plot <- ggplot(plot_df_lodes, aes(x = x, stratum = stratum, alluvium = trend_
   labs(#title = "Change in area of occupancy",
     #subtitle = "numbers = number of species",
     x = "", y = "") +
-  annotate("text", x = 1, y = 85, label = "Counterfactual\nland use", hjust = 0.5, size = 9) + # y = 85 for spec_okay
-  annotate("text", x = 2, y = 85, label = "Factual\nland use", hjust = 0.5, size = 9) + # size = 9 for paper version
+  annotate("text", x = 1, y = 85, label = "Counterfactual\nland use", hjust = 0.5, size = 9) + 
+  annotate("text", x = 2, y = 85, label = "Factual\nland use", hjust = 0.5, size = 9) +
   coord_cartesian(clip = 'off') + # prevent annotations to get cut
   guides(fill = "none") +
   theme_bw() +
   theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
-        plot.margin = margin(40,15,10,5), # trbl
+        plot.margin = margin(40,15,0,5), # trbl
         panel.border = element_blank(),
         axis.ticks = element_blank(), axis.text = element_blank(),
         text = element_text(size = 24),
@@ -486,7 +392,6 @@ ggsave(filename = file.path("plots", "attribution", "summary_plots", "alluvial_l
        units = "cm")
 
 
-
 ## climate + land use change: ----
 
 plot_df_climlu <- flow_df %>%
@@ -497,8 +402,8 @@ plot_df_climlu <- flow_df %>%
 
 # version for presentation:
 
-jpeg(file = file.path("plots", "attribution", "summary_plots", "alluvial_climlu_presentation.jpg"),
-     width = 900, height = 1200, quality = 100)
+# jpeg(file = file.path("plots", "attribution", "summary_plots", "alluvial_climlu_presentation.jpg"),
+#      width = 900, height = 1200, quality = 100)
 
 plot_df_climlu %>% 
   ggplot(aes(axis1 = cfclimlu, axis2 = fact, y = n)) +
@@ -519,7 +424,7 @@ plot_df_climlu %>%
             aes(label = ifelse(test = after_stat(x) == "1",
                                yes = paste0(stratum, " (",
                                             flow_df %>%
-                                              filter(species %in% spec_okay) %>% 
+                                              filter(species %in% spec_attr) %>% 
                                               group_by(cfclimlu) %>% 
                                               summarise(n = n()) %>% 
                                               arrange(cfclimlu) %>%  
@@ -527,7 +432,7 @@ plot_df_climlu %>%
                                               rev, ")"),
                                no = paste0(stratum, " (",
                                            flow_df %>%
-                                             filter(species %in% spec_okay) %>%
+                                             filter(species %in% spec_attr) %>%
                                              group_by(fact) %>%
                                              summarise(n = n()) %>%
                                              arrange(fact) %>%
@@ -559,8 +464,7 @@ plot_df_climlu %>%
         legend.key.spacing.y = unit(0.2, "cm"), 
         legend.title = element_text(margin=margin(0,0,10,0)))
 
-dev.off()
-
+#dev.off()
 
 
 # version for manuscript:
@@ -584,7 +488,7 @@ climlu_plot <- plot_df_climlu %>%
             aes(label = ifelse(test = after_stat(x) == "1",
                                yes = paste0(stratum, " (",
                                             flow_df %>%
-                                              filter(species %in% spec_okay) %>% 
+                                              filter(species %in% spec_attr) %>% 
                                               group_by(cfclimlu) %>% 
                                               summarise(n = n()) %>% 
                                               arrange(cfclimlu) %>%  
@@ -592,7 +496,7 @@ climlu_plot <- plot_df_climlu %>%
                                               rev, ")"),
                                no = paste0(stratum, " (",
                                            flow_df %>%
-                                             filter(species %in% spec_okay) %>%
+                                             filter(species %in% spec_attr) %>%
                                              group_by(fact) %>%
                                              summarise(n = n()) %>%
                                              arrange(fact) %>%
@@ -610,8 +514,8 @@ climlu_plot <- plot_df_climlu %>%
   labs(#title = "Change in area of occupancy",
     #subtitle = "numbers = number of species",
     x = "", y = "") +
-  annotate("text", x = 1, y = 85, label = "Counterfactual\nclimate & land use", hjust = 0.5, size = 9) + # y = 85 for spec_okay
-  annotate("text", x = 2, y = 85, label = "Factual climate\n& land use", hjust = 0.5, size = 9) + # size = 9 for paper version
+  annotate("text", x = 1, y = 85, label = "Counterfactual\nclimate & land use", hjust = 0.5, size = 9) + 
+  annotate("text", x = 2, y = 85, label = "Factual climate\n& land use", hjust = 0.5, size = 9) + 
   coord_cartesian(clip = 'off') + # prevent annotations to get cut
   guides(fill = "none") +
   theme_bw() +
@@ -634,252 +538,62 @@ ggsave(filename = file.path("plots", "attribution", "summary_plots", "alluvial_c
        units = "cm")
 
 
-
-
-
-# lodes form, seems more stable, but rendering order not optimal:
-plot_df_lodes <- to_lodes_form(plot_df_climlu,
-                               axes = c(1:2),
-                               id = trend_change_climlu ) %>% 
-  mutate(x = factor(x, levels = c("cfclimlu", "fact"))) %>% 
-  # same order as in plot_df_climlu:
-  mutate(trend_change_climlu2 = rep(plot_df_climlu$trend_change_climlu, 2))
-
-
-# jpeg(file = file.path("plots", "attribution", "summary_plots", "alluvial_climlu.jpg"),
-#      width = 900, height = 1200, quality = 100)
-
-plot_df_lodes %>% # reihenfolge falsch xx
-ggplot(aes(x = x, stratum = stratum, alluvium = trend_change_climlu,#rep(c(-1:-4, -7, -6, -5, -8:-10), 2),
-           y = n)) + # change rendering order via order in alluvium argument
-  geom_flow(stat = "alluvium", aes(fill = trend_change_climlu2),
-            color = "darkgray", width = 1/5, show.legend = TRUE) +
-  scale_fill_manual(values = c("relative global change loser" = "#abd9e9",
-                               "absolute global change loser" =  "#2c7bb6",
-                               "no change" = "gray90",
-                               "absolute global change winner" = "#d7191c",
-                               "relative global change winner" = "#fdae61"),
-                    drop = FALSE, na.value = NA, name = "impact of drivers") +
-  new_scale_fill() +
-  geom_stratum(aes(fill = stratum), width = 1/5, colour = "grey20") +
-  scale_fill_manual(values = c("positive\ntrend" = "#EFCA08", "negative\ntrend" =  "#7DC4C9", "stable" =  "#EDE6F2"), na.value = NA) +
-  # text in bars:
-  geom_text(stat = "stratum",
-            fontface = "italic",
-            size = 7,
-            aes(label = ifelse(test = after_stat(x) == "1",
-                               yes = paste0(stratum, " (",
-                                            plot_df_lodes %>%
-                                              filter(x == "cfclimlu") %>%
-                                              group_by(stratum) %>%
-                                              summarise(n = sum(n)) %>%
-                                              pull(n) %>%
-                                              rev, ")"),
-                               no = paste0(stratum, " (",
-                                           plot_df_lodes %>%
-                                             filter(x == "fact") %>%
-                                             group_by(stratum) %>%
-                                             summarise(n = sum(n)) %>%
-                                             pull(n) %>%
-                                             rev, ")")))) +
-  # species numbers in flow:
-  geom_text(stat = "alluvium",
-            fontface = "italic",
-            aes(label = ifelse(test = after_stat(x) == "1",
-                               yes = plot_df_lodes %>% filter(x == "cfclimlu") %>% pull(n),
-                               no = "")),
-            size = 6, nudge_x = 0.15) +
-  scale_x_discrete(limits = c("cfclimlu", "fact"), expand = c(0.15, 0.0)) +
-  labs(title = "Change in area of occupancy",
-       subtitle = "linear trend in 100 posterior draws of N. occ. routes per year\nnumbers = number of species",
-       x = "", y = "") +
-  annotate("text", x = 1, y = 85, label = "Counterfactual\nclimate & land use", hjust = 0.5, size = 8) +
-  annotate("text", x = 2, y = 85, label = "Observed \nglobal change", hjust = 0.5, size = 8) + 
-  guides(fill = "none") +
-  theme_bw() +
-  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
-        panel.border = element_blank(),
-        axis.ticks = element_blank(), axis.text = element_blank(),
-        text = element_text(size = 26),
-        plot.subtitle = element_text(margin = margin(0,0,30,0)),
-        legend.text = element_text(size = 24),
-        legend.position = "bottom", legend.direction = "vertical", legend.box.spacing = unit(-50, "pt"))
-
-#dev.off()
-
-
-
-
-# arrange plots for manuscript: ----
-
-# library(ggpubr)
-# 
-# combined_plot <- ggarrange(clim_plot, lu_plot, ncol = 2, nrow = 1, 
-#                            common.legend = TRUE, legend = "bottom",
-#                            labels = "AUTO",
-#                            font.label = list(size = 26),
-#                            hjust = -0.3) +
-#   theme(legend.box.spacing = unit(-100, "pt"))
-# 
-
-
-
-library(cowplot)
-combined_plot2 <- plot_grid(clim_plot + theme(legend.position="none"),
-                            lu_plot + theme(legend.position="none"),
-                            align = 'vh',
-                            labels = "AUTO",
-                            label_size = 26)
-combined_plot2
-
-# plot to get legend from:
-leg_plot <- plot_df_clim %>% 
-  ggplot(aes(axis1 = cfclim, axis2 = fact, y = n)) +
-  geom_alluvium(aes(fill = trend_change_clim), show.legend = TRUE, width = 1/5, colour = "grey50", alpha = 0.6) +
-  scale_fill_manual(values = c("relative climate change loser" = "#abd9e9",
-                               "absolute climate change loser" =  "#2c7bb6",
-                               "no change" = "gray90",
-                               "absolute climate change winner" = "#d7191c",
-                               "relative climate change winner" = "#fdae61"), 
-                    labels = c("absolute change winner",
-                               "relative change winner",
-                               "no change",
-                               "relative change loser",
-                               "absolute change loser"),
-                    drop = FALSE, na.value = NA) +
-  new_scale_fill() +
-  scale_fill_manual(values = c("positive\ntrend" = "#EFCA08", "negative\ntrend" =  "#7DC4C9", "stable" =  "#EDE6F2"), na.value = NA) +
-  geom_stratum(width = 1/4, aes(fill = cfclim), show.legend = FALSE, colour = "grey20") + 
-  geom_stratum(width = 1/4, aes(fill = fact), show.legend = FALSE, colour = "grey20") +
-  guides(fill = "none") +
-  theme_bw() +
-  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
-        plot.margin = margin(40,15,10,5), # trbl # top margin to later have label when arranging multiple plots
-        panel.border = element_blank(),
-        axis.ticks = element_blank(), axis.text = element_blank(),
-        text = element_text(size = 24),
-        plot.subtitle = element_text(margin = margin(0,0,30,0), size = 30),
-        legend.text = element_text(size = 24),
-        legend.position = "bottom", legend.direction = "vertical", 
-        legend.box.margin = margin(-50, 0, 0, 0),
-        legend.key.spacing.y = unit(0.2, "cm"), 
-        legend.title=element_blank())
-
-# extract the legend:
-legend <- get_legend(
-  # create some space to the left of the legend
-  leg_plot
-  #+ theme(legend.box.margin = margin(0, 0, 20, 0))
-)
-
-
-combined_plot_final <- plot_grid(combined_plot2, legend, 
-                                 nrow = 2,
-                                 rel_heights = c(1, .15))
-combined_plot_final
-
-# does make new plots with 
-ggsave(filename = file.path("plots", "attribution", "summary_plots", "alluvial_climate_lu_manuscript.svg"), 
-       plot = combined_plot_final,
-       device = "svg",
-       width = 45,
-       height = 32,
-       units = "cm")
-
-
-# version with bird icon:
-
-library(rphylopic)
-
-uuid <- get_uuid(name = "Contopus virens", n = 1)
-img <- get_phylopic(uuid = uuid)
-
-icon <- ggplot() +
-  add_phylopic(x = 1, y = 1, img = img, remove_background = TRUE, vjust = 0.2) + # vjust for alignment with legend in final plot
-  theme_nothing()
-
-icon
-#get_attribution(uuid = uuid)
-
-# bottom row:
-legend_plot <- plot_grid(NULL, icon, legend, NULL, 
-                         nrow = 1, ncol = 4,
-                         rel_widths = c(2.6, 0.4, 2.2, 3), # rel_widths = c(0.25, 0.05, 0.4, 0.3),
-                         scale = c(1, 1, 1, 1))
-legend_plot
-
-combined_plot_final2 <- plot_grid(combined_plot2, 
-                                  legend_plot, 
-                                  nrow = 2,
-                                  rel_heights = c(1, .2))
-combined_plot_final2
-ggsave(filename = file.path("plots", "attribution", "summary_plots", "alluvial_climate_lu_manuscript2.svg"), 
-       plot = combined_plot_final2,
-       device = "svg",
-       width = 45,
-       height = 32,
-       units = "cm")
-
-
-
 # conceptual figures, replicated from Langhammer et al. 2024: ----
 
+# used as legend
 
 dummy_df <- expand.grid(impact = factor(c("absolute winners", "relative winners", 
-                                          #"no change", 
                                           "relative losers", "absolute losers"), 
                                         levels = c("absolute winners", "relative winners", 
-                                                   #"no change", 
                                                    "relative losers", "absolute losers")),
-                        scenario = factor(c("observed change" ,"counterfactual scenario")),
+                        scenario = factor(c("             observed" ,"            counterfactual")), # added spaces to get text placed in the wider part of the shaded area
                         x = c(0, 1)) %>% 
   as_tibble() %>% 
   arrange(impact) %>% 
   mutate(ymin = c(0, 0, 2, -2, # abs. winners
                   0, 0, -1, -6,  # rel. winners
-                  #0, 0, 2, 1, # no change
                   0, 0, 1, 6, # rel. losers
-                  0, 0, -6, -1), # abs. losers
+                  0, 0, -6, -2), # abs. losers
          ymax = c(0, 0, 5, 1, # abs. winners
                   0, 0, -4, -9, # rel. winners
-                  #0, 0, 5, 4, # no change
                   0, 0, 4, 9, # rel. losers
-                  0, 0, -3, 3)) # abs. losers
+                  0, 0, -3, 1)) %>% # abs. losers
+  # for label placement:
+  mutate(ymean = ymin + (ymax-ymin)/2)
 
-
-# version for presentation:
-
-conc_plot <- ggplot(dummy_df) +
+# plot:
+conc_plot_m <- ggplot(dummy_df) +
   geom_ribbon(aes(x = x, ymin = ymin, ymax = ymax, fill = scenario)) +
-  facet_wrap(~impact, ncol = 1, # change for horizontal version
-             axes = "all", axis.labels = "all") + #, scales = "free"
+  facet_wrap(~impact, ncol = 4, # change for horizontal version
+             axes = "all", axis.labels = "all") +
   geom_hline(yintercept = 0, linetype = "longdash") +
-  #geomtextpath::geom_labelpath(aes(x = x, y = ymin), size = 5, fill = "#F6F6FF") + # xx
+  
+  geomtextpath::geom_textpath(aes(x = x, y = ymean, label = scenario, colour = scenario), 
+                              size = 8, text_only = TRUE) + # requires some manual adjustments
+  
+  scale_colour_manual(values = c("white", "black"), guide = "none") +
   scale_x_continuous(expand = c(0, 0)) +
-  scale_fill_manual(values = c(alpha("grey60", 0.6), alpha("grey10", 0.6))) +
-  labs(x = "time", y = "occupied area", title = "Impact categories") +
+  scale_fill_manual(values = c(alpha("grey10", 0.6), alpha("grey60", 0.6)), guide = "none" ) +
+  labs(x = "time", y = "occupied area") +
   theme_bw() +
   theme(axis.ticks = element_blank(),
         axis.text = element_blank(),
         panel.grid = element_blank(),
         strip.background = element_rect(fill = NA),# colour added later
-        legend.position = "bottom", legend.direction = "vertical",legend.title=element_blank(),
-        text = element_text(size = 30), # paper version size = 25
-        plot.title = element_text(margin=margin(0,0,20,0)),
-        legend.key.spacing.y = unit(0.3, "cm"),
-        axis.title = element_text(size = 25)
+        text = element_text(size = 24),
+        strip.text.x = element_text(size = 24),
+        plot.margin = margin(5,5,5,5)
   ) 
-conc_plot
+conc_plot_m
 
 # add colours for facet strips:
-g <- ggplot_gtable(ggplot_build(conc_plot))
+g <- ggplot_gtable(ggplot_build(conc_plot_m))
 stripr <- which(grepl('strip', g$layout$name))
 fills <- c(
-  alpha("#2c7bb6", alpha = 0.6),
-  alpha("#abd9e9", alpha = 0.6),
-  #alpha("gray90", alpha = 0.6),
+  alpha("#d7191c", alpha = 0.6),
   alpha("#fdae61", alpha = 0.6),
-  alpha("#d7191c", alpha = 0.6)
+  alpha("#abd9e9", alpha = 0.6),
+  alpha("#2c7bb6", alpha = 0.6)
 )
 
 k <- 1
@@ -889,9 +603,7 @@ for (i in stripr) {
   k <- k+1
 }
 
-jpeg(file = file.path("plots", "attribution", "summary_plots",
-                      "conceptual_trend_change_categories.jpg"),
-     width = 350, height = 1000, quality = 100)
+grid::grid.draw(g)
 
 # svg(file = file.path("plots", "attribution", "summary_plots",
 #                      "conceptual_trend_change_categories.svg"),
@@ -900,4 +612,253 @@ jpeg(file = file.path("plots", "attribution", "summary_plots",
 grid::grid.draw(g)
 dev.off()
 
-# version for manuscript:
+
+# arrange plots for manuscript with conceptual legend and bird icon: -----
+
+# climate change:
+clim_plot <- plot_df_clim %>% 
+  ggplot(aes(axis1 = cfclim, axis2 = fact, y = n)) +
+  geom_alluvium(aes(fill = trend_change_clim), show.legend = TRUE, width = 1/5, colour = "grey50", alpha = 0.6) +
+  scale_fill_manual(values = c("relative climate change loser" = "#abd9e9",
+                               "absolute climate change loser" =  "#2c7bb6",
+                               "no change" = "gray90",
+                               "absolute climate change winner" = "#d7191c",
+                               "relative climate change winner" = "#fdae61"), 
+                    drop = FALSE, na.value = NA, guide = "none") +
+  new_scale_fill() +
+  scale_fill_manual(values = c("positive\ntrend" = "#EFCA08", "negative\ntrend" =  "#7DC4C9", "stable" =  "#EDE6F2"), na.value = NA, guide = "none") +
+  geom_stratum(width = 1/4, aes(fill = cfclim), show.legend = FALSE, colour = "grey20") + 
+  geom_stratum(width = 1/4, aes(fill = fact), show.legend = FALSE, colour = "grey20") +
+  # species numbers in bars:
+  geom_text(stat = "stratum", 
+            fontface = "italic",
+            aes(label = ifelse(test = after_stat(x) == "1",
+                               yes = paste0(stratum, " (",
+                                            flow_df %>%
+                                              filter(species %in% spec_attr) %>% 
+                                              group_by(cfclim) %>% 
+                                              summarise(n = n()) %>% 
+                                              arrange(cfclim) %>%  
+                                              pull(n) %>% 
+                                              rev, ")"),
+                               no = paste0(stratum, " (",
+                                           flow_df %>%
+                                             filter(species %in% spec_attr) %>%
+                                             group_by(fact) %>%
+                                             summarise(n = n()) %>%
+                                             arrange(as.character(fact)) %>%
+                                             pull(n) %>%
+                                             rev, ")"))),
+            size = 8) +
+  # species numbers in flow:
+  geom_text(stat = "alluvium", 
+            fontface = "italic",
+            aes(label = ifelse(test = after_stat(x) == "1",
+                               yes = plot_df_clim %>% pull(n),
+                               no = "")),
+            size = 7, nudge_x = 0.15) +
+  scale_x_discrete(limits = c("cfclim", "fact"), expand = c(0.13, 0.0)) +
+  labs(x = "", y = "") +
+  annotate("text", x = 1, y = 85, label = "Counterfactual\nclimate", hjust = 0.5, size = 9) + 
+  annotate("text", x = 2, y = 85, label = "Factual\nclimate", hjust = 0.5, size = 9) + 
+  coord_cartesian(clip = 'off') + # prevent annotations to get cut
+  theme_bw() +
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+        plot.margin = margin(40,15,-50,5), # trbl # top margin for labels when arranging multiple plots
+        panel.border = element_blank(),
+        axis.ticks = element_blank(), axis.text = element_blank(),
+        text = element_text(size = 24),
+        legend.position = "none")
+
+clim_plot
+
+# land use change:
+lu_plot <- ggplot(plot_df_lodes, aes(x = x, stratum = stratum, alluvium = trend_change_lu, y = n)) +
+  geom_flow(stat = "alluvium", aes(fill = trend_change_lu2),
+            color = "darkgray",width = 1/4, show.legend = TRUE, alpha = 0.6) +
+  scale_fill_manual(values = c("relative land use change loser" = "#abd9e9",
+                               "absolute land use change loser" =  "#2c7bb6",
+                               "no change" = "gray90",
+                               "absolute land use change winner" = "#d7191c",
+                               "relative land use change winner" = "#fdae61"), 
+                    drop = FALSE, na.value = NA, name = "impact of drivers") +
+  new_scale_fill() +
+  geom_stratum(aes(fill = stratum), width = 1/4, colour = "grey20") + 
+  scale_fill_manual(values = c("positive\ntrend" = "#EFCA08", "negative\ntrend" =  "#7DC4C9", "stable" =  "#EDE6F2"), na.value = NA) +
+  # species numbers in bars:
+  geom_text(stat = "stratum", 
+            fontface = "italic",
+            size = 8,
+            aes(label = ifelse(test = after_stat(x) == "1",
+                               yes = paste0(stratum, " (",
+                                            plot_df_lodes %>% 
+                                              filter(x == "cflu") %>% 
+                                              group_by(stratum) %>% 
+                                              summarise(n = sum(n)) %>% 
+                                              pull(n) %>% 
+                                              rev, ")"),
+                               no = paste0(stratum, " (",
+                                           plot_df_lodes %>% 
+                                             filter(x == "fact") %>% 
+                                             group_by(stratum) %>% 
+                                             summarise(n = sum(n)) %>% 
+                                             pull(n) %>% 
+                                             rev, ")")))) +
+  # species numbers in flow:
+  geom_text(stat = "alluvium", 
+            fontface = "italic",
+            aes(label = ifelse(test = after_stat(x) == "1",
+                               yes = plot_df_lu %>% pull(n),
+                               no = "")),
+            size = 7, nudge_x = 0.15) +
+  scale_x_discrete(limits = c("cflu", "fact"), expand = c(0.13, 0.0)) +
+  labs(x = "", y = "") +
+  annotate("text", x = 1, y = 85, label = "Counterfactual\nland use", hjust = 0.5, size = 9) + 
+  annotate("text", x = 2, y = 85, label = "Factual\nland use", hjust = 0.5, size = 9) + 
+  coord_cartesian(clip = 'off') + # prevent annotations to get cut
+  theme_bw() +
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+        axis.ticks = element_blank(), axis.text = element_blank(),
+        plot.margin = margin(40,15,-50,5), # trbl
+        panel.border = element_blank(),
+        text = element_text(size = 24),
+        legend.position = "none")
+
+lu_plot
+
+# arrange side-by-side:
+combined_plot <- plot_grid(clim_plot,
+                           lu_plot,
+                           align = 'vh',
+                           labels = "AUTO",
+                           label_size = 26)
+
+# get bird icon:
+
+uuid <- get_uuid(name = "Contopus virens", n = 1)
+img <- get_phylopic(uuid = uuid)
+icon <- ggplot() +
+  add_phylopic(x = 1, y = 1, img = img, remove_background = TRUE) + # vjust for alignment with legend in final plot
+  theme_nothing()
+
+# arrange all parts:
+
+svg(file = file.path("plots", "attribution", "summary_plots", "alluvial_climate_lu_manuscript_conceptual_legend.svg"),
+    width = 17, # in inches
+    height = 14)
+
+# clear plot area:
+grid.newpage()
+
+# define area for main plot:
+vp1 <- viewport(x = 0.5, y = 0.25, 
+                height = 0.75, width = 1,
+                just = c("center", "bottom"),
+                name = "combined_plots")
+
+# enter vp1 
+pushViewport(vp1)
+# add plot:
+print(combined_plot, newpage = FALSE)
+
+# leave vp1 - up one level (into root viewport)
+upViewport(1)
+
+# define legend area
+vp2 <- viewport(x = 0.493, y = 0.02, 
+                height = 0.25, width = 0.8,
+                just = c("center", "bottom"),
+                name = "legend")
+# enter vp2
+pushViewport(vp2)
+# add plot:
+grid.draw(g)
+
+# leave vp2 - up one level (into root viewport)
+upViewport(1)
+
+# define icon area
+vp3 <- viewport(x = 0.01, y = 0.09, 
+                height = 0.15, width = 0.07,
+                just = c("left", "bottom"),
+                name = "icon")
+pushViewport(vp3)
+print(icon, newpage = FALSE)
+
+dev.off()
+
+
+# # version without conceptual legend: ----
+# 
+# # arrange plots:
+# combined_plot <- plot_grid(clim_plot,
+#                            lu_plot,
+#                            align = 'vh',
+#                            labels = "AUTO",
+#                            label_size = 26)
+# combined_plot
+# 
+# # add common legend:
+# # plot to get legend from:
+# leg_plot <- plot_df_clim %>% 
+#   ggplot(aes(axis1 = cfclim, axis2 = fact, y = n)) +
+#   geom_alluvium(aes(fill = trend_change_clim), show.legend = TRUE, width = 1/5, colour = "grey50", alpha = 0.6) +
+#   scale_fill_manual(values = c("relative climate change loser" = "#abd9e9",
+#                                "absolute climate change loser" =  "#2c7bb6",
+#                                "no change" = "gray90",
+#                                "absolute climate change winner" = "#d7191c",
+#                                "relative climate change winner" = "#fdae61"), 
+#                     labels = c("absolute change winner",
+#                                "relative change winner",
+#                                "no change",
+#                                "relative change loser",
+#                                "absolute change loser"),
+#                     drop = FALSE, na.value = NA) +
+#   new_scale_fill() +
+#   scale_fill_manual(values = c("positive\ntrend" = "#EFCA08", "negative\ntrend" =  "#7DC4C9", "stable" =  "#EDE6F2"), na.value = NA) +
+#   geom_stratum(width = 1/4, aes(fill = cfclim), show.legend = FALSE, colour = "grey20") + 
+#   geom_stratum(width = 1/4, aes(fill = fact), show.legend = FALSE, colour = "grey20") +
+#   guides(fill = "none") +
+#   theme_bw() +
+#   theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+#         plot.margin = margin(40,15,10,5), # trbl # top margin to later have label when arranging multiple plots
+#         panel.border = element_blank(),
+#         axis.ticks = element_blank(), axis.text = element_blank(),
+#         text = element_text(size = 24),
+#         plot.subtitle = element_text(margin = margin(0,0,30,0), size = 30),
+#         legend.text = element_text(size = 24),
+#         legend.position = "bottom", legend.direction = "vertical", 
+#         legend.box.margin = margin(-50, 0, 0, 0),
+#         legend.key.spacing.y = unit(0.2, "cm"), 
+#         legend.title=element_blank())
+# 
+# # extract the legend:
+# legend <- get_legend(leg_plot)
+# 
+# #  bird icon:
+# uuid <- get_uuid(name = "Contopus virens", n = 1)
+# img <- get_phylopic(uuid = uuid)
+# icon <- ggplot() +
+#   add_phylopic(x = 1, y = 1, img = img, remove_background = TRUE, vjust = 0.2) + # vjust for alignment with legend in final plot
+#   theme_nothing()
+# icon
+# #get_attribution(uuid = uuid, text = TRUE)
+# 
+# # bottom row: icon + legend
+# legend_plot <- plot_grid(NULL, icon, legend, NULL, 
+#                          nrow = 1, ncol = 4,
+#                          rel_widths = c(2.6, 0.4, 2.2, 3), # rel_widths = c(0.25, 0.05, 0.4, 0.3),
+#                          scale = c(1, 1, 1, 1))
+# legend_plot
+# 
+# # upper row: alluvial plots
+# combined_plot_final <- plot_grid(combined_plot, legend_plot, nrow = 2, rel_heights = c(1, .2))
+# 
+# combined_plot_final
+# 
+# ggsave(filename = file.path("plots", "attribution", "summary_plots", "alluvial_climate_lu_manuscript2.svg"), 
+#        plot = combined_plot_final,
+#        device = "svg",
+#        width = 45,
+#        height = 32,
+#        units = "cm")

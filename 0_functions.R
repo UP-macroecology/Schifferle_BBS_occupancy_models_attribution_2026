@@ -1,6 +1,5 @@
-# function for spatial thinning of routes (fom Anna):
+# function for spatial thinning of routes:
 
-# function for "fast" spatial thinning"
 thin <- function(sf, thin_dist = 3000, runs = 10, ncores = 10){
   
   require(sf, quietly = TRUE)
@@ -42,25 +41,20 @@ thin <- function(sf, thin_dist = 3000, runs = 10, ncores = 10){
   
   out <- sf[selected_run,]
   
-  # out <- sf_to_df(out)[,3:4] %>%
-  #   rename("lon" = "x", "lat" = "y") # xx
-  
   out
 }
 
 
-# Function select07 (from Damaris, comments from me):
-select07 <- function(imp, X, threshold=0.7, method="spearman") # imp = importance
-{
-  
-  # choose most important variable of those that have spearman correlation > 0.7
+# function to choose most important variable of those that have spearman correlation > 0.7: 
+
+select07 <- function(imp, X, threshold = 0.7, method="spearman") { # imp = importance
   
   cm <- cor(X, method=method) # correlation matrix
   sort.imp <- colnames(X)[order(imp,decreasing=T)] # sort variables according to importance based on PCA
   
   pairs <- which(abs(cm)>= threshold, arr.ind=TRUE) # identifies correlated variable pairs
-  index <- which(pairs[,1]==pairs[,2])           # removes entry on diagonal
-  pairs <- pairs[-index,]                        # -"-
+  index <- which(pairs[,1]==pairs[,2]) # removes entry on diagonal
+  pairs <- pairs[-index,]                       
   
   exclude <- NULL
   
@@ -79,92 +73,63 @@ select07 <- function(imp, X, threshold=0.7, method="spearman") # imp = importanc
   sort.imp[!(sort.imp %in% unique(exclude)), drop = FALSE]
 }
 
-# Function to subsample routes so that there is a maximum of 30 routes in each Bird Conservation Region:
 
-# 2 versions:
+# function to subsample routes so that there is a maximum of 30 routes in each Bird Conservation Region:
 
-## 1) first remove one of the two closest points, 
-## then calculate distances again and again remove one of the two closest points...
+# from: https://gist.github.com/danlwarren/271288d5bab45d2da549:
 
-subsample1 <- function(data, npoints_keep = 30){
-  
-  # data = sf object
-  
-  # number of points to remove:
-  remove_n <- nrow(data) - npoints_keep
-  
-  output_data <- data
-  
-  for(r in 1:remove_n){
-    
-    #print(r)
-    
-    # distance matrix:
-    dist_mat <- output_data %>% 
-      st_distance()
-    
-    # which pair of points are closest:
-    dist_mat[dist_mat==units::as_units(0, "m")] <- NA  # exclude 0 (distance to itself)
-    ind <- arrayInd(which.min(dist_mat), dim(dist_mat))
-    
-    # corresponding RTENO:
-    remove_this <- output_data %>% 
-      slice(ind[sample(c(1,2), 1)]) %>% # arbitrarily remove one of two closest points
-      pull(RTENO)
-    
-    # remove that route:
-    output_data <- output_data %>% 
-      filter(RTENO != remove_this)
-  }
-  return(output_data)
-}
+# Function to rarefy point data in any number of dimensions.  The goal here is to 
+# take a large data set and reduce it in size in such a way as to approximately maximize the 
+# difference between points.  For instance, if you have 2000 points but suspect a lot of 
+# spatial autocorrelation between them, you can pass in your data frame, the names (or indices)
+# of the lat/lon columns, and the number 200, and you get back 200 points from your original data 
+# set that are chosen to be as different from each other as possible given a randomly chosen
+# starting point
 
-## 2) from: https://gist.github.com/danlwarren/271288d5bab45d2da549:
-
-# randomly choose one point, calculate distance to all others, choose the most distant one,
-# then find distance of all not chosen points to the chosen points and choose again the most distant point to all chosen points, repeat
-# input:
+# Input is:
+#
 # x, a data frame containing the columns to be used to calculate distances along with whatever other data you need
 # cols, a vector of column names or indices to use for calculating distances
 # npoints, the number of rarefied points to spit out
-# e.g. subsample2(my.data, c("latitude", "longitude"), 200)
+#
+# e.g., thin.max(my.data, c("latitude", "longitude"), 200)
 
-# advantage: random drawing -> repeat to get different sets -> what to use? xx
 
-subsample2 <- function(x, cols, npoints){
+thin.max <- function(x, cols, npoints){
+  #Create empty vector for output
+  inds <- vector(mode="numeric")
   
-  # create empty vector for output:
-  inds <- vector(mode = "numeric")
+  #Create distance matrix
+  this.dist <- as.matrix(dist(x[,cols], upper=TRUE))
   
-  # create distance matrix:
-  this.dist <- as.matrix(dist(x[, cols], upper=TRUE))
-  
-  # draw first index at random:
+  #Draw first index at random
   inds <- c(inds, as.integer(runif(1, 1, length(this.dist[,1]))))
   
-  # get second index from maximally distant point from first one (necessary for apply ftc)
+  #Get second index from maximally distant point from first one
+  #Necessary because apply needs at least two columns or it'll barf
+  #in the next bit
   inds <- c(inds, which.max(this.dist[,inds]))
   
   while(length(inds) < npoints){
-    # for each point, find its distance to the closest point that's already been selected:
+    #For each point, find its distance to the closest point that's already been selected
     min.dists <- apply(this.dist[,inds], 1, min)
     
-    # select the point that is furthest from everything already selected:
+    #Select the point that is furthest from everything we've already selected
     this.ind <- which.max(min.dists)
     
-    # get rid of ties, if they exist:
+    #Get rid of ties, if they exist
     if(length(this.ind) > 1){
       print("Breaking tie...")
       this.ind <- this.ind[1]
     }
     inds <- c(inds, this.ind)
   }
+  
   return(x[inds,])
 }
 
 
-
-# species specific presence-absence data as input for occupancy models, based on BBS data:
+# function get presence-absence data for a species from BBS data, as input for occupancy models:
 
 BBS_pres_abs_spec <- function(species, 
                               BBS_spec_data = bbs_dt_occ, 
@@ -198,7 +163,7 @@ BBS_pres_abs_spec <- function(species,
     arrange(RTENO)
   
   # for the following species there are reported presences on routes far outside the breeding range
-  # these are considered absences (not used for models):
+  # these are considered absences (not used for models): # see 1_3_dataprep_BBS_outlier_check_selected_species.R.R
   if(species %in% c("Yellow-throated Warbler", "Red Crossbill")){
     if(species == "Yellow-throated Warbler"){
       occ_dt_spec$presence[which(occ_dt_spec$RTENO == 84069052)] <- 0
@@ -211,9 +176,8 @@ BBS_pres_abs_spec <- function(species,
 }
 
 
-# returns BBS routes that are within a certain buffer distance around the routes where
-# a species was recorded; these are considered to fit dynamic occupancy models:
-
+# function to get BBS routes that are within a certain buffer around the routes where
+# a species was recorded, as input for occupancy models:
 
 training_routes <- function(species, buffer_km, BBS_spec_data = bbs_dt_occ,
                             routes_sf = routes_sel_sf,
@@ -258,78 +222,9 @@ training_routes <- function(species, buffer_km, BBS_spec_data = bbs_dt_occ,
 }
 
 
-# modified flocker function to get Z matrix of occupancy probabilities from flocker models faster:
+# modified function of R package flocker to get Z matrix of occupancy probabilities from flocker models faster:
 
-# flocker get_Z() for multi-colex and history condition = FALSE:
-
-# function (flocker_fit, draw_ids = NULL, history_condition = TRUE, sample = FALSE, new_data = NULL) {
-# 
-#   if (is.null(draw_ids)) {
-#     n_iter <- brms::ndraws(flocker_fit)
-#   }
-#   else {
-#     n_iter <- length(draw_ids)
-#   }
-# 
-#   use_components <- c("occ", "col", "ex", "auto", "Omega")
-#   obs <- NULL
-# 
-#   #lik_type "multi_colex":
-#   lps2 <- fitted_flocker(flocker_fit, components = c("occ", "colo", "ex"), draw_ids = draw_ids, new_data = new_data)
-#   init <- lps2$linpred_occ[, 1, ]
-#   colo <- lps2$linpred_col
-#   ex <- lps2$linpred_ex
-#   det <- NULL
-# 
-#   Z <- get_Z_dynamic(init, colo, ex, history_condition, sample, obs, det)
-#   class(Z) <- c("postZ", class(Z))
-#   Z
-# }
-# 
-# # flocker get_Z_dynamic:
-# 
-# function (init, colo, ex, history_condition, sample, obs = NULL, det = NULL) {
-# 
-#   nsite <- nrow(init)
-#   ntimestep <- ncol(colo)
-#   ndraw <- ncol(init)
-# 
-#   det <- NULL
-# 
-#   out <- new_array(colo)
-# 
-#   for (i in 1:nsite) {
-#     for (j in 1:ndraw) {
-#       out[i, , j] <- forward_sim(init[i, j], colo[i, 
-#                                                   , j], ex[i, , j], sample)
-#     }
-#   }
-#   out
-# }
-# 
-# # flocker forward_sim:
-# 
-# function (init, colo, ex, sample = FALSE) {
-# 
-#   length_out <- length(colo)
-#   
-#   if (!identical(colo, NA)) { # if there is at least one NA in colo
-#     colo <- colo[1:max(which(!is.na(colo)))] # removes NAs at the end only?
-#     ex <- ex[1:max(which(!is.na(colo)))]
-#   }
-# 
-#   out <- rep(NA, length_out)
-#   
-#   out[1] <- init
-#   if (length(colo) > 1) {
-#     for (i in 2:length(colo)) {
-#       out[i] <- (1 - out[i - 1]) * colo[i] + (out[i -  1]) * (1 - ex[i])
-#     }
-#   }
-#   out
-# }
-
-# adapted version to use data frame as new data (much faster):
+# adapted version to use data frame as new data:
  get_Z_mod <- function(flocker_fit, 
                        draw_ids = NULL, 
                        new_data = NULL){ # as data frame
@@ -351,8 +246,6 @@ training_routes <- function(species, buffer_km, BBS_spec_data = bbs_dt_occ,
                           new_data = new_data)
      
    # reformat from long df to array:
-   
-   #dim(lps2$linpred_occ) # 71800, 1000
    
    nsites <- length(unique(new_data$cellID))
    nyears <- length(unique(new_data$year))
@@ -381,7 +274,7 @@ training_routes <- function(species, buffer_km, BBS_spec_data = bbs_dt_occ,
 
        length_out <- length(colo[i, , j])
 
-       if (!identical(colo[i, , j], NA)) { # if there is at least one NA in colo xx
+       if (!identical(colo[i, , j], NA)) { # if there is at least one NA in colo 
          colo[i, , j] <- colo[i, , j][1:max(which(!is.na(colo[i, , j])))] # removes NAs at the end only?
          ex[i, , j] <- ex[i, , j][1:max(which(!is.na(colo[i, , j])))]
        }
@@ -405,7 +298,7 @@ training_routes <- function(species, buffer_km, BBS_spec_data = bbs_dt_occ,
  }
  
  
- # get sum of routes with species observations for each year between 1995 and 2019:
+ # get sum of routes across the conterminous USA with observations of a species for each year between 1995 and 2019:
  
  obs_time_series <- function(spec){
    
@@ -415,7 +308,7 @@ training_routes <- function(species, buffer_km, BBS_spec_data = bbs_dt_occ,
    
    # route-level presence:
    # sum all routes for each year (temporal trend)
-   obs_temp_trend <- occ_dt_spec %>% #xx
+   obs_temp_trend <- occ_dt_spec %>%
      group_by(Year) %>%
      summarise(pres_sum = sum(presence, na.rm = TRUE))
    

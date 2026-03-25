@@ -1,5 +1,5 @@
 ---
-title: "Check fitted flocker model"
+title: "Check fitted flocker model and plot posteriors"
 format: pdf
 editor: visual
 params:
@@ -20,41 +20,28 @@ library(ggplot2)
 library(cmdstanr)
 library(bayesplot)
 library(brms)
-
-# selected species, sorted by ecoregion 
-# (final_species_eco_sorted; output of 1_2_species_selection.R)
-load(file = file.path("data", "final_species_selection_eco_sorted.RData")) 
-
 ```
 
-Specify model to check:
+Model to check:
 
 ```{r}
-spec <- params$spec #final_species_eco_sorted[6] # 1
-spec
+#| echo: false
+
+spec <- params$spec
 buffer_km <- params$buffer_km
-buffer_km
 fold <- params$fold
-# fold
-
 results_dir <- params$results_dir
-results_dir
 model_file <- params$model_file
+
+spec
+buffer_km
+substring(results_dir, 1, 80)
+substring(results_dir, 81, 160)
 model_file
-```
 
-Load fitted model:
+# load model:
+load(file = file.path(results_dir, model_file)) # adjust
 
-```{r}
-# xx adjust
-# load(file = file.path(results_dir,
-#                       paste0("out_", spec, "_fm_buffer", buffer_km, ".RData"))) #
-# load(file = file.path(results_dir,
-#                       paste0("out_", spec, "_temp_val_5yrs.RData")))
-load(file = file.path(results_dir, model_file))
-#print(out)
-
-posterior <- brms::as_draws(out)
 ```
 
 ## Check whether MCMC worked:
@@ -63,14 +50,13 @@ posterior <- brms::as_draws(out)
 
 ```{r}
 #| echo: false
+
+posterior <- brms::as_draws(out)
+
 # check for divergent transitions:
 hmc_diagnostics <- nuts_params(out)
+
 # extract the number of divergence transitions:
-
-# hmc_diagnostics %>%
-#   filter(Parameter == "divergent__") %>%
-#   count(Value)
-
 div_trans <- sum(subset(hmc_diagnostics, Parameter == "divergent__")$Value)
 
 print(paste("divergent transitions:", div_trans))
@@ -90,18 +76,15 @@ if(div_trans > 0){
 }
 ```
 
-#### Explorations regarding divergent transitions:
-
-...
-
 ### Is effective number of MCMC samples large enough:
 
 The larger the ratio of n_eff to N (number of samples), the better.
 
 ```{r}
 #| echo: false
-n_eff_ratios <- neff_ratio(out)
-print(mcmc_neff(n_eff_ratios, size = 2)) # a useful heuristic is to worry about any neff/N less than 0.1)
+
+n_eff_ratios <- neff_ratio(out) # "a useful heuristic is to worry about any neff/N less than 0.1")
+print(mcmc_neff(n_eff_ratios, size = 2)) 
 
 if("low" %in% mcmc_neff_data(n_eff_ratios)$rating){
   print("effective sample size too small")
@@ -132,6 +115,7 @@ if(min(n_eff_ratio_bulk) < 0.1 |  min(n_eff_ratio_tail) < 0.1 ){
 #| echo: false
 #| fig-height: 11
 #| fig-width: 9
+
 color_scheme_set("mix-brightblue-gray")
 for(par in c("b_occ", "b_col", "b_ex")){
   print(
@@ -149,15 +133,15 @@ for(par in c("b_occ", "b_col", "b_ex")){
 rhats <- bayesplot::rhat(out$fit)
 summary(rhats)
 
-if(max(rhats) > 1.05){
-  print(paste("R-hat > 1.05 for", length(which(rhats > 1.05)), "parameters."))
+if(max(rhats) >= 1.02){
+  print(paste("R-hat > 1.02 for", length(which(rhats > 1.02)), "parameters."))
 }
-if(max(rhats) >= 1.01){
+if(max(rhats) >= 1.02){
   print(mcmc_rhat(rhats) +
           yaxis_text(hjust = 1)
         )
 } else {
-  print("All R-hat values < 1.01")
+  print("All R-hat values < 1.02")
 }
 ```
 

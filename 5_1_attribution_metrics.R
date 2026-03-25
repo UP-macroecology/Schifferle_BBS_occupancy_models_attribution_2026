@@ -1,51 +1,36 @@
-# assemble metrics used to quantify the contribution of climate and land use change to estimated occupancy dynamics
-# based on counterfactual and factual predictions
+# assemble metrics to compare occupancy time series under factual and counterfactual climate
+# and land use to quantify the contribution of climate and land use change
 
 # packages: --------------------------------------------------------------------
 
 library(dplyr)
 library(ggplot2)
 
+
 # directories: -----------------------------------------------------------------
-main_dir <- file.path("//NAS-2-P-SN-01.ibb.uni-potsdam.de", "daten$", "AG26", "Transfer",
-                      "Schifferle_BBS_occupancy_models_2023")
+
+# project directory:
+dir <- file.path("//NAS-2-P-SN-01.ibb.uni-potsdam.de", "daten$", "AG26", "Transfer", 
+                 "Schifferle_BBS_occupancy_models_2023")
+
+# observed time series:
+obs_dir <- file.path(dir, "data", "observed_time_series_1995_2019") # output of 4_1_DOMs_predictions_time_series.R
+# predicted time series for factual data:
+fact_dir <- file.path(dir, "results", "fm_buffer750km", "fact_pred_time_series_1995_2019") # output of 4_1_DOMs_predictions_time_series.R
+# predicted time series for counterfactual data:
+cfact_dir <- file.path(dir, "results", "attribution", "cfact_pred_time_series_1995_2019") # output of 4_1_DOMs_predictions_time_series.R
 
 
 # load data: -------------------------------------------------------------------
 
-# species for which fitting worked:
-load(file = file.path("data", "species_set_analysis.RData")) # output of 3_1_DOM_CV_evaluation_metrics.R
-final_species
+# species for attribution:
+load(file = file.path("data", "species_DOM_val_okay.RData")) # output of 4_0_DOMs_predictions_y_routes_scenarios.R
+spec_attr
 
-# species for which models worked fine:
-
-# okay in time:
-load(file.path("//NAS-2-P-SN-01.ibb.uni-potsdam.de/users$/schifferle1", "Documents", "DEBTs", "analysis", "Schifferle_BBS_occupancy_models_2023",
-               "results", "temp_val_buffer_750_10yrs", "temp_eval", "10_years", "spec_set_temp_val_ok1.RData")) # output of 3_1_DOM_temp_evaluation_metrics.R
-spec_temp_okay <- specs_thresh
-# okay in space:
-CV_eval_summary <- read.csv(file = file.path("//NAS-2-P-SN-01.ibb.uni-potsdam.de/users$/schifferle1", "Documents", "DEBTs", "analysis", "Schifferle_BBS_occupancy_models_2023",
-                                             "results", "CV_buffer750km", "CV_eval", "CV_eval_summary.csv")) # 3_1_DOM_CV_evaluation_metrics.R
-spec_spat_okay <- CV_eval_summary %>% 
-  filter(y_spat_auc_mean >= 0.7) %>% 
-  pull(species)
-
-# okay in both:
-spec_okay <- intersect(spec_temp_okay, spec_spat_okay) # 80
-#save(spec_okay, file = file.path("data", "species_DOM_val_okay.RData"))
-
-# directories: -----------------------------------------------------------------
-
-obs_dir <- file.path(main_dir, "data", "observed_time_series_1995_2019")
-fact_dir <- file.path(main_dir, "results", "fm_buffer750km", "fact_pred_time_series_1995_2019")
-cfact_dir <- file.path(main_dir, "results", "attribution", "cfact_pred_time_series_1995_2019") # output of 5_0_occupancy_dynamics_time_series.R
 
 # assemble df: -----------------------------------------------------------------
 
-# df to store results:
-attr_metr_df <- tibble(species = final_species,
-                      slope_obs = NA,
-                      p_obs = NA,
+attr_metr_df <- tibble(species = spec_attr,
                       slope_fact = NA,
                       slope_CIlow_fact = NA,
                       slope_CIhigh_fact = NA,
@@ -65,16 +50,13 @@ attr_metr_df <- tibble(species = final_species,
                       mape_fact = NA,
                       mape_cfclim = NA,
                       mape_cflu = NA,
-                      mape_cfclimlu = NA,
-                      mae_fact = NA,
-                      mae_cfclim = NA,
-                      mae_cflu = NA,
-                      mae_cfclimlu = NA)
-# species:
+                      mape_cfclimlu = NA)
+
+# iterate over species:
 
 for(s in 1:nrow(attr_metr_df)){
   
-  spec <- final_species[s]
+  spec <- spec_attr[s]
   
   print(paste(s, spec))
   
@@ -91,12 +73,6 @@ for(s in 1:nrow(attr_metr_df)){
   ts_preds_cfact
   
   # determine overall linear trend:
-  
-  # ## observed: not used further?
-  # trend_obs <- summary(lm(Npres ~ year, data = ts_obs))
-  # attr_metr_df$slope_obs[s] <- trend_obs$coefficients["year", "Estimate"]
-  # attr_metr_df$p_obs[s] <- trend_obs$coefficients["year", "Pr(>|t|)"]
-  
   
   ## predictions:
   # 100 posterior draws per year;
@@ -140,35 +116,30 @@ for(s in 1:nrow(attr_metr_df)){
   lm_df_all <- rbind(lm_df_f, lm_df_clim, lm_df_lu, lm_df_climlu) %>% 
     mutate(scenario = factor(scenario))
   
-  # test plot:
-  # xx improve for manuscript!
-  plot_dir <- file.path("plots", "attribution", "explorations", "lm_posterior_draws_scaled_no_int") # xx
-  if(!dir.exists(plot_dir)) dir.create(plot_dir, recursive = TRUE)
-  jpeg(file = file.path(plot_dir, paste0(spec, "_lm_posterior_draws_opt3.jpg")), # xx
-       width = 1200, height = 800, quality = 100)
-  print(lm_df_all %>%
-          mutate(scenario = factor(scenario, levels = c("fact", "clim", "lu", "climlu")),
-                 scenario = recode(scenario, fact = "factual", clim = "counterfactual\nclimate",
-                                   lu = "counterfactual\nland use", climlu = "counterfactual\nclimate + land use")) %>%
-          ggplot(aes(x = year_scaled, y = value_scaled, colour = scenario, fill = scenario)) +
-          geom_point(size = 1.5, position = position_jitter(width = 0.3), alpha = 0.2, shape = 19) +
-          geom_smooth(method = "lm", formula = y ~ x + 0, se = TRUE) +
-          labs(y = "scaled number of occupied routes",
-               title = paste0(spec, ", 100 draws of posterior distribution"),
-               x = "scaled year") +
-          scale_colour_manual(values = c("counterfactual\nclimate + land use" = "#046865",
-                                         "counterfactual\nland use" = "#B7410E",
-                                         "counterfactual\nclimate" = "#0D98BA",
-                                         "factual" = "#85CB33")) +
-          scale_fill_manual(values = c("counterfactual\nclimate + land use" = "#046865",
-                                       "counterfactual\nland use" = "#B7410E",
-                                       "counterfactual\nclimate" = "#0D98BA",
-                                       "factual" = "#85CB33")) +
-          guides(fill = "none") +
-          theme_bw() +
-          theme(text = element_text(size = 20))
-  )
-  dev.off()
+  # # plot to check:
+  # print(lm_df_all %>%
+  #         mutate(scenario = factor(scenario, levels = c("fact", "clim", "lu", "climlu")),
+  #                scenario = recode(scenario, fact = "factual", clim = "counterfactual\nclimate",
+  #                                  lu = "counterfactual\nland use", climlu = "counterfactual\nclimate + land use")) %>%
+  #         ggplot(aes(x = year_scaled, y = value_scaled, colour = scenario, fill = scenario)) +
+  #         geom_point(size = 1.5, position = position_jitter(width = 0.3), alpha = 0.2, shape = 19) +
+  #         geom_smooth(method = "lm", formula = y ~ x + 0, se = TRUE) +
+  #         labs(y = "scaled number of occupied routes",
+  #              title = spec,
+  #              x = "scaled year") +
+  #         scale_colour_manual(values = c("counterfactual\nclimate + land use" = "#046865",
+  #                                        "counterfactual\nland use" = "#B7410E",
+  #                                        "counterfactual\nclimate" = "#0D98BA",
+  #                                        "factual" = "#85CB33")) +
+  #         scale_fill_manual(values = c("counterfactual\nclimate + land use" = "#046865",
+  #                                      "counterfactual\nland use" = "#B7410E",
+  #                                      "counterfactual\nclimate" = "#0D98BA",
+  #                                      "factual" = "#85CB33")) +
+  #         guides(fill = "none") +
+  #         theme_bw() +
+  #         theme(text = element_text(size = 20))
+  # )
+
   
   # linear models to quantify trend:
   
@@ -209,7 +180,6 @@ for(s in 1:nrow(attr_metr_df)){
   attr_metr_df$slope_CIhigh_cfclimlu[s] <- CI_f[2]
   
   # mean absolute percent error:
-  # xx based on mean? or rather with uncertainty? 
   attr_metr_df$mape_fact[s] <- Metrics::mape(actual = ts_obs$Npres, 
                                             predicted = ts_preds_fact$median_Nocc)
   
@@ -221,37 +191,23 @@ for(s in 1:nrow(attr_metr_df)){
   
   attr_metr_df$mape_cfclimlu[s] <- Metrics::mape(actual = ts_obs$Npres, 
                                                 predicted = ts_preds_cfact$cf_clim_1995soc$median_Nocc)
-  
-  # mean absolute error:
-  attr_metr_df$mae_fact[s] <- Metrics::mae(actual = ts_obs$Npres, 
-                                          predicted = ts_preds_fact$median_Nocc)
-  
-  attr_metr_df$mae_cfclim[s] <- Metrics::mae(actual = ts_obs$Npres, 
-                                            predicted = ts_preds_cfact$cf_clim$median_Nocc)
-  
-  attr_metr_df$mae_cflu[s] <- Metrics::mae(actual = ts_obs$Npres, 
-                                          predicted = ts_preds_cfact$cf_1995soc$median_Nocc)
-  
-  attr_metr_df$mae_cfclimlu[s] <- Metrics::mae(actual = ts_obs$Npres, 
-                                              predicted = ts_preds_cfact$cf_clim_1995soc$median_Nocc)
-  
-  
 }
 
-#save(attr_metr_df, file = file.path(main_dir, "results", "attribution", "attribution_metrics_final.RData"))
+#save(attr_metr_df, file = file.path(dir, "results", "attribution", "attribution_metrics_final.RData"))
 
 
-# manuscript figure illustrating trend calculation: ----
+# figure for manuscript to illustrate trend calculation: -----------------------
 
-#spec <- "Black-throated Green Warbler"
+# directory to save plot:
+plot_dir <- file.path("plots", "attribution", "explorations", "lm_posterior_draws_scaled_no_int")
+
+# example species:
 spec <- "Dickcissel"
 
 # observations time series:
 load(file.path(obs_dir, paste0(spec, "_obs_ts_sum_occ_routes.RData")))
-
 # time series predictions factual:
 load(file.path(fact_dir, paste0(spec, "_ts_sum_occ_routes_f_preds.RData")))
-
 # time series predictions counterfactual:
 load(file.path(cfact_dir, paste0(spec, "_ts_sum_occ_routes_cf_preds.RData")))
 
@@ -292,9 +248,7 @@ lm_df_climlu <- ts_preds_cfact$cf_clim_1995soc %>%
 lm_df_all <- rbind(lm_df_f, lm_df_clim, lm_df_lu, lm_df_climlu) %>% 
   mutate(scenario = factor(scenario))
 
-plot_dir <- file.path("plots", "attribution", "explorations", "lm_posterior_draws_scaled_no_int") # xx
-
-
+# plot:
 trend_calc_plot <- lm_df_all %>%
         mutate(scenario = factor(scenario, levels = c("fact", "clim", "lu", "climlu")),
                scenario = recode(scenario, fact = "factual", clim = "counterfactual\nclimate",
@@ -320,7 +274,7 @@ trend_calc_plot <- lm_df_all %>%
               legend.key.width =  unit(1, units = "cm"),
               legend.key.spacing.y = unit(0.5, units = "cm"))
 trend_calc_plot
-ggsave(filename = file.path("plots", "attribution", "explorations", "lm_posterior_draws_scaled_no_int", "trend_calculation_example.svg"), 
+ggsave(filename = file.path(plot_dir, "trend_calculation_example.svg"), 
        plot = trend_calc_plot,
        device = "svg",
        width = 29.7,
