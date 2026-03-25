@@ -1,0 +1,12 @@
+.Rproj.user
+.Rhistory
+.RData
+.Ruserdata
+.sh
+tests
+sh_files
+scripts_deprecated_and_tests
+scripts_copies_cluster
+results
+data
+plots
