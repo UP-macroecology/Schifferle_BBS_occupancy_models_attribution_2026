@@ -611,3 +611,12 @@ ggsave(filename = file.path("plots", "attribution", "maps", "climlu_change_impac
        width = 29.7,
        height = 21, # A4
        units = "cm")
+
+# (operating system info): ----
+osi <- sessionInfo()
+packages <- sort(paste0(unlist(lapply(osi$otherPkgs, "[[", "Package")),
+                        "_",
+                        unlist(lapply(osi$otherPkgs, "[[", "Version"))))
+packages
+paste(packages, collapse = ", ")
+sessionInfo()

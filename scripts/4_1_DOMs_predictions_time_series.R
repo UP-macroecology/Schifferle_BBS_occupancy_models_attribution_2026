@@ -108,7 +108,7 @@ foreach(s = 1:length(spec_attr),
   print("factual predictions")
   
   # check where to look for model output (did MCMC fitting work with less or only with more iterations?)
-  if(file.exists(file.path(res_dir, "refit_2000_2000", paste0("out_", spec, "_fm_buffer_750.RData")))){
+  if(file.exists(file.path(res_dir, "refit_2000_2000", paste0("out_", spec, "_fm_buffer_750.RData")))){ # output of 2_1_fit_DOMs_full_model.R
     output_dir <- file.path(res_dir, "refit_2000_2000")
   } else {
     output_dir <- res_dir
