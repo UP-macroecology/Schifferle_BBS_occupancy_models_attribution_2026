@@ -287,7 +287,8 @@ bcr_sf <- read_sf(file.path("data", "BCR_Terrestrial", "BCR_Terrestrial_master_I
   # add centroid coordinate for label placement:
   mutate(X = st_coordinates(st_centroid(.))[,1],
          Y = st_coordinates(st_centroid(.))[,2],
-         Label2 = gsub(pattern = " ", replacement = "\n", x = Label))
+         Label2 = gsub(pattern = " ", replacement = "\n", x = Label)) %>% 
+  rmapshaper::ms_simplify(keep = 0.05, keep_shapes = TRUE) # simplify to save storage space
 
 # plot map:
 
@@ -315,9 +316,10 @@ route_map <- ggplot() +
   )
 route_map
 
-# ggsave(filename = file.path("plots", "route_selection_BCRs_no_labels.svg"), 
+# ggsave(filename = file.path("plots", "route_selection_BCRs_no_labels.svg"),
 #        plot = route_map,
 #        device = "svg",
 #        width = 32,
 #        height = 29.7, # A4
 #        units = "cm")
+
