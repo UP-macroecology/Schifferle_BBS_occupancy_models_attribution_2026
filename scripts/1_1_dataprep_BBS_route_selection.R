@@ -17,7 +17,7 @@ library(ggplot2)
 
 # functions: -------------------------------------------------------------------
 
-source("0_functions.R") # to get thin() and thin.max()
+source(file.path("scripts", "0_functions.R")) # to get thin() and thin.max()
 
 
 # load data: -------------------------------------------------------------------

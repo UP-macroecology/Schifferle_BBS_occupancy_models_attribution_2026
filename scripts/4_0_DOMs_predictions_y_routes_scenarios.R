@@ -41,7 +41,7 @@ if(!dir.exists(preds_dir)){dir.create(preds_dir, recursive = TRUE)}
 
 # functions: -------------------------------------------------------------------
 
-source("0_functions.R")
+source(file.path("scripts", "0_functions.R"))
 
 
 # load data: -------------------------------------------------------------------

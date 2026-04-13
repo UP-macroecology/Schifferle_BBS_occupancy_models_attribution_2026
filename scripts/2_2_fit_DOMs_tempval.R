@@ -31,7 +31,7 @@ dir <- file.path("//NAS-2-P-SN-01.ibb.uni-potsdam.de", "daten$", "AG26", "Transf
 
 # functions: -------------------------------------------------------------------
 
-source("0_functions.R")
+source(file.path("scripts", "0_functions.R"))
 
 
 # load data: -------------------------------------------------------------------

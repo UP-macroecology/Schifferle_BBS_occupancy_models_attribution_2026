@@ -23,7 +23,7 @@ library(factoextra) # for PCA related plots
 
 # functions: -----------------------------------------------------------------
 
-source("0_functions.R") # to get select07 function
+source(file.path("scripts", "0_functions.R")) # to get select07 function
 
 
 # load data: -------------------------------------------------------------------

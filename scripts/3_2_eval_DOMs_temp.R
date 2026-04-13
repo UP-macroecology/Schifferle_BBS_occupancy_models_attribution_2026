@@ -26,7 +26,7 @@ if(!dir.exists(intermediate_time_series_dir)){dir.create(intermediate_time_serie
 
 # functions: -------------------------------------------------------------------
 
-source("0_functions.R")
+source(file.path("scripts", "0_functions.R"))
 
 
 # load data: -------------------------------------------------------------------

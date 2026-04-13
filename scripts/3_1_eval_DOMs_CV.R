@@ -29,7 +29,7 @@ if(!dir.exists(file.path(results_dir, "CV_eval"))){dir.create(file.path(results_
 
 # functions: -------------------------------------------------------------------
 
-source("0_functions.R")
+source(file.path("scripts", "0_functions.R"))
 
 
 # load data: -------------------------------------------------------------------
