@@ -1,12 +1,22 @@
-# Prepare factual climate data used as covariates to fit dynamic occupancy models:
+# Script:   1_0_dataprep_climate.R
+# Purpose:  Prepare factual climate data used as covariates to fit dynamic occupancy models:
+# Inputs:   downloaded climate data (netCDFs)
+# Outputs:  data/US_outline_ESRI102003.shp
+#           <clim_path>/ISIMIP_CLIM_ESRI102003/<var>_<yyyymm>_ESRI102003.tif
+#           <clim_path>/bioclim/<var>_<year>.tif
+#           <clim_path>/seasonal/<var>_<year>.tif
+# Runs on:  Local
 
-# 1) download daily climate data (tasmax, tasmin, pr) for 1990-2019 from ISIMIP: 
+# Steps:
+# 1) download daily climate data (tasmax, tasmin, pr) for 1992-2019 from ISIMIP: 
 ## https://data.isimip.org/search/tree/ISIMIP3a/InputData/climate/atmosphere/gswp3-w5e5/obsclim/
 ## bounding box conterminous USA: South: 24 North: 50 West: -126 East: -66
 # 2) aggregate to monthly data
 # 3) calculate bioclimatic variables
 # 4) calculate seasonal variables (spring, summer, autumn, winter) as addition to bioclimatic variables
 
+
+source(file.path("scripts", "0_paths.R"))
 
 # packages: --------------------------------------------------------------------
 
@@ -15,12 +25,9 @@ library(doParallel)
 library(dplyr)
 library(sf)
 library(terra)
-
+library(spData)
 
 # directories: -----------------------------------------------------------------
-
-# data stored as "pr.zip", "tasmin.zip", "tasmax.zip" here:
-clim_path <- file.path("data", "Env_data", "ISIMIP_GSWP3_W5E5") # factual data
 
 # folder to store rasters of bioclimatic variables:
 bioclim_folder <- file.path(clim_path, "bioclim")
@@ -35,16 +42,16 @@ if(!dir.exists(seasonal_folder)){dir.create(seasonal_folder, recursive = TRUE)}
 
 # outline conterminous US, to later mask SpatRasters
 
-# library(spData)
-# if (requireNamespace("sf", quietly = TRUE)) {
-#   data(us_states)
-# }
-# US_albers_sf <- us_states %>%
-#   st_union() %>%
-#   st_transform(crs = "ESRI:102003")
-# # save as shp:
-# write_sf(US_albers_sf, file.path("data", "US_outline_ESRI102003.shp"))
-US_albers_sf <- read_sf(file.path("data", "US_outline_ESRI102003.shp"))
+if (requireNamespace("sf", quietly = TRUE)) {
+  data(us_states)
+}
+US_albers_sf <- us_states %>%
+  st_union() %>%
+  st_transform(crs = "ESRI:102003")
+# save as shp:
+write_sf(US_albers_sf, file.path(dir, "data", "US_outline_ESRI102003.shp"))
+
+US_albers_sf <- read_sf(file.path(dir, "data", "US_outline_ESRI102003.shp"))
 
 
 # daily data to monthly means: -------------------------------------------------
@@ -65,7 +72,7 @@ foreach(var = c("tasmin", "tasmax", "pr"),
           print(var)
   
           # list files:
-          #zipfiles <- utils::unzip(file.path(clim_path, paste0(var, ".zip")), list = TRUE)
+          zipfiles <- utils::unzip(file.path(clim_path, paste0(var, ".zip")), list = TRUE)
           nc_files <- grep(x = zipfiles$Name, pattern = ".nc", value = TRUE) # every nc file contains daily values of 10 years
           
           # unzip files:
@@ -123,7 +130,7 @@ foreach(var = c("tasmin", "tasmax", "pr"),
                   rast(crs = "EPSG:4326") %>% 
                   crop(ext(c(-126, -66, 24, 50))) %>% # cut extent
                   project(y = "ESRI:102003", method = "average") %>% # project
-                  mask(US_albers_sf) 
+                  terra::mask(US_albers_sf)
 
                 # directory to store results:
                 res_dir_proj <- file.path(clim_path, "ISIMIP_CLIM_ESRI102003")
@@ -445,6 +452,10 @@ for(s in 1:4){
 }
 
 
+# session info:
+writeLines(capture.output(sessionInfo()), file.path(dir, "results", "sessionInfo", "1_0_dataprep_climate.txt"))
+
+
 
 # # explorations: --------------------------------------------------------------
 
@@ -483,3 +494,5 @@ for(s in 1:4){
 # cl_rast <- terra::rast(files[which(grepl(paste0(var, "_[0-9]{4}.tif"), files))])
 # values_df <- values(cl_rast, dataframe = TRUE) 
 # plot(x = 1995:2019, y = colSums(values_df, na.rm = TRUE)/(colSums(values_df, na.rm = TRUE)[1]), type = "o", main = var)
+
+

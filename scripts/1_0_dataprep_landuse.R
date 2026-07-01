@@ -1,5 +1,10 @@
-# Prepare factual land use data used as covariates to fit dynamic occupancy models:
+# Script:   1_0_dataprep_landuse.R
+# Purpose:  Prepare reconstructed land use data used as covariates to fit dynamic occupancy models
+# Inputs:   downloaded land use data (netCDFs)
+# Outputs:  <lu_path>/ISIMIP_LU_ESRI102003/<var>_<year>_ESRI102003.tif
+# Runs on:  Local
 
+# Steps:
 # 1) download annual land use data for 1990-2019 from ISIMIP: 
 ## https://data.isimip.org/search/tree/ISIMIP3a/InputData/socioeconomic/landuse/histsoc/ (based on LUH2 land use states)
 ## bounding box conterminous USA: South: 24 North: 50 West: -126 East: -66
@@ -18,6 +23,8 @@
 # we summarise annual crops (Naimi et al. 2022)
 
 
+source(file.path("scripts", "0_paths.R"))
+
 # packages: --------------------------------------------------------------------
 
 library(ncdf4)
@@ -27,18 +34,15 @@ library(sf)
 
 # directories: -----------------------------------------------------------------
 
-# ISIMIP download:
-lu_path <- file.path("data", "Env_data", "ISIMIP_land_use_and_irrigation")
-
-# to store annual tifs:
-res_dir_proj <- file.path(lu_path, "ISIMIP_LU_ESRI102003")
-if(!dir.exists(res_dir_proj)){dir.create(res_dir_proj)}
+# store annual tifs:
+lu_folder <- file.path(lu_path, "ISIMIP_LU_ESRI102003")
+if(!dir.exists(lu_folder)){dir.create(lu_folder)}
 
 
 # load data: -------------------------------------------------------------------
 
 # outline conterminous US, to later mask SpatRasters
-US_albers_sf <- read_sf(file.path("data", "US_outline_ESRI102003.shp")) # output of 1_0_dataprep_climate.R
+US_albers_sf <- read_sf(file.path(dir, "data", "US_outline_ESRI102003.shp")) # output of 1_0_dataprep_climate.R
 
 # downloaded land use files:
 lu_files <- list.files(lu_path, full.names = TRUE, pattern = "histsoc_annual_1901_2021.nc")
@@ -104,7 +108,7 @@ for(f in 1:length(lu_files)){
     
     # extract one .tif-file per focal year:
     
-    for(y in 1990:2019){ 
+    for(y in 1992:2019){ 
 
       print(y)
       
@@ -117,7 +121,7 @@ for(f in 1:length(lu_files)){
         terra::mask(US_albers_sf) # cut out US
       
       writeRaster(dt_export,
-                  filename = file.path(res_dir_proj, paste0(v, "_", y, "_ESRI102003.tif")),
+                  filename = file.path(lu_folder, paste0(v, "_", y, "_ESRI102003.tif")),
                   overwrite = TRUE)
     }
     
@@ -142,7 +146,7 @@ for(f in 1:length(lu_files)){
         
         # extract one .tif-file per focal year:
         
-        for(y in 1990:2019){
+        for(y in 1992:2019){
           
           print(y)
           
@@ -155,7 +159,7 @@ for(f in 1:length(lu_files)){
             terra::mask(US_albers_sf) # cut out US
           
           writeRaster(dt_export,
-                      filename = file.path(res_dir_proj, paste0(v, "_", y, "_ESRI102003.tif")),
+                      filename = file.path(lu_folder, paste0(v, "_", y, "_ESRI102003.tif")),
                       overwrite = TRUE)
           
         }
@@ -170,7 +174,7 @@ for(f in 1:length(lu_files)){
 
 start <- 1995 # start year
 
-lu_classes <- unique(gsub(x = list.files(res_dir_proj),
+lu_classes <- unique(gsub(x = list.files(lu_folder),
                           pattern = "(?:_mean_[0-9]{4})?_[0-9]{4}_ESRI102003.tif", 
                           replacement = ""))
 
@@ -179,12 +183,16 @@ for(luc in lu_classes){
   
   print(luc)
   
-  luc_3yrs <- rast(file.path(res_dir_proj, paste0(luc, "_", c((start-1):(start-3)), "_ESRI102003.tif")))
+  luc_3yrs <- rast(file.path(lu_folder, paste0(luc, "_", c((start-1):(start-3)), "_ESRI102003.tif")))
   names(luc_3yrs) <- c((start-1):(start-3))
   luc_3yrs_mean <- mean(luc_3yrs)
   names(luc_3yrs_mean) <- luc
   
-  writeRaster(luc_3yrs_mean, file.path(res_dir_proj, paste0(luc, "_mean_", start-3, "_", start-1, "_ESRI102003.tif")),
+  writeRaster(luc_3yrs_mean, file.path(lu_folder, paste0(luc, "_mean_", start-3, "_", start-1, "_ESRI102003.tif")),
               overwrite = TRUE)
   
 }
+
+# session info:
+writeLines(capture.output(sessionInfo()), file.path(dir, "results", "sessionInfo", "1_0_dataprep_landuse.txt"))
+

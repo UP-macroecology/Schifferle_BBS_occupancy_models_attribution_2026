@@ -1,10 +1,26 @@
-# model evaluation: spatial predictive performance based on cross validation 
+# Script:   3_1_eval_DOMs_CV.R
+# Purpose:  Model evaluation: spatial predictive performance based on cross validation 
+# Inputs:   data/final_species_selection.RData
+#           data/BBS_for_occ_spec_records.RData
+#           data/BBS_for_occ_selection.RData
+#           data/route_selection_1995_2019_surv_beg_end_max_5y_miss_v2_spat_thin_100km_max_30_r_per_BCR_centroids.shp
+#           results/fm_buffer750km/refit_2000_2000/check_output/specs_MCMC_failed.RData
+#           results/temp_val_buffer_750_10yrs/refit_2000_2000/check_output/specs_MCMC_failed.RData
+#           results/CV_buffer750km/refit_2000_2000/check_output/specs_MCMC_failed.RData
+#           results/CV_buffer750km/test_preds_<species>_CV_fold<fold>.RData
+#           results/CV_buffer750km/refit_2000_2000/test_preds_<species>_CV_fold<fold>.RData
+#           data/CV_route_block_allocation/block_size_500km/<species>.RData
+# Outputs:  results/species_set_analysis.RData 
+#           results/CV_buffer750km/CV_eval/obs_preds/<species>_obs_ymean_preds.RData (one file per species for which MCMC worked)
+#           results/CV_buffer750km/CV_eval/CV_eval_<species>.RData (one file per species for which MCMC worked)
+#           results/CV_buffer750km/CV_eval/CV_eval_summary.csv (one file per species for which MCMC worked)
+# Runs on:  Local
 
-# measures:
-# (spatio-temporal: AUC)
-# mean yearly AUC
-
+# measures: mean yearly AUC, (spatio-temporal: AUC)
 # based on predictions of y (occ. prob. * det. prob.) for all sites (+ only for sites with change)
+
+
+source(file.path("scripts", "0_paths.R"))
 
 
 # packages: --------------------------------------------------------------------
@@ -15,11 +31,6 @@ library(ggplot2)
 
 
 # directories: -----------------------------------------------------------------
-
-print(tempdir())
-
-# project directory:
-dir <- file.path("//NAS-2-P-SN-01.ibb.uni-potsdam.de", "daten$", "AG26", "Transfer", "Schifferle_BBS_occupancy_models_2023")
 
 results_dir <- file.path(dir, "results", "CV_buffer750km")
 
@@ -35,16 +46,16 @@ source(file.path("scripts", "0_functions.R"))
 # load data: -------------------------------------------------------------------
 
 # selected species:
-load(file = file.path("data", "final_species_selection.RData")) # species_selection_final; output of 1_2_dataprep_BBS_species_selection.R
+load(file = file.path(dir, "data", "final_species_selection.RData")) # species_selection_final; output of 1_2_dataprep_BBS_species_selection.R
 
 # route-year-species information (only surveyed)
-load(file = file.path("data", "BBS_for_occ_spec_records.RData")) # bbs_dt_occ; output of 1_0_dataprep_BBS_bird_data.R
+load(file = file.path(dir, "data", "BBS_for_occ_spec_records.RData")) # bbs_dt_occ; output of 1_0_dataprep_BBS_bird_data.R
 
 # routes-years:
-load(file = file.path("data", "BBS_for_occ_selection.RData")) # route_sel_dt; output of 1_3_dataprep_match_BBS_routes_env_data.R
+load(file = file.path(dir, "data", "BBS_for_occ_selection.RData")) # route_sel_dt; output of 1_3_dataprep_match_BBS_routes_env_data.R
 
 # selected routes spatial data (to buffer presences):
-routes_sel_sf <- st_read(file.path("data", "route_selection_1995_2019_surv_beg_end_max_5y_miss_v2_spat_thin_100km_max_30_r_per_BCR_centroids.shp")) # output of 1_1_dataprep_BBS_route_selection.R
+routes_sel_sf <- st_read(file.path(dir, "data", "route_selection_1995_2019_surv_beg_end_max_5y_miss_v2_spat_thin_100km_max_30_r_per_BCR_centroids.shp")) # output of 1_1_dataprep_BBS_route_selection.R
 
 
 # species set for which MCMC fitting worked for full model, cross validation and temporal validation: ----
@@ -64,9 +75,9 @@ specs_discard_cv <- names(which(lengths(spec_folds_MCMC_fail) != 0))
 final_species <- sort(subset(species_selection_final,
        !species_selection_final %in% c(specs_discard_fm, specs_discard_cv, specs_discard_tv))) # 159
 
-#save(final_species, file = file.path("data", "species_set_analysis.RData"))
+#save(final_species, file = file.path(dir, "results", "species_set_analysis.RData"))
 
-#load(file = file.path("data", "species_set_analysis.RData"))
+#load(file = file.path(dir, "results", "species_set_analysis.RData"))
 
 
 # evaluation metrics: ----------------------------------------------------------
@@ -283,24 +294,5 @@ CV_eval_summary <- read.csv(file = file.path(results_dir, "CV_eval", "CV_eval_su
 summary(CV_eval_summary)
 
 
-# explorative plots: ----
-
-# maps comparing mean CV predictions and observations:
-
-obs_preds_sf <- y_preds_obs_df %>%
-  left_join(routes_sel_sf, by = c(RTENO = "RTENO_BBS")) %>%
-  st_as_sf()
-
-# the more similar the colours of observation and prediction dots, the better:
-
-# multiple years:
-obs_preds_sf %>%
-  filter(Year %in% seq(1995, 2019, length = 4)) %>%
-  ggplot() +
-  facet_wrap(~Year) +
-  geom_sf(aes(fill = as.factor(presence)), pch = 21, size = 3) +
-  scale_fill_viridis_d(name = "observation") +
-  geom_sf(aes(color = pred_y_mean), size = 1) +
-  scale_color_viridis_c(name = "mean y prediction") +
-  theme_bw() +
-  ggtitle(spec)
+# session info:
+writeLines(capture.output(sessionInfo()), file.path(dir, "results", "sessionInfo", "3_1_eval_DOMs_CV.txt"))

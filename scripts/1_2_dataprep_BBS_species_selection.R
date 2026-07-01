@@ -1,9 +1,18 @@
-# Select BBS species for which dynamic occupancy models are fitted:
+# Script:   1_2_dataprep_BBS_species_selection.R
+# Purpose:  Select BBS species for which to fit dynamic occupancy models
+# Inputs:   data/BBS_data_merged.RData
+#           data/BBS_for_occ_spec_records.RData
+#           data/route_selection_1995_2019_surv_beg_end_max_5y_miss_v2_spat_thin_100km_max_30_r_per_BCR.RData
+# Outputs:  data/final_species_selection.RData
+# Runs on:  Local
 
-# excluded are species which:
+# Steps:
+# of all available species in BBS data, we excluded species which:
 # 1) are nocturnal or water-related (not well captured by BBS method)
 # 2) which are rare or very common (model fitting difficult)
 
+
+source(file.path("scripts", "0_paths.R"))
 
 # packages: --------------------------------------------------------------------
 
@@ -21,17 +30,17 @@ source(file.path("scripts", "0_functions.R"))
 
 # BBS cleaned, all species info:
 
-load(file = file.path("data", "BBS_data_merged.RData")) # bbs_dt; output of 1_0_dataprep_BBS_bird_data.R
+load(file = file.path(dir, "data", "BBS_data_merged.RData")) # bbs_dt; output of 1_0_dataprep_BBS_bird_data.R
 BBS_species_list <- bbs_dt  %>% 
   select(English_Common_Name, Scientific_Name, ORDER, Family) %>%
   distinct
 
 # BBS data cleaned:
-load(file = file.path("data", "BBS_for_occ_spec_records.RData")) # output of 1_0_dataprep_BBS_bird_data.R
+load(file = file.path(dir, "data", "BBS_for_occ_spec_records.RData")) # output of 1_0_dataprep_BBS_bird_data.R
 bbs_dt_occ
 
 # selected routes:
-load(file = file.path("data", "route_selection_1995_2019_surv_beg_end_max_5y_miss_v2_spat_thin_100km_max_30_r_per_BCR.RData")) # output of 1_1_dataprep_BBS_route_selection.R
+load(file = file.path(dir, "data", "route_selection_1995_2019_surv_beg_end_max_5y_miss_v2_spat_thin_100km_max_30_r_per_BCR.RData")) # output of 1_1_dataprep_BBS_route_selection.R
 sel_routes_final
 
 
@@ -119,6 +128,13 @@ n_routes_pres <- bbs_dt_occ_sel %>% # presences only
 # exclude species that are detected at less than 50 different routes across the whole time period
 # and species that have less than 50 routes where they were never detected:
 
+n_routes_pres %>% 
+  filter(n_routes < 50) %>% 
+  nrow
+n_routes_pres %>% 
+  filter(n_routes > (length(sel_routes_final)-50)) %>% 
+  nrow
+
 excl_data_av <- n_routes_pres %>% 
   filter(n_routes < 50 | n_routes > (length(sel_routes_final)-50)) %>%
   pull(English_Common_Name) %>% 
@@ -138,4 +154,7 @@ species_selection_final <- bbs_dt_occ_sel %>%
 length(species_selection_final) # 192
 
 # save:
-save(species_selection_final, file = file.path("data", "final_species_selection.RData"))
+save(species_selection_final, file = file.path(dir, "data", "final_species_selection.RData"))
+
+# session info:
+writeLines(capture.output(sessionInfo()), file.path(dir, "results", "sessionInfo", "1_2_dataprep_BBS_species_selection.txt"))

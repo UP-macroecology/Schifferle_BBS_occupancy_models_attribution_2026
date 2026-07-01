@@ -1,9 +1,24 @@
-# check whether model fitting for cross-validation was successful based on MCMC diagnostics
+# Script:   2_4c_fit_DOMs_CV_check_fit.R
+# Purpose:  Check whether dynamic occupancy model re-fitting for cross validation folds was successful based on MCMC diagnostics
+# Inputs:   results/CV_buffer750km/out_<species>_CV_fold<fold>.RData 
+#           results/CV_buffer750km/refit_2000_2000/out_<species>_CV_fold<fold>.RData
+# Outputs:  results/CV_buffer750km/check_output/specs_MCMC_failed.RData
+#           results/CV_buffer750km/refit_2000_2000/check_output/specs_MCMC_failed.RData
+#           results/CV_buffer750km/check_output/MCMC_check_res.txt
+#           results/CV_buffer750km/refit_2000_2000/check_output/MCMC_check_res.txt
+# Runs on:  Local
+# Notes:    this script is run two times: 
+#           1) check fit of dynamic occupancy models fitted to data of each cross validation fold with 1000 iterations
+#           2) check fit of dynamic occupancy models fitted to data of each cross validation fold with 2000 iterations
+#           -> set results directory accordingly:
 
-# 1) saves text file with check results for each fold regarding 
-# - divergent transitions
-# - effective number of MCMC samples, also in bulk and tail, 
-# - R-hat values < 1.02 
+
+source(file.path("scripts", "0_paths.R"))
+
+# set results directory:
+
+results_dir <- file.path(dir, "results", "CV_buffer750km") # cross validation - first fitting round
+#results_dir <- file.path(dir, "results", "CV_buffer750km", "refit_2000_2000") # cross validation - second fitting round
 
 
 # packages: --------------------------------------------------------------------
@@ -16,15 +31,7 @@ library(flocker)
 
 # directories: -----------------------------------------------------------------
 
-set_cmdstan_path("C:/Users/schifferle1/Documents/cmdstan-2.34.1")
-
-# project directory:
-dir <- file.path("//NAS-2-P-SN-01.ibb.uni-potsdam.de", "daten$", "AG26", "Transfer", "Schifferle_BBS_occupancy_models_2023")
-
-# cross validation - first fitting round:
-# results_dir <- file.path(dir, "results", "CV_buffer750km")
-# cross validation - second fitting round:
-results_dir <- file.path(dir, "results", "CV_buffer750km", "refit_2000_2000")
+set_cmdstan_path(path = NULL) # for HPC; local: set_cmdstan_path("C:/Users/schifferle1/Documents/cmdstan-2.34.1")
 
 
 # MCMC diagnostics: ------------------------------------------------------------
@@ -129,3 +136,6 @@ sink(file = NULL)
 save(spec_folds_MCMC_fail, file = file.path(results_dir, "check_output", "specs_folds_MCMC_failed.RData"))
 
 names(which(lengths(spec_folds_MCMC_fail) != 0))
+
+# session info:
+writeLines(capture.output(sessionInfo()), file.path(dir, "results", "sessionInfo", "2_4c_fit_DOMs_CV_check_fit.txt"))

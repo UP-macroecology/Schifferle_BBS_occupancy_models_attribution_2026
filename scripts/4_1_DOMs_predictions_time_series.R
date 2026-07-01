@@ -1,13 +1,32 @@
+# Script:   4_1_DOMs_predictions_time_series.R
+# Purpose:  Generate occupancy time series (1995-2019) aggregated across the conterminous USA from the simulated occupancy probabilities
+# Inputs:   results/species_DOM_val_okay.RData
+#           data/BBS_for_occ_selection.RData
+#           data/route_selection_1995_2019_surv_beg_end_max_5y_miss_v2_spat_thin_100km_max_30_r_per_BCR_centroids.shp
+#           data/BBS_for_occ_spec_records.RData
+#           results/fm_buffer750km/postproc_<species>_fm_buffer750.RData
+#           results/fm_buffer750km/refit_2000_2000/postproc_<species>_fm_buffer750.RData
+#           results/attribution/fm_y_preds_routes_cf_1995_all/<species>_y_preds_cf_<scenario>.RData 
+# Outputs:  data/observed_time_series_1995_2019/<species>_obs_ts_sum_occ_routes.RData
+#           results/fm_buffer750km/y_preds_route_level_section_sum/<species>_y_preds_route_level_section_sum.RData (one file per species)
+#           results/fm_buffer750km/fact_pred_time_series_1995_2019/<species>_ts_sum_occ_routes_f_preds.RData (one file per species)
+#           results/attribution/cfact_pred_time_series_1995_2019/<species>_ts_sum_occ_routes_cf_preds.RData (one file per species)
+#           plots/attribution/time_series/<species>_ts_y_preds_cf_1995_all_line.jpg
+# Runs on:  Local
+
+# Steps:
 # calculate time series of occupancy change between 1995 and 2019 aggregated 
 # across the conterminous USA based on: 
-# - observations
-# - dynamic occupancy model predictions for factual data (climate + land use change)
-# - dynamic occupancy model predictions for counterfactual scenarios: 
+# 1) observations
+# 2) dynamic occupancy model predictions for factual data (climate + land use change)
+# 3)dynamic occupancy model predictions for counterfactual scenarios: 
 #   - no climate change
 #   - no land use change
 #   - no climate + no land use change
 # as basis for attribution
-# ( + time series plots)
+
+
+source(file.path("scripts", "0_paths.R"))
 
 
 # packages: --------------------------------------------------------------------
@@ -27,15 +46,12 @@ source(file.path("scripts", "0_functions.R"))
 
 # directories: -----------------------------------------------------------------
 
-# project directory:
-# dir <- file.path("//NAS-2-P-SN-01.ibb.uni-potsdam.de", "daten$", "AG26", "Transfer", "Schifferle_BBS_occupancy_models_2023")
-dir <- file.path("/mnt", "ibb_share", "zurell_transfer", "Schifferle_BBS_occupancy_models_2023")
-
 # directory with fitted models:
 res_dir <- file.path(dir, "results", "fm_buffer750km")
 
 # save observations time series:
 obs_dir <- file.path(dir, "data", "observed_time_series_1995_2019")
+if(!dir.exists(obs_dir)){dir.create(obs_dir)}
 
 # save predicted time series for factual data:
 fact_dir <- file.path(dir, "results", "fm_buffer750km", "fact_pred_time_series_1995_2019")
@@ -48,24 +64,24 @@ if(!dir.exists(fact_dir)){dir.create(fact_dir)}
 if(!dir.exists(cfact_dir)){dir.create(cfact_dir)}
 
 # directory to save plots:
-plot_dir <- file.path("plots", "attribution", "fm_y_preds_routes_cf_1995_all")
+plot_dir <- file.path(dir, "plots", "attribution", "time_series")
 if(!dir.exists(plot_dir)){dir.create(plot_dir, recursive = TRUE)}
 
 
 # load data: -------------------------------------------------------------------
 
 # species for attribution:
-load(file = file.path("data", "species_DOM_val_okay.RData")) # output of 4_0_DOMs_predictions_y_routes_scenarios.R
+load(file = file.path(dir, "results", "species_DOM_val_okay.RData")) # output of 4_0_DOMs_predictions_y_routes_scenarios.R
 spec_attr
 
 # routes-years:
-load(file = file.path("data", "BBS_for_occ_selection.RData")) # route_sel_dt; output of 1_3_dataprep_match_BBS_routes_env_data.R
+load(file = file.path(dir, "data", "BBS_for_occ_selection.RData")) # route_sel_dt; output of 1_3_dataprep_match_BBS_routes_env_data.R
 
 # selected routes spatial data (to buffer presences):
-routes_sel_sf <- st_read(file.path("data", "route_selection_1995_2019_surv_beg_end_max_5y_miss_v2_spat_thin_100km_max_30_r_per_BCR_centroids.shp")) # output of 1_1_dataprep_BBS_route_selection.R
+routes_sel_sf <- st_read(file.path(dir, "data", "route_selection_1995_2019_surv_beg_end_max_5y_miss_v2_spat_thin_100km_max_30_r_per_BCR_centroids.shp")) # output of 1_1_dataprep_BBS_route_selection.R
 
 # route-year-species information (only surveyed)
-load(file = file.path("data", "BBS_for_occ_spec_records.RData")) # bbs_dt_occ; output of 1_0_dataprep_BBS_bird_data.R
+load(file = file.path(dir, "data", "BBS_for_occ_spec_records.RData")) # bbs_dt_occ; output of 1_0_dataprep_BBS_bird_data.R
 
 
 # calculate time series: -------------------------------------------------------
@@ -247,58 +263,58 @@ foreach(s = 1:length(spec_attr),
 # end <- 2019
 # 
 # for(s in 1:length(spec_attr)){
-#   
+# 
 #   spec <- spec_attr[s]
-#   
+# 
 #   print(paste(s, spec))
-#   
+# 
 #   # observations time series:
-#   load(file.path(dir, "data", "observed_time_series_1995_2019", paste0(spec, "_obs_ts_sum_occ_routes.RData"))) 
+#   load(file.path(dir, "data", "observed_time_series_1995_2019", paste0(spec, "_obs_ts_sum_occ_routes.RData")))
 #   ts_obs
-#   
+# 
 #   # factual predictions time series:
-#   load(file.path(dir, "results", "fm_buffer750km", "fact_pred_time_series_1995_2019", 
+#   load(file.path(dir, "results", "fm_buffer750km", "fact_pred_time_series_1995_2019",
 #                  paste0(spec, "_ts_sum_occ_routes_f_preds.RData")))
 #   ts_preds_f <- ts_preds_fact
-#   
+# 
 #   # counterfactual predictions time series:
-#   load(file.path(dir, "results", "attribution", "cfact_pred_time_series_1995_2019", 
+#   load(file.path(dir, "results", "attribution", "cfact_pred_time_series_1995_2019",
 #                  paste0(spec, "_ts_sum_occ_routes_cf_preds.RData")))
 #   ts_preds_cfact
-#   
+# 
 #   # assemble df:
-#   
-#   time_series_df <- tibble(spec = spec, year = start:end) %>% 
+# 
+#   time_series_df <- tibble(spec = spec, year = start:end) %>%
 #     left_join(ts_obs, by = "year")
-#   
+# 
 #   # factual:
 #   time_series_df$fact <- ts_preds_f$median_Nocc
 #   time_series_df$fact_CIlow <- ts_preds_f$CI80low
 #   time_series_df$fact_CIhigh <- ts_preds_f$CI80high
-#   
+# 
 #   # counterfactual climate:
 #   time_series_df$cfclim <- ts_preds_cfact$cf_clim$median_Nocc
 #   time_series_df$cfclim_CIlow <- ts_preds_cfact$cf_clim$CI80low
 #   time_series_df$cfclim_CIhigh <- ts_preds_cfact$cf_clim$CI80high
-#   
+# 
 #   # counterfactual land use:
 #   time_series_df$cflu <- ts_preds_cfact$cf_1995soc$median_Nocc
 #   time_series_df$cflu_CIlow <- ts_preds_cfact$cf_1995soc$CI80low
 #   time_series_df$cflu_CIhigh <- ts_preds_cfact$cf_1995soc$CI80high
-#   
+# 
 #   # counterfactual climate + land use:
 #   time_series_df$cfclimlu <- ts_preds_cfact$cf_clim_1995soc$median_Nocc
 #   time_series_df$cfclimlu_CIlow <- ts_preds_cfact$cf_clim_1995soc$CI80low
 #   time_series_df$cfclimlu_CIhigh <- ts_preds_cfact$cf_clim_1995soc$CI80high
-#   
+# 
 #   # plot:
 #   # https://r-graph-gallery.com/web-line-chart-with-labels-at-end-of-line.html
-#   
+# 
 #   # line plot:
-#   
+# 
 #   # data:
 #   time_series_df_lf <- time_series_df %>%
-#     select(-matches("CI")) %>% 
+#     select(-matches("CI")) %>%
 #     tidyr::pivot_longer(cols = -c(spec, year), names_to = "scenario", values_to = "N_routes_median") %>%
 #     mutate(scenario = factor(scenario),
 #            name_lab = if_else(year == 2019, scenario, NA_character_),
@@ -308,14 +324,14 @@ foreach(s = 1:length(spec_attr),
 #                                  "cfclim" ~ "all climate counterfact.",
 #                                  "cflu" ~ "all land use counterfact.",
 #                                  "cfclimlu" ~ "all counterfact."))
-#   
+# 
 #   # colours:
 #   cols <- c("cfclim" = "#0D98BA",
 #             "cflu" = "#B7410E",
 #             "cfclimlu" = "#046865",
 #             "Npres" = "black",
 #             "fact" = "#85CB33")
-#   
+# 
 #   # linetype:
 #   line_type <- c("Npres" = 1,
 #                  "fact" = 1,
@@ -354,85 +370,12 @@ foreach(s = 1:length(spec_attr),
 #     theme(legend.position = "none", panel.grid = element_blank(),
 #           text = element_text(size = 20))
 #   p
-#   
-#   # jpeg(file = file.path(plot_dir, paste0(spec, "_ts_y_preds_cf_1995_all_line.jpg")), 
-#   #      width = 1000, height = 700, quality = 100)
-#   # print(p)
-#   # dev.off()
-#   # 
-#   
-#   # # version with credible intervals:
-#   # 
-#   # ts_median_df_lf <- time_series_df %>%
-#   #   select(!matches("CI")) %>%
-#   #   tidyr::pivot_longer(cols = c(Npres, fact, cfclim, cflu, cfclimlu), names_to = "scenario", values_to = "N_routes_median") %>%
-#   #   mutate(scenario = factor(scenario, levels = c("Npres", "cfclim", "fact", "cflu", "cfclimlu")),
-#   #          name_lab = if_else(year == 2019, scenario, NA_character_), # to get only one label
-#   #          name_lab = case_match(name_lab,
-#   #                                "Npres" ~ "observations",
-#   #                                "fact" ~ "obsclim_histsoc",
-#   #                                "cfclim" ~ "climate counterfact.\n1995",
-#   #                                "cflu" ~ "land use counterfact.\n1995",
-#   #                                "cfclimlu" ~ "climate and land use counterfactual 1995"))
-#   # 
-#   # ts_CI_df_lf <- time_series_df %>%
-#   #   select(c(spec, year, matches("CI"))) %>%
-#   #   tidyr::pivot_longer(cols = matches("CI"), names_to = "scenario", values_to = "N_routes") %>%
-#   #   mutate(CI = gsub(".*_", "", scenario),
-#   #          scenario = gsub("_.*", "", scenario)) %>%
-#   #   tidyr::pivot_wider(names_from = CI, values_from = N_routes)
-#   # 
-#   # time_series_df_lf <- ts_median_df_lf %>%
-#   #   left_join(ts_CI_df_lf, by = c("spec", "year", "scenario"))
-#   # 
-#   # 
-#   # # colours:
-#   # cols <- c("cfclim" = "#0D98BA",
-#   #           "obs" = "grey40",
-#   #           "fact" = "#FFCC17", #85CB33
-#   #           "cflu" = "#C7653A",
-#   #           "cfclimlu" = "#331832")#"#B7410E"
-#   # 
-#   #  # plot:
-#   #  p <- time_series_df_lf %>%
-#   #    filter(!scenario %in% c("Npres", "cfclimlu")) %>%
-#   #    ggplot(aes(x = year, y = N_routes_median, group = scenario)) +
-#   #    # geometric annotations that play the role of grid lines (to avoid grid lines on the right where labels are)
-#   #    geom_vline(xintercept = seq(1995, 2020, by = 5), color = "grey90", linewidth = .6) +
-#   #    geom_segment(data = tibble(y = seq(round(min(time_series_df_lf$CIlow, na.rm = TRUE), digits = -1),
-#   #                                       round(max(time_series_df_lf$CIhigh, na.rm = TRUE), digits = -1), length = 5),
-#   #                               x1 = 1995, 
-#   #                               x2 = 2020),
-#   #                 aes(x = x1, xend = x2, y = y, yend = y), 
-#   #                 inherit.aes = FALSE, color = "grey90", linewidth = .6) +
-#   #    # data lines:
-#   #    geom_ribbon(aes(ymin = CIlow, ymax = CIhigh, fill = scenario), alpha = 0.3) +
-#   #    geom_line(aes(colour = scenario), linewidth = 1) +
-#   #    # geom_point(data = time_series_df_lf %>%  filter(scenario == "Npres"),
-#   #    #            aes(colour = scenario), size = 2) +
-#   #    labs(title = spec,  subtitle = "median + 80 % CI", y = "Number of occupied routes", x = "") +
-#   #    geom_text_repel(
-#   #      aes(color = scenario, label = name_lab),
-#   #      fontface = "bold",
-#   #      size = 6,
-#   #      direction = "y", xlim = c(2020, NA), hjust = 0,
-#   #      segment.size = .7, segment.alpha = .5, segment.linetype = 1,
-#   #      #box.padding = .4,
-#   #      segment.curvature = -0.1, segment.ncp = 3, segment.angle = 20,
-#   #      max.overlaps = 30
-#   #    ) +
-#   #    scale_x_continuous(expand = c(0, 0), limits = c(1995, 2027)) +
-#   #    scale_colour_manual(values = cols) +
-#   #    scale_fill_manual(values = cols) +
-#   #    theme_bw() +
-#   #    theme(legend.position = "none", panel.grid = element_blank(),
-#   #          text = element_text(size = 25))
-#   #  
-#   #  p
-#   #  
-#   #  jpeg(file = file.path(plot_dir, paste0(spec, "_ts_y_preds_cf_1995_all_unc.jpg")), 
-#   #       width = 1000, height = 700, quality = 100)
-#   #  print(p)
-#   #  dev.off()
-#   # 
+# 
+#   jpeg(file = file.path(plot_dir, paste0(spec, "_ts_y_preds_cf_1995_all_line.jpg")),
+#        width = 1000, height = 700, quality = 100)
+#   print(p)
+#   dev.off()
 # }
+
+# session info:
+writeLines(capture.output(sessionInfo()), file.path(dir, "results", "sessionInfo", "4_1_DOMs_predictions_time_series.txt"))

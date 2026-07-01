@@ -6,7 +6,7 @@ params:
   spec: "Acadian Flycatcher"
   buffer_km: 750
   fold: 1
-  results_dir: "M:/Documents/DEBTs/analysis/Schifferle_BBS_occupancy_models_2023/results/full_model" 
+  results_dir: "" 
   model_file: NA
 ---
 
@@ -14,6 +14,13 @@ params:
 #| echo: false
 #| output: false
 #| warning: false
+
+# Script:   2_3b_fit_DOMs_check_fit_details.qmd
+# Purpose:  Create one pdf per species / fitted dynamic occupancy model with details on MCMC.
+# Notes:    This script is called by 2_3a_fit_DOMs_check_fit.R. Inputs and outputs are specified there.
+
+# packages:
+
 library(dplyr)
 library(flocker)
 library(ggplot2)

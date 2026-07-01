@@ -1,5 +1,16 @@
-# assemble metrics to compare occupancy time series under factual and counterfactual climate
-# and land use to quantify the contribution of climate and land use change
+# Script:   5_1_attribution_metrics.R
+# Purpose:  Assemble metrics to compare occupancy time series for different scenarios to quantify the contribution of climate and land use change
+# Inputs:   results/species_DOM_val_okay.RData
+#           data/observed_time_series_1995_2019/<species>_obs_ts_sum_occ_routes.RData
+#           results/fm_buffer750km/fact_pred_time_series_1995_2019/<species>_ts_sum_occ_routes_f_preds.RData (one file per species)
+#           results/attribution/cfact_pred_time_series_1995_2019/<species>_ts_sum_occ_routes_cf_preds.RData (one file per species)
+# Outputs:  results/attribution/attribution_metrics_final.RData
+#           plots/attribution/trend_calculation_example.svg (Fig. S2)
+# Runs on:  Local
+
+
+source(file.path("scripts", "0_paths.R"))
+
 
 # packages: --------------------------------------------------------------------
 
@@ -8,10 +19,6 @@ library(ggplot2)
 
 
 # directories: -----------------------------------------------------------------
-
-# project directory:
-dir <- file.path("//NAS-2-P-SN-01.ibb.uni-potsdam.de", "daten$", "AG26", "Transfer", 
-                 "Schifferle_BBS_occupancy_models_2023")
 
 # observed time series:
 obs_dir <- file.path(dir, "data", "observed_time_series_1995_2019") # output of 4_1_DOMs_predictions_time_series.R
@@ -24,7 +31,7 @@ cfact_dir <- file.path(dir, "results", "attribution", "cfact_pred_time_series_19
 # load data: -------------------------------------------------------------------
 
 # species for attribution:
-load(file = file.path("data", "species_DOM_val_okay.RData")) # output of 4_0_DOMs_predictions_y_routes_scenarios.R
+load(file = file.path(dir, "results", "species_DOM_val_okay.RData")) # output of 4_0_DOMs_predictions_y_routes_scenarios.R
 spec_attr
 
 
@@ -196,10 +203,11 @@ for(s in 1:nrow(attr_metr_df)){
 #save(attr_metr_df, file = file.path(dir, "results", "attribution", "attribution_metrics_final.RData"))
 
 
-# figure for manuscript to illustrate trend calculation: -----------------------
+
+# figure for manuscript to illustrate trend calculation (Fig. S2): -----------------------
 
 # directory to save plot:
-plot_dir <- file.path("plots", "attribution", "explorations", "lm_posterior_draws_scaled_no_int")
+plot_dir <- file.path(dir, "plots", "attribution")
 
 # example species:
 spec <- "Dickcissel"
@@ -280,3 +288,6 @@ ggsave(filename = file.path(plot_dir, "trend_calculation_example.svg"),
        width = 29.7,
        height = 18, # A4
        units = "cm")
+
+# session info:
+writeLines(capture.output(sessionInfo()), file.path(dir, "results", "sessionInfo", "5_1_attribution_metrics.txt"))

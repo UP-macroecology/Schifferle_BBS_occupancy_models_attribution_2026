@@ -1,11 +1,26 @@
-# Generate counterfactual climate data by removing climate change from 1995,
-# the beginning of our time series, onwards with the ATTRICI approach (Mengel et al. 2021)
+# Script:   1_2b_dataprep_cf_climate_attrici_preprocessing.R
+# Purpose:  Generate counterfactual climate data by removing climate change from 1995 onwards
+# Inputs:   data/US_outline_ESRI102003.shp
+#           <clim_path>/gswp3-w5e5_obsclim_<var>_lat24.0to50.0lon-126.0to-66.0_daily_<year1>_<year2>.nc xx
+# Outputs:  data/Counterfactual_env_data/ISIMIP_GSWP3_W5E5/attrici_detrending/input_files/US_mask.nc
+#           xx
+# Runs on:  Local
+# Notes:    Detrending is done with the external command-line tool ATTRICI (Mengel et al. 2021), 
+#           data preparation for this is happening here,
+#           ATTRICI commands to be used via the command line are pasted at the end of this script,
+#           they are written for the HPC cluster of the MacroEco and PENC lab at the University of Potsdam,
+#           paths must be adapted
 
+# xx gmt file?
+
+# Steps:
 # 1) prepare climate .nc-files from ISIMIP data that will then be used as input for
-# ATTRICI (Mengel et al. 2021) to calculate counterfactual climate data
-# 2) ATTRICI used via Windows command line tool, code pasted here
+# ATTRICI to calculate counterfactual climate data
+# 2) use external command-line tool ATTRICI via Windows command line, code pasted below
 # 3) convert ATTRICI output to tifs, postprocess temperature
-# 4) calculate variables that will then be used to simulate occupancy dynamics with fitted dynamic occupancy models
+# 4) calculate variables that will then be used to simulate occupancy time series with dynamic occupancy models
+
+source(file.path("scripts", "0_paths.R"))
 
 
 # packages: --------------------------------------------------------------------
@@ -19,12 +34,10 @@ library(ggplot2)
 
 # directories: -----------------------------------------------------------------
 
-# factual climate data downloaded from ISIMIP (see 1_0_dataprep_climate.R)
-fclim_path <- file.path("data", "Env_data", "ISIMIP_GSWP3_W5E5")
-
 # directory to store ATTRICI input:
-output_path <- file.path("T:", "Schifferle_BBS_occupancy_models_2023", "data", "Counterfactual_env_data",
+output_path <- file.path(dir, "data", "Counterfactual_env_data",
                          "ISIMIP_GSWP3_W5E5", "attrici_detrending", "input_files")
+if(!dir.exists(output_path)){dir.create(output_path, recursive = TRUE)}
 
 
 # 1) prepare input for ATTRICI: ------------------------------------------------
@@ -32,12 +45,12 @@ output_path <- file.path("T:", "Schifferle_BBS_occupancy_models_2023", "data", "
 ## create mask for the conterminous USA: -----
 
 # US outline:
-US_albers_sf <- read_sf(file.path("data", "US_outline_ESRI102003.shp")) # output of 1_0_dataprep_climate.R
+US_albers_sf <- read_sf(file.path(dir, "data", "US_outline_ESRI102003.shp")) # output of 1_0_dataprep_climate.R
 # transform to WGS84 (to match ISIMIP data):
 US_albers_sf_wgs84 <- st_transform(US_albers_sf, crs = 4326)
 
 # example ISIMIP file:
-pr_files <- list.files(fclim_path, pattern = "_pr_.*\\.nc$", full.names = TRUE)
+pr_files <- list.files(clim_path, pattern = "_pr_.*\\.nc$", full.names = TRUE)
 pr1 <- ncdf4::nc_open(pr_files[1])
 
 # create mask:
@@ -74,7 +87,7 @@ ncdf4::nc_close(ncout)
 
 
 ## merge climate data from 1901 to 2019 into single nc file: --------
-
+# xx
 vars <- c("tas", "tasmin", "tasmax", "pr") # tas needed to calculate tasrange and tasskew for ATTRICI, which are then detrended and converted back to tasmin, tasmax
 
 for(i in 1:length(vars)){
@@ -83,7 +96,7 @@ for(i in 1:length(vars)){
   
   print(var_name)
   
-  var_files <- list.files(fclim_path, pattern = paste0("obsclim_", var_name, "_.*\\.nc$"), full.names = TRUE)
+  var_files <- list.files(clim_path, pattern = paste0("obsclim_", var_name, "_.*\\.nc$"), full.names = TRUE)
   
   # extract data of all files:
   data_list <- lapply(var_files, function(f) {
@@ -131,10 +144,13 @@ for(i in 1:length(vars)){
   
 }
 
+# session info:
+writeLines(capture.output(sessionInfo()), file.path(dir, "results", "sessionInfo", "1_2b_dataprep_cf_climate_attrici_preprocessing.txt"))
 
 # 2) detrending using ATTRICI tool (Mengel et al. 2021): -----------------------
 
-# used command line:
+# xx
+# use via command line:
 
 # (requires CDO installation on the HPC)
 # cloned bootstrapping branch (recommended by Matthias Mengel): https://github.com/ISI-MIP/attrici/tree/bootstrapping

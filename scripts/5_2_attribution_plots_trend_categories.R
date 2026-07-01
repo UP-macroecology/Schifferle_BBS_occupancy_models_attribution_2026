@@ -1,5 +1,18 @@
-# alluvial plots to compare factual and counterfactual occupancy trends
-# categories: absolute and relative winners and losers of change
+# Script:   5_2_attribution_plots_trend_categories.R
+# Purpose:  Generate plots to compare factual and counterfactual occupancy trends
+# Inputs:   results/species_DOM_val_okay.RData
+#           results/attribution/attribution_metrics_final.RData
+# Outputs:  results/attribution/trend_categories.RData
+#           plots/attribution/barplot_trend_cats_stacked.svg (Fig. 2)
+# Runs on:  Local
+
+# Steps:
+# define categories of absolute and relative winners and losers of change
+# Chi-square test of categories
+# barplots
+# (alternative: alluvial plots)
+
+source(file.path("scripts", "0_paths.R"))
 
 
 # packages: --------------------------------------------------------------------
@@ -13,57 +26,45 @@ library(rphylopic)
 library(grid)
 
 
-# directories: -----------------------------------------------------------------
-
-# project directory:
-dir <- file.path("//NAS-2-P-SN-01.ibb.uni-potsdam.de", "daten$", "AG26", "Transfer", 
-                 "Schifferle_BBS_occupancy_models_2023")
-
-
 # load data: -------------------------------------------------------------------
 
 # species for attribution:
-load(file = file.path("data", "species_DOM_val_okay.RData")) # output of 4_0_DOMs_predictions_y_routes_scenarios.R
+load(file = file.path(dir, "results", "species_DOM_val_okay.RData")) # output of 4_0_DOMs_predictions_y_routes_scenarios.R
 spec_attr
 
 # attribution metrics:
 load(file = file.path(dir, "results", "attribution", "attribution_metrics_final.RData")) # output of 5_1_attribution_metrics.R
 
 
-# alluvial plots: --------------------------------------------------------------
-
-# https://r-charts.com/flow/ggalluvial/
-# change categories based on linear trend
-
-## restructure data for plotting: ----
+# reformat data: ---------------------------------------------------------------
 
 flow_df <- attr_metr_df %>% 
   # categorize relative impact (based on Langhammer et al. 2024):
   select(c(species, starts_with("slope"), starts_with("p_"))) %>% 
   ## factual vs. counterfactual climate:
   mutate(trend_change_clim = case_when(slope_fact > slope_cfclim & slope_fact > 0 & p_fact < 0.05 ~ "absolute climate change winner",
-                                  slope_fact > slope_cfclim & slope_fact > 0 & p_fact >= 0.05 ~ "relative climate change winner",
-                                  slope_fact > slope_cfclim & slope_fact < 0 ~ "relative climate change winner",
-                                  slope_fact < slope_cfclim & slope_fact > 0 ~ "relative climate change loser",
-                                  slope_fact < slope_cfclim & slope_fact < 0 & p_fact >= 0.05 ~ "relative climate change loser",
-                                  slope_fact < slope_cfclim & slope_fact < 0 & p_fact < 0.05 ~ "absolute climate change loser",
-                                  .default = NA)) %>% 
+                                       slope_fact > slope_cfclim & slope_fact > 0 & p_fact >= 0.05 ~ "relative climate change winner",
+                                       slope_fact > slope_cfclim & slope_fact < 0 ~ "relative climate change winner",
+                                       slope_fact < slope_cfclim & slope_fact > 0 ~ "relative climate change loser",
+                                       slope_fact < slope_cfclim & slope_fact < 0 & p_fact >= 0.05 ~ "relative climate change loser",
+                                       slope_fact < slope_cfclim & slope_fact < 0 & p_fact < 0.05 ~ "absolute climate change loser",
+                                       .default = NA)) %>% 
   ## factual vs. counterfactual land use:
   mutate(trend_change_lu = case_when(slope_fact > slope_cflu & slope_fact > 0 & p_fact < 0.05 ~ "absolute land use change winner",
-                                slope_fact > slope_cflu & slope_fact > 0 & p_fact >= 0.05 ~ "relative land use change winner",
-                                slope_fact > slope_cflu & slope_fact < 0 ~ "relative land use change winner",
-                                slope_fact < slope_cflu & slope_fact > 0 ~ "relative land use change loser",
-                                slope_fact < slope_cflu & slope_fact < 0 & p_fact >= 0.05 ~ "relative land use change loser",
-                                slope_fact < slope_cflu & slope_fact < 0 & p_fact < 0.05 ~ "absolute land use change loser",
-                                .default = NA)) %>% 
+                                     slope_fact > slope_cflu & slope_fact > 0 & p_fact >= 0.05 ~ "relative land use change winner",
+                                     slope_fact > slope_cflu & slope_fact < 0 ~ "relative land use change winner",
+                                     slope_fact < slope_cflu & slope_fact > 0 ~ "relative land use change loser",
+                                     slope_fact < slope_cflu & slope_fact < 0 & p_fact >= 0.05 ~ "relative land use change loser",
+                                     slope_fact < slope_cflu & slope_fact < 0 & p_fact < 0.05 ~ "absolute land use change loser",
+                                     .default = NA)) %>% 
   ## factual vs. counterfactual climate + land use:
   mutate(trend_change_climlu = case_when(slope_fact > slope_cfclimlu & slope_fact > 0 & p_fact < 0.05 ~ "absolute global change winner",
-                                    slope_fact > slope_cfclimlu & slope_fact > 0 & p_fact >= 0.05 ~ "relative global change winner",
-                                    slope_fact > slope_cfclimlu & slope_fact < 0 ~ "relative global change winner",
-                                    slope_fact < slope_cfclimlu & slope_fact > 0 ~ "relative global change loser",
-                                    slope_fact < slope_cfclimlu & slope_fact < 0 & p_fact >= 0.05 ~ "relative global change loser",
-                                    slope_fact < slope_cfclimlu & slope_fact < 0 & p_fact < 0.05 ~ "absolute global change loser",
-                                    .default = NA)) %>% 
+                                         slope_fact > slope_cfclimlu & slope_fact > 0 & p_fact >= 0.05 ~ "relative global change winner",
+                                         slope_fact > slope_cfclimlu & slope_fact < 0 ~ "relative global change winner",
+                                         slope_fact < slope_cfclimlu & slope_fact > 0 ~ "relative global change loser",
+                                         slope_fact < slope_cfclimlu & slope_fact < 0 & p_fact >= 0.05 ~ "relative global change loser",
+                                         slope_fact < slope_cfclimlu & slope_fact < 0 & p_fact < 0.05 ~ "absolute global change loser",
+                                         .default = NA)) %>% 
   ## add "no change"-category if confidence intervals of slopes overlap (= smaller max. is larger than larger min.):
   mutate(stable_cfclim = pmin(slope_CIhigh_fact, slope_CIhigh_cfclim) > pmax(slope_CIlow_fact, slope_CIlow_cfclim),
          stable_cflu = pmin(slope_CIhigh_fact, slope_CIhigh_cflu) > pmax(slope_CIlow_fact, slope_CIlow_cflu),
@@ -76,9 +77,9 @@ flow_df <- attr_metr_df %>%
   mutate(trend_change_clim = factor(trend_change_clim, levels = c("absolute climate change winner", "relative climate change winner", 
                                                                   "no change", "relative climate change loser", "absolute climate change loser")),
          trend_change_lu = factor(trend_change_lu, levels = c("absolute land use change winner", "relative land use change winner", 
-                                                                  "no change", "relative land use change loser", "absolute land use change loser")),
+                                                              "no change", "relative land use change loser", "absolute land use change loser")),
          trend_change_climlu = factor(trend_change_climlu, levels = c("absolute global change winner", "relative global change winner", 
-                                                                "no change", "relative global change loser", "absolute global change loser"))) %>% 
+                                                                      "no change", "relative global change loser", "absolute global change loser"))) %>% 
   # categorize trend within each scenario:
   select(-c(matches("_CI"))) %>% 
   tidyr::pivot_longer(cols = matches("(slope_)|(p_)"), names_to = c("metric", "scenario"), 
@@ -95,6 +96,91 @@ flow_df <- attr_metr_df %>%
 #save(flow_df, file =  file.path(dir, "results", "attribution", "trend_categories.RData"))
 
 
+# Chi-square test against equal expected classes: ------------------------------
+
+clim_test <- flow_df %>% 
+  group_by(trend_change_clim) %>% 
+  summarise(n = n())
+clim_test$n
+chisq.test(clim_test$n, p = rep(0.2, 5))
+
+lu_test <- flow_df %>% 
+  count(trend_change_lu, .drop = FALSE)
+lu_test$n
+chisq.test(lu_test$n, p = rep(0.2, 5))
+
+climlu_test <- flow_df %>% 
+  group_by(trend_change_climlu) %>% 
+  summarise(n = n())
+climlu_test$n
+chisq.test(climlu_test$n, p = rep(0.2, 5))
+
+
+# barplots of number of winner and loser species under different scenarios: ----
+
+bp_dt <- flow_df %>% 
+  mutate(fact = forcats::fct_recode(fact, "negative\nN = 45" = "negative\ntrend",
+                                    "positive\nN = 31" = "positive\ntrend",
+                                    "stable\nN = 4" = "stable")) %>% 
+  select(species, fact, trend_change_clim, trend_change_lu, trend_change_climlu) %>% 
+  # trend categories: absolute / relative winner / loser without driver:
+  mutate(trend_change_clim = gsub(pattern = " climate change", replacement = "", x = trend_change_clim),
+         trend_change_lu = gsub(pattern = " land use change", replacement = "", x = trend_change_lu),
+         trend_change_climlu = gsub(pattern = " global change", replacement = "", x = trend_change_climlu)) %>% 
+  # convert to factor:
+  mutate(trend_change_clim = factor(trend_change_clim, levels = c("absolute winner", "relative winner", "no change", "relative loser", "absolute loser")),
+         trend_change_lu = factor(trend_change_lu, levels = c("absolute winner", "relative winner", "no change", "relative loser", "absolute loser")),
+         trend_change_climlu  = factor(trend_change_climlu , levels = c("absolute winner", "relative winner", "no change", "relative loser", "absolute loser"))) %>% 
+  # convert to long format:
+  tidyr::pivot_longer(cols = starts_with("trend"), names_to = "scenario", values_to = "category") %>% 
+  mutate(scenario = factor(scenario, levels = c("trend_change_clim", "trend_change_lu", "trend_change_climlu")),
+         scenario = recode(scenario, trend_change_clim = "A: Climate change", trend_change_lu = "B: Land use change", trend_change_climlu = "C: Climate & land use change"))
+
+bp_dt2 <- bp_dt %>% 
+  group_by(fact, scenario, category) %>% 
+  summarise(n = n()) 
+
+
+# stacked barplots:
+bp_trends_stacked <- ggplot(bp_dt2, aes(x = fact, y = n, group = scenario)) +
+  geom_bar(aes(fill = category), stat = "identity", position = "stack", width = 0.6) +
+  geom_text(aes(label = n, group = fact), 
+             size = 4, colour = "grey20", position = position_stack(vjust = 0.5)) +
+  facet_wrap(~scenario) +
+  scale_fill_manual(values = c("relative loser" = "#abd9e9", #,
+                                 "absolute loser" =  "#2c7bb6",#",
+                                 "no change" = "#B18985", #, #"gray80",
+                                 "absolute winner" = "#d7191c",
+                                 "relative winner" = "#fdae61"), 
+                      drop = FALSE, na.value = NA, name = "trend change") +
+  scale_y_continuous(expand = expansion(mult = c(0, 0.15))) +
+  labs(y = "N species", x = "factual occupancy trend") +
+  theme_bw() +
+  theme(strip.background = element_blank(),
+        text = element_text(size = 14),
+        axis.title.x = element_text(margin = margin(t = 10), size = 13),
+        axis.title.y = element_text(margin = margin(r = 10), size = 13),
+        legend.position = "bottom",
+        legend.title.position = "top",
+        legend.margin = margin(t = -5, r = 0, b = 0, l = 0),
+        strip.text = element_text(size = 13))
+
+
+ggsave(filename = file.path(dir, "plots", "attribution", "barplot_trend_cats_stacked.svg"), 
+       plot = bp_trends_stacked,
+       device = "svg",
+       width = 21,
+       height = 11, # A4
+       units = "cm")
+
+# (xx maybe add bird icon)
+
+
+# alternative: alluvial plots: -------------------------------------------------
+
+# https://r-charts.com/flow/ggalluvial/
+# change categories based on linear trend
+
 ## climate change: ----
 
 plot_df_clim <- flow_df %>%
@@ -104,9 +190,9 @@ plot_df_clim <- flow_df %>%
 
 # version for presentation:
 
-# jpeg(file = file.path("plots", "attribution", "summary_plots", "alluvial_climate_presentation.jpg"),
+# jpeg(file = file.path(dir, "plots", "attribution", "alluvial_climate_presentation.jpg"),
 #      width = 910, height = 1200, quality = 100)
-# svg(file = file.path("plots", "attribution", "summary_plots", "alluvial_climate_presentation.svg"),
+# svg(file = file.path(dir, "plots", "attribution", "alluvial_climate_presentation.svg"),
 #     width = 14, height = 18)
 
 plot_df_clim %>% 
@@ -233,13 +319,12 @@ clim_plot <- plot_df_clim %>%
         legend.key.spacing.y = unit(0.2, "cm"), 
         legend.title=element_blank())
 
-
-ggsave(filename = file.path("plots", "attribution", "summary_plots", "alluvial_climate_manuscript.svg"), 
-       plot = clim_plot,
-       device = "svg",
-       width = 21,
-       height = 29.7, # A4
-       units = "cm")
+# ggsave(filename = file.path(dir, "plots", "attribution", "alluvial_climate_manuscript.svg"),
+#        plot = clim_plot,
+#        device = "svg",
+#        width = 21,
+#        height = 29.7, # A4
+#        units = "cm")
 
 
 ## land use change: ----
@@ -259,9 +344,9 @@ plot_df_lodes <- to_lodes_form(plot_df_lu, axes = c(1:2), id = trend_change_lu )
 
 # version for presentation:
 
-# jpeg(file = file.path("plots", "attribution", "summary_plots", "alluvial_lu_presentation.jpg"),
+# jpeg(file = file.path(dir, "plots", "attribution", "alluvial_lu_presentation.jpg"),
 #      width = 920, height = 1200, quality = 100)
-# svg(file = file.path("plots", "attribution", "summary_plots", "alluvial_lu_presentation.svg"),
+# svg(file = file.path(dir, "plots", "attribution", "alluvial_lu_presentation.svg"),
 #     width = 14, height = 18)
 
 ggplot(plot_df_lodes, aes(x = x, stratum = stratum, alluvium = trend_change_lu, y = n)) +
@@ -384,12 +469,12 @@ lu_plot <- ggplot(plot_df_lodes, aes(x = x, stratum = stratum, alluvium = trend_
         legend.key.spacing.y = unit(0.2, "cm"), 
         legend.title=element_blank())
 
-ggsave(filename = file.path("plots", "attribution", "summary_plots", "alluvial_lu_manuscript.svg"), 
-       plot = lu_plot,
-       device = "svg",
-       width = 21,
-       height = 29.7, # A4
-       units = "cm")
+# ggsave(filename = file.path(dir, "plots", "attribution", "alluvial_lu_manuscript.svg"),
+#        plot = lu_plot,
+#        device = "svg",
+#        width = 21,
+#        height = 29.7, # A4
+#        units = "cm")
 
 
 ## climate + land use change: ----
@@ -402,7 +487,7 @@ plot_df_climlu <- flow_df %>%
 
 # version for presentation:
 
-# jpeg(file = file.path("plots", "attribution", "summary_plots", "alluvial_climlu_presentation.jpg"),
+# jpeg(file = file.path(dir, "plots", "attribution", "alluvial_climlu_presentation.jpg"),
 #      width = 900, height = 1200, quality = 100)
 
 plot_df_climlu %>% 
@@ -530,17 +615,17 @@ climlu_plot <- plot_df_climlu %>%
         legend.key.spacing.y = unit(0.2, "cm"), 
         legend.title=element_blank())
 
-ggsave(filename = file.path("plots", "attribution", "summary_plots", "alluvial_climlu_manuscript.svg"), 
-       plot = climlu_plot,
-       device = "svg",
-       width = 21,
-       height = 29.7, # A4
-       units = "cm")
+# ggsave(filename = file.path(dir, "plots", "attribution", "alluvial_climlu_manuscript.svg"), 
+#        plot = climlu_plot,
+#        device = "svg",
+#        width = 21,
+#        height = 29.7, # A4
+#        units = "cm")
 
 
-# conceptual figures, replicated from Langhammer et al. 2024: ----
+## arrange plots for manuscript with conceptual legend and bird icon: -----
 
-# used as legend
+# concept figure as legend:
 
 dummy_df <- expand.grid(impact = factor(c("absolute winners", "relative winners", 
                                           "relative losers", "absolute losers"), 
@@ -602,20 +687,11 @@ for (i in stripr) {
   g$grobs[[i]]$grobs[[1]]$children[[j]]$gp$fill <- fills[k]
   k <- k+1
 }
-
 grid::grid.draw(g)
 
-# svg(file = file.path("plots", "attribution", "summary_plots",
-#                      "conceptual_trend_change_categories.svg"),
-#     width = 9, height = 9)
-
-grid::grid.draw(g)
-dev.off()
-
-
-# arrange plots for manuscript with conceptual legend and bird icon: -----
 
 # climate change:
+
 clim_plot <- plot_df_clim %>% 
   ggplot(aes(axis1 = cfclim, axis2 = fact, y = n)) +
   geom_alluvium(aes(fill = trend_change_clim), show.legend = TRUE, width = 1/5, colour = "grey50", alpha = 0.6) +
@@ -673,6 +749,7 @@ clim_plot <- plot_df_clim %>%
 clim_plot
 
 # land use change:
+
 lu_plot <- ggplot(plot_df_lodes, aes(x = x, stratum = stratum, alluvium = trend_change_lu, y = n)) +
   geom_flow(stat = "alluvium", aes(fill = trend_change_lu2),
             color = "darkgray",width = 1/4, show.legend = TRUE, alpha = 0.6) +
@@ -727,6 +804,7 @@ lu_plot <- ggplot(plot_df_lodes, aes(x = x, stratum = stratum, alluvium = trend_
 lu_plot
 
 # arrange side-by-side:
+
 combined_plot <- plot_grid(clim_plot,
                            lu_plot,
                            align = 'vh',
@@ -743,7 +821,7 @@ icon <- ggplot() +
 
 # arrange all parts:
 
-svg(file = file.path("plots", "attribution", "summary_plots", "alluvial_climate_lu_manuscript_conceptual_legend.svg"),
+svg(file = file.path(dir, "plots", "attribution", "alluvial_climate_lu_manuscript_conceptual_legend.svg"),
     width = 17, # in inches
     height = 14)
 
@@ -788,7 +866,7 @@ print(icon, newpage = FALSE)
 dev.off()
 
 
-# # version without conceptual legend: ----
+## # version without conceptual legend: ----
 # 
 # # arrange plots:
 # combined_plot <- plot_grid(clim_plot,
@@ -856,9 +934,12 @@ dev.off()
 # 
 # combined_plot_final
 # 
-# ggsave(filename = file.path("plots", "attribution", "summary_plots", "alluvial_climate_lu_manuscript2.svg"), 
+# ggsave(filename = file.path(dir, "plots", "attribution", "alluvial_climate_lu_manuscript2.svg"), 
 #        plot = combined_plot_final,
 #        device = "svg",
 #        width = 45,
 #        height = 32,
 #        units = "cm")
+
+# session info:
+writeLines(capture.output(sessionInfo()), file.path(dir, "results", "sessionInfo", "5_2_attribution_plots_trend_categories.txt"))

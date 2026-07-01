@@ -1,13 +1,28 @@
-# Model fitting for temporal validation:
-# fit model with data of first 15 years
-# predict y (observations) for all 25 years, only last ten years used later for model evaluation
-
-# executed once (round 1), then MCMC checked with 2_3a_fit_DOMs_check_fit.R, 
-# then executed again (round 2) for species with issues with larger number of iterations
-# -> is this round 1 or 2:
+# Script:   2_2_fit_DOMs_tempval.R
+# Purpose:  Fit dynamic occupancy models with subset of years for temporal validation
+#           fit model with data of first 15 years, predict y (observations) for all 25 years, last ten years used later for model evaluation
+# Inputs:   data/BBS_for_occ_spec_records.RData
+#           data/route_selection_1995_2019_surv_beg_end_max_5y_miss_v2_spat_thin_100km_max_30_r_per_BCR_centroids.shp
+#           data/final_species_selection.RData
+#           data/selected_variables.RData
+#           data/BBS_for_occ_selection.RData
+#           data/route_year_env_data.RData
+#           for second run (see notes below): results/temp_val_buffer_750_10yrs/check_output/specs_MCMC_failed.RData
+# Outputs:  results/temp_val_buffer_750_10yrs/out_<species>_temp_val_10yrs_buffer_750.RData (one per species)
+#           results/temp_val_buffer_750_10yrs/preds_<species>_temp_val_10yrs_buffer_750.RData (one per species)
+#           results/temp_val_buffer_750_10yrs/refit_2000_2000/out_<species>_temp_val_10yrs_buffer_750.RData (one per species with initial model fitting issues)
+#           results/temp_val_buffer_750_10yrs/refit_2000_2000/preds_<species>_temp_val_10yrs_buffer_750.RData (one per species with initial model fitting issues)
+# Runs on:  HPC (NAS Potsdam)
+# Notes:    this script is run twice, first with 1000 fitting iterations (set round <- 1) and secondly, after
+#           MCMC fitting was checked with 2_3a_fit_DOMs_check_fit.R, for subset of species 
+#           with model fitting issues with 2000 iterations (set round <- 2)
 
 # round <- 1
 round <- 2
+
+
+source(file.path("scripts", "0_paths.R"))
+
 
 # packages: --------------------------------------------------------------------
 
@@ -24,10 +39,6 @@ set_cmdstan_path(path = NULL) # for HPC; local: set_cmdstan_path("C:/Users/schif
 
 print(tempdir())
 
-# project directory:
-dir <- file.path("//NAS-2-P-SN-01.ibb.uni-potsdam.de", "daten$", "AG26", "Transfer", "Schifferle_BBS_occupancy_models_2023")
-#dir <- file.path("/mnt", "ibb_share", "zurell_transfer", "Schifferle_BBS_occupancy_models_2023")
-
 
 # functions: -------------------------------------------------------------------
 
@@ -37,23 +48,23 @@ source(file.path("scripts", "0_functions.R"))
 # load data: -------------------------------------------------------------------
 
 # route-year-species information (only surveyed)
-load(file = file.path("data", "BBS_for_occ_spec_records.RData")) # bbs_dt_occ; output of 1_0_dataprep_BBS_bird_data.R
+load(file = file.path(hpc_dir, "data", "BBS_for_occ_spec_records.RData")) # bbs_dt_occ; output of 1_0_dataprep_BBS_bird_data.R
 
 # selected routes spatial data (to buffer presences):
-routes_sel_sf <- st_read(file.path("data", "route_selection_1995_2019_surv_beg_end_max_5y_miss_v2_spat_thin_100km_max_30_r_per_BCR_centroids.shp")) # output of 1_1_dataprep_BBS_route_selection.R
+routes_sel_sf <- st_read(file.path(hpc_dir, "data", "route_selection_1995_2019_surv_beg_end_max_5y_miss_v2_spat_thin_100km_max_30_r_per_BCR_centroids.shp")) # output of 1_1_dataprep_BBS_route_selection.R
 
 # selected species:
-load(file = file.path("data", "final_species_selection.RData")) # species_selection_final; output of 1_2_dataprep_BBS_species_selection.R
+load(file = file.path(hpc_dir, "data", "final_species_selection.RData")) # species_selection_final; output of 1_2_dataprep_BBS_species_selection.R
 
 # selected variables:
-load(file = file.path("data", "selected_variables.RData")) # selvar_final; output of 1_2a_dataprep_env_variable_selection.R
+load(file = file.path(hpc_dir, "data", "selected_variables.RData")) # selvar_final; output of 1_2a_dataprep_env_variable_selection.R
 
 # routes-years:
-load(file = file.path("data", "BBS_for_occ_selection.RData")) # route_sel_dt; output of 1_3_dataprep_match_BBS_routes_env_data.R
+load(file = file.path(hpc_dir, "data", "BBS_for_occ_selection.RData")) # route_sel_dt; output of 1_3_dataprep_match_BBS_routes_env_data.R
 
 # selected routes and focal years matched to environmental data:
 # merged route, year, environment data:
-load(file = file.path("data", "route_year_env_data.RData")) # route_sel_env_dt_final; output 1_3_dataprep_match_BBS_routes_env_data.R
+load(file = file.path(hpc_dir, "data", "route_year_env_data.RData")) # route_sel_env_dt_final; output 1_3_dataprep_match_BBS_routes_env_data.R
 
 
 # settings: --------------------------------------------------------------------
@@ -61,10 +72,12 @@ load(file = file.path("data", "route_year_env_data.RData")) # route_sel_env_dt_f
 if(round == 1){
   
   # directory for logfiles:
-  log_dir <- file.path("logfiles", "temp_val_buffer_750_10yrs")
+  log_dir <- file.path(hpc_dir, "logfiles", "temp_val_buffer_750_10yrs")
+  if(!dir.exists(log_dir)){dir.create(log_dir, recursive = TRUE)}
   
   # directory for results:
-  res_dir <- file.path(dir, "results", "temp_val_buffer_750_10yrs")
+  res_dir <- file.path(hpc_dir, "results", "temp_val_buffer_750_10yrs")
+  if(!dir.exists(res_dir)){dir.create(res_dir, recursive = TRUE)}
   
   # species to fit models for:
   species_set <- species_selection_final
@@ -77,13 +90,15 @@ if(round == 1){
 if(round == 2){
   
   # directory for logfiles:
-  log_dir <- file.path("logfiles", "temp_val_buffer_750_10yrs", "refit_2000_2000")
+  log_dir <- file.path(hpc_dir, "logfiles", "temp_val_buffer_750_10yrs", "refit_2000_2000")
+  if(!dir.exists(log_dir)){dir.create(log_dir, recursive = TRUE)}
   
   # directory for results:
-  res_dir <- file.path(dir, "results", "temp_val_buffer_750_10yrs", "refit_2000_2000")
+  res_dir <- file.path(hpc_dir, "results", "temp_val_buffer_750_10yrs", "refit_2000_2000")
+  if(!dir.exists(res_dir)){dir.create(res_dir, recursive = TRUE)}
   
   # load species for which MCMC with 1000 + 1000 iterations failed (specs_MCMC_failed; output of 2_3a_fit_DOMs_check_fit.R)
-  load(file.path(dir, "results", "temp_val_buffer_750_10yrs", "check_output", "specs_MCMC_failed.RData"))
+  load(file.path(hpc_dir, "results", "temp_val_buffer_750_10yrs", "check_output", "specs_MCMC_failed.RData"))
   
   # species to fit models for:
   species_set <- specs_MCMC_failed
@@ -368,6 +383,9 @@ foreach(spec = species_set,
       }
 
 stopCluster(cl)
+
+# session info:
+writeLines(capture.output(sessionInfo()), file.path(hpc_dir, "results", "sessionInfo", "2_2_fit_DOMs_tempval.txt"))
 
 rm(list=ls())
 gc()

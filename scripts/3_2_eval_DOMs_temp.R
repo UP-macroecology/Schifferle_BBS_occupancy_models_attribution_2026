@@ -1,6 +1,20 @@
-# model evaluation: temporal predictive performance of DOMs
+# Script:   3_2_eval_DOMs_temp.R
+# Purpose:  Model evaluation: temporal predictive performance of DOMs 
+# Inputs:   data/final_species_selection.RData
+#           data/BBS_for_occ_spec_records.RData
+#           data/BBS_for_occ_selection.RData
+#           data/route_selection_1995_2019_surv_beg_end_max_5y_miss_v2_spat_thin_100km_max_30_r_per_BCR_centroids.shp
+#           results/temp_val_buffer_750_10yrs/preds_<species>_temp_val_10yrs_buffer_750.RData
+#           results/temp_val_buffer_750_10yrs/refit_2000_2000/preds_<species>_temp_val_10yrs_buffer_750.RData
+# Outputs:  results/temp_val_buffer_750_10yrs/temp_eval/10_years/pred_occ_sum/<species>_occ_sum_series.RData (one file per species for which MCMC worked)
+#           results/temp_val_buffer_750_10yrs/temp_eval/10_years/temp_val_metrics.RData
+#           results/temp_val_buffer_750_10yrs/temp_eval/10_years/spec_set_temp_val_ok.RData
+#           results/temp_val_buffer_750_10yrs/temp_eval/10_years/time_series_aggr_across_routes/temp_val_10yrs_<species>_750km.jpg (one plot per species for which MCMC worked)
+# Runs on:  Local
 
 # model fitted to 15 years of training data and evaluated based on the following 10 years
+
+source(file.path("scripts", "0_paths.R"))
 
 
 # packages: --------------------------------------------------------------------
@@ -12,9 +26,6 @@ library(gridExtra)
 
 
 # directories: -----------------------------------------------------------------
-
-# project directory:
-dir <- file.path("//NAS-2-P-SN-01.ibb.uni-potsdam.de", "daten$", "AG26", "Transfer", "Schifferle_BBS_occupancy_models_2023")
 
 results_dir <- file.path(dir, "results", "temp_val_buffer_750_10yrs")
 
@@ -32,17 +43,17 @@ source(file.path("scripts", "0_functions.R"))
 # load data: -------------------------------------------------------------------
 
 # selected species:
-load(file = file.path("data", "species_set_analysis.RData")) # output of 3_1_eval_DOMs_CV.R
+load(file = file.path(dir, "results", "species_set_analysis.RData")) # output of 3_1_eval_DOMs_CV.R
 final_species
 
 # route-year-species information (only surveyed)
-load(file = file.path("data", "BBS_for_occ_spec_records.RData")) # bbs_dt_occ; output of 1_0_dataprep_BBS_bird_data.R
+load(file = file.path(dir, "data", "BBS_for_occ_spec_records.RData")) # bbs_dt_occ; output of 1_0_dataprep_BBS_bird_data.R
 
 # routes-years:
-load(file = file.path("data", "BBS_for_occ_selection.RData")) # route_sel_dt; output of 1_3_dataprep_match_BBS_routes_env_data.R
+load(file = file.path(dir, "data", "BBS_for_occ_selection.RData")) # route_sel_dt; output of 1_3_dataprep_match_BBS_routes_env_data.R
 
 # selected routes spatial data (to buffer presences):
-routes_sel_sf <- st_read(file.path("data", "route_selection_1995_2019_surv_beg_end_max_5y_miss_v2_spat_thin_100km_max_30_r_per_BCR_centroids.shp")) # output of 1_1_dataprep_BBS_route_selection.R
+routes_sel_sf <- st_read(file.path(dir, "data", "route_selection_1995_2019_surv_beg_end_max_5y_miss_v2_spat_thin_100km_max_30_r_per_BCR_centroids.shp")) # output of 1_1_dataprep_BBS_route_selection.R
 
 n_train_years <- 15 
 
@@ -243,3 +254,6 @@ specs_thresh <- temp_val_metrics %>%
 #   )
 #   dev.off()
 # }
+
+# session info:
+writeLines(capture.output(sessionInfo()), file.path(dir, "results", "sessionInfo", "3_2_eval_DOMs_temp.txt"))

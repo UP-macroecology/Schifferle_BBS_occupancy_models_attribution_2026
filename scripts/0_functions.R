@@ -1,3 +1,10 @@
+# Script: 0_functions.R
+# Purpose: Defines functions used throughout the analyses
+# Inputs:  -
+# Outputs: -
+# Runs on: HPC (NAS Potsdam)
+
+
 # function for spatial thinning of routes:
 
 thin <- function(sf, thin_dist = 3000, runs = 10, ncores = 10){
@@ -78,16 +85,7 @@ select07 <- function(imp, X, threshold = 0.7, method="spearman") { # imp = impor
 
 # from: https://gist.github.com/danlwarren/271288d5bab45d2da549:
 
-# Function to rarefy point data in any number of dimensions.  The goal here is to 
-# take a large data set and reduce it in size in such a way as to approximately maximize the 
-# difference between points.  For instance, if you have 2000 points but suspect a lot of 
-# spatial autocorrelation between them, you can pass in your data frame, the names (or indices)
-# of the lat/lon columns, and the number 200, and you get back 200 points from your original data 
-# set that are chosen to be as different from each other as possible given a randomly chosen
-# starting point
-
 # Input is:
-#
 # x, a data frame containing the columns to be used to calculate distances along with whatever other data you need
 # cols, a vector of column names or indices to use for calculating distances
 # npoints, the number of rarefied points to spit out

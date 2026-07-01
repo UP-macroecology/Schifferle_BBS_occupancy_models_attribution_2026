@@ -1,5 +1,21 @@
-# assigns BBS routes with 750 km buffer around species presences to 5 folds 
-# for spatially blocked cross validation of DOMs
+# Script:   2_4a_fit_DOMs_CV_fold_assignment.R
+# Purpose:  Assign BBS routes to 5 folds for spatially blocked cross validation of DOMs (species specific: routes with 750 km buffer around species presences)
+# Inputs:   data/BBS_for_occ_spec_records.RData
+#           data/route_selection_1995_2019_surv_beg_end_max_5y_miss_v2_spat_thin_100km_max_30_r_per_BCR_centroids.shp
+#           data/route_year_env_data.RData
+#           data/final_species_selection.RData
+#           data/selected_variables.RData
+#           data/BBS_for_occ_selection.RData
+# Outputs:  data/CV_route_block_allocation/block_size_500km/<species>.RData (one per species)
+#           plots/blockCV_folds/block_size_500km/<species>.jpg (one per species)
+#           plots/blockCV_folds/block_size_500km/<species>_env_similarity.jpg (one per species)
+#           data/blockCV_500km_fold_pres_per_year.txt 
+#           data/blockCV_500km_pres_abs_per_fold.txt 
+# Runs on:  Local
+
+
+source(file.path("scripts", "0_paths.R"))
+
 
 # packages: --------------------------------------------------------------------
 
@@ -12,13 +28,15 @@ library(ggplot2)
 
 # directories: -----------------------------------------------------------------
 
+hexagon_size_m <- 500000 # tested different values
+
 # directory to save plots regarding fold assignment:
-if(!dir.exists(file.path("plots", "blockCV_folds", paste0("block_size_", hexagon_size_m/1000, "km")))){
-  dir.create(file.path("plots", "blockCV_folds", paste0("block_size_", hexagon_size_m/1000, "km")), recursive = TRUE)
+if(!dir.exists(file.path(dir, "plots", "blockCV_folds", paste0("block_size_", hexagon_size_m/1000, "km")))){
+  dir.create(file.path(dir, "plots", "blockCV_folds", paste0("block_size_", hexagon_size_m/1000, "km")), recursive = TRUE)
 }
 # directory to save block assignment:
-if(!dir.exists(file.path("data", "CV_route_block_allocation", paste0("block_size_", hexagon_size_m/1000, "km")))){
-  dir.create(file.path("data", "CV_route_block_allocation", paste0("block_size_", hexagon_size_m/1000, "km")), recursive = TRUE)
+if(!dir.exists(file.path(dir, "data", "CV_route_block_allocation", paste0("block_size_", hexagon_size_m/1000, "km")))){
+  dir.create(file.path(dir, "data", "CV_route_block_allocation", paste0("block_size_", hexagon_size_m/1000, "km")), recursive = TRUE)
 }
 
 
@@ -30,29 +48,29 @@ source(file.path("scripts", "0_functions.R"))
 # load data: -------------------------------------------------------------------
 
 # route-year-species information (only surveyed)
-load(file = file.path("data", "BBS_for_occ_spec_records.RData")) # bbs_dt_occ; output of 1_0_dataprep_BBS_bird_data.R
+load(file = file.path(dir, "data", "BBS_for_occ_spec_records.RData")) # bbs_dt_occ; output of 1_0_dataprep_BBS_bird_data.R
 
 # selected routes spatial data (to buffer presences):
-routes_sel_sf <- st_read(file.path("data", "route_selection_1995_2019_surv_beg_end_max_5y_miss_v2_spat_thin_100km_max_30_r_per_BCR_centroids.shp")) # output of 1_1_dataprep_BBS_route_selection.R
+routes_sel_sf <- st_read(file.path(dir, "data", "route_selection_1995_2019_surv_beg_end_max_5y_miss_v2_spat_thin_100km_max_30_r_per_BCR_centroids.shp")) # output of 1_1_dataprep_BBS_route_selection.R
 
 # selected routes and focal years matched to environmental data:
-load(file = file.path("data", "route_year_env_data.RData")) # route_sel_env_dt_final; output 1_3_dataprep_match_BBS_routes_env_data.R
+load(file = file.path(dir, "data", "route_year_env_data.RData")) # route_sel_env_dt_final; output 1_3_dataprep_match_BBS_routes_env_data.R
 
 # selected species:
-load(file = file.path("data", "final_species_selection.RData")) # species_selection_final; output of 1_2_dataprep_BBS_species_selection.R
+load(file = file.path(dir, "data", "final_species_selection.RData")) # species_selection_final; output of 1_2_dataprep_BBS_species_selection.R
 
 # selected variables:
-load(file = file.path("data", "selected_variables.RData")) # selvar_final; output of 1_2a_dataprep_env_variable_selection.R
+load(file = file.path(dir, "data", "selected_variables.RData")) # selvar_final; output of 1_2a_dataprep_env_variable_selection.R
 
 # routes-years:
-load(file = file.path("data", "BBS_for_occ_selection.RData")) # route_sel_dt; output of 1_3_dataprep_match_BBS_routes_env_data.R
+load(file = file.path(dir, "data", "BBS_for_occ_selection.RData")) # route_sel_dt; output of 1_3_dataprep_match_BBS_routes_env_data.R
 
 # environmental data to check environmental similarity between training and test folds:
 
 # files:
-bioclim_files <- list.files(file.path("data", "Env_data", "ISIMIP_GSWP3_W5E5", "bioclim"), full.names = TRUE)
-lu_files <- list.files(file.path("data", "Env_data", "ISIMIP_land_use_and_irrigation", "ISIMIP_LU_ESRI102003"), full.names = TRUE)
-sclim_files <- list.files(file.path("data", "Env_data", "ISIMIP_GSWP3_W5E5", "seasonal"), full.names = TRUE)
+bioclim_files <- list.files(file.path(clim_path, "bioclim"), full.names = TRUE)
+lu_files <- list.files(file.path(lu_path, "ISIMIP_LU_ESRI102003"), full.names = TRUE)
+sclim_files <- list.files(file.path(clim_path, "seasonal"), full.names = TRUE)
 
 # rasters:
 bioclim_3yrs_sp <- rast(bioclim_files[which(grepl("1992_1995", bioclim_files))])
@@ -69,8 +87,6 @@ env_rasters <- c(bioclim_3yrs_sp_sel, sclim_3yrs_sp_sel, lu_3yrs_sp_sel)
 
 
 # assign routes to folds: ------------------------------------------------------
-
-hexagon_size_m <- 500000 # tested different values
 
 # iterate over species:
 
@@ -110,7 +126,7 @@ for(spec in species_selection_final){
                       )
 
   # save plot:
-  jpeg(file = file.path("plots", "blockCV_folds", paste0("block_size_", hexagon_size_m/1000, "km"), paste0(spec, ".jpg")), 
+  jpeg(file = file.path(dir, "plots", "blockCV_folds", paste0("block_size_", hexagon_size_m/1000, "km"), paste0(spec, ".jpg")), 
        width = 1000, height = 800, quality = 100)
   print(
     cv_plot(cv = sb_US, x = occ_spec_sf_buffered, nrow = 2, points_alpha = 0.5) + 
@@ -125,7 +141,7 @@ for(spec in species_selection_final){
   sb_US$folds_ids # which route in which fold
   sb_US$folds_list # for each fold, which routes are in training set, which routes are in test set
   
-  save(sb_US, file = file.path("data", "CV_route_block_allocation", paste0("block_size_", hexagon_size_m/1000, "km"), paste0(spec, ".RData")))
+  save(sb_US, file = file.path(dir, "data", "CV_route_block_allocation", paste0("block_size_", hexagon_size_m/1000, "km"), paste0(spec, ".RData")))
   
   
   # check environmental similarity to evaluate possible extrapolation in testing folds:
@@ -140,7 +156,7 @@ for(spec in species_selection_final){
                               progress = TRUE)
   
   # write plot to file:
-  jpeg(file = file.path("plots", "blockCV_folds", paste0("block_size_", hexagon_size_m/1000, "km"), paste0(spec, "_env_similarity.jpg")), 
+  jpeg(file = file.path(dir, "plots", "blockCV_folds", paste0("block_size_", hexagon_size_m/1000, "km"), paste0(spec, "_env_similarity.jpg")), 
        width = 800, height = 600, quality = 100)
   print(
     env_sim_US +
@@ -156,7 +172,7 @@ for(spec in species_selection_final){
 # do we have presences in every year of the training data for each fold (to be able to fit the model):
 
 # write check results to text file:
-sink(file.path("data", paste0("blockCV_",  hexagon_size_m/1000, "km_fold_pres_per_year.txt")))
+sink(file.path(dir, "data", paste0("blockCV_",  hexagon_size_m/1000, "km_fold_pres_per_year.txt")))
 
 for(spec in species_selection_final){
 
@@ -171,7 +187,7 @@ for(spec in species_selection_final){
     arrange(RTENO)
   
   # assigned routes to folds:
-  load(file.path("data", "CV_route_block_allocation", "block_size_500km", paste0(spec, ".RData")))
+  load(file.path(dir, "data", "CV_route_block_allocation", "block_size_500km", paste0(spec, ".RData")))
   
   # iterate over folds:
   
@@ -200,9 +216,9 @@ sink(file = NULL)
 ## number of presences and absences in training and test data
 
 # write for each species number of presences and absences in training and test data of each fold to file:
-sink(file.path("data", paste0("blockCV_", hexagon_size_m/1000, "km_pres_abs_per_fold.txt")))
+sink(file.path(dir, "data", paste0("blockCV_", hexagon_size_m/1000, "km_pres_abs_per_fold.txt")))
 for(spec in species_selection_final){
-  load(file.path("data", "CV_route_block_allocation", paste0("block_size_", hexagon_size_m/1000, "km"), paste0(spec, ".RData")))
+  load(file.path(dir, "data", "CV_route_block_allocation", paste0("block_size_", hexagon_size_m/1000, "km"), paste0(spec, ".RData")))
   print(spec)
   print(sb_US$records)
 }
@@ -212,3 +228,6 @@ sink(file = NULL)
 # we want 80 % of presences in training data, 20 % in test data
 # minimum 40 presences in training data and 10 presences in test data
 # since the included species were detected on at least 50 routes
+
+# session info:
+writeLines(capture.output(sessionInfo()), file.path(dir, "results", "sessionInfo", "2_4a_fit_DOMs_CV_fold_assignment.txt"))

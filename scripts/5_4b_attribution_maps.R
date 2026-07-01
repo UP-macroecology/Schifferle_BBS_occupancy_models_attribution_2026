@@ -1,105 +1,83 @@
-# maps on spatial patterns in:
+# Script:   5_4b_attribution_maps.R
+# Purpose:  Maps on spatial patterns
+# Inputs:   results/species_DOM_val_okay.RData
+#           data/BBS_data_merged.RData
+#           data/US_outline_ESRI102003.shp
+#           data/Birdlife_range_maps/<species>.shp
+#           results/attribution/attribution_metrics_final.RData
+#           results/attribution/trend_categories.RData
+# Outputs:  data/Birdlife_range_maps/US_clipped/<species>_US_clipped.shp
+#           data/Birdlife_range_maps/tifs/<species>_US_clipped.tif
+#           data/Birdlife_range_maps/tifs_attr/<species>_attr.tif
+#           plots/attribution/maps/species_richness.svg (Fig. S 3)
+#           plots/attribution/maps/clim_lu_combined_all.svg (Fig. 5)
+#           plots/attribution/maps/clim_change_impact_cats.svg (Fig. S 4)
+#           plots/attribution/maps/lu_change_impact_cats.svg (Fig. S 5)
+#           plots/attribution/maps/climlu_change_impact_cats.svg (Fig. S 6)
+# Runs on:  Local
+
+# Steps:
+# rasterize shapefiles
+# add impact categories and driver importance as attributes
+# generate maps on spatial patterns in:
 # - community mean relative importance of climate change and land use change
 # - occupancy trends (absolute / relative winners and losers)
 # at the range level, based on overlaying BirdLife range 
- 
+
+
+source(file.path("scripts", "0_paths.R"))
+
 
 # packages: --------------------------------------------------------------------
 
 library(dplyr)
 library(sf)
-library(doParallel)
-library(gdalUtilities)
 library(terra)
 library(ggplot2)
 library(tidyterra)
 library(cowplot)
-library(rmapshaper) # to simplify geometry of elevation contour lines
 
 
 # directories: -----------------------------------------------------------------
 
-# project directory:
-dir <- file.path("//NAS-2-P-SN-01.ibb.uni-potsdam.de", "daten$", "AG26", "Transfer", 
-                 "Schifferle_BBS_occupancy_models_2023")
-
-# BirdLife range maps:
-datashare_Birdlife <- file.path("//NAS-2-P-SN-01.ibb.uni-potsdam.de/daten$", "AG26", "Arbeit", "datashare", "data", "biodat", "distribution", "Birdlife", "BOTW_2022")
-#datashare_Birdlife <- file.path("/mnt", "ibb_share", "zurell", "biodat", "distribution", "Birdlife", "BOTW_2022")
-
-# directory to save extracted BirdLife ranges:
-# output_dir <- file.path("/mnt", "ibb_share", "zurell_transfer", "Schifferle_BBS_occupancy_models_2023", "data", "Birdlife_range_maps")
+# directory with extracted BirdLife ranges:
 output_dir <- file.path(dir, "data", "Birdlife_range_maps")
 
+# directory to store maps:
+plot_dir <- file.path(dir, "plots", "attribution", "maps")
+if(!dir.exists(plot_dir)){dir.create(plot_dir, recursive = TRUE)}
 
 # prepare data: ----------------------------------------------------------------
 
 # species for attribution:
-load(file = file.path("data", "species_DOM_val_okay.RData")) # output of 4_0_DOMs_predictions_y_routes_scenarios.R
+load(file = file.path(dir, "results", "species_DOM_val_okay.RData")) # output of 4_0_DOMs_predictions_y_routes_scenarios.R
 spec_attr
 
 # add scientific names:
-load(file.path("data", "BBS_data_merged.RData")) # bbs_dt; output of 1_0_dataprep_BBS_bird_data.R
-spec_names <- bbs_dt %>% 
-  select(English_Common_Name, Scientific_Name) %>% 
-  distinct %>% 
-  filter(English_Common_Name %in% spec_attr)
+load(file.path(dir, "data", "BBS_data_merged.RData")) # bbs_dt; output of 1_0_dataprep_BBS_bird_data.R
 
+# outline conterminous US
+US_albers_sf <- read_sf(file.path(dir, "data", "US_outline_ESRI102003.shp")) # output of 1_0_dataprep_climate.R
 
-## shapefile extraction from Birdlife gdb: -------------------------------------
+# attribution metrics:
+load(file = file.path(dir, "results", "attribution", "attribution_metrics_final.RData")) # output of 5_1_attribution_metrics.R
+attr_metr_df
 
-# register cores for parallel computation:
-registerDoParallel(cores = 20)
-
-# only parts of range where species is considered extant (presence = 1) and which
-# is used either throughout the whole year (seasonal = 1) or during the breeding season (seasonal = 2)
-
-# # account for taxonomic changes between BBS and BL range maps:
-# # (resources:
-# # https://www.iucnredlist.org/
-# # https://explorer.natureserve.org/Search)
-spec_name_change_df <- data.frame("BBS_name" = "Dryobates villosus", "BL_name" = "Leuconotopicus villosus")
-spec_name_change_df[2,] <- c("Dryocopus pileatus", "Hylatomus pileatus")
-
-foreach(s = 1:nrow(spec_names),
-        .packages = c("gdalUtilities"),
-        .verbose = TRUE,
-        .errorhandling = "remove",
-        .inorder = FALSE) %dopar% {
-          
-          spec <- spec_names$Scientific_Name[s]
-          
-          # check if species was already processed:
-          exists <- file.exists(file.path("data", "Birdlife_range_maps", paste0(spec_names$English_Common_Name[s], ".shp")))
-          if(exists) {
-            print(paste(spec, "ran already."))
-            next
-          }
-          
-          # adjust species name if BL uses other taxonomy than BBS:
-          if(spec %in% spec_name_change_df$BBS_name){
-            spec <- spec_name_change_df$BL_name[which(spec_name_change_df$BBS_name == spec)]
-          }
-          
-          # extract shapefile:
-          gdalUtilities::ogr2ogr(src_datasource_name = file.path(datashare_Birdlife, "BOTW.gdb"),
-                                 layer = "All_Species",
-                                 where = paste0("sci_name = '", spec, "' AND (SEASONAL = '1' OR SEASONAL = '2') AND PRESENCE = '1'"), # SEASONAL = 1: resident throughout the year, SEASONAL = 2: breeding season
-                                 dst_datasource_name = file.path(output_dir, paste0(spec_names$English_Common_Name[s], ".shp")),
-                                 overwrite = TRUE)
-        }
-
+# impact categories:
+load(file =  file.path(dir, "results", "attribution", "trend_categories.RData")) # output of 5_2_attribution_plots_trend_categories.R
+flow_df
 
 ## rasterize shapefile for easier summary calculations: ------------------------
 
 # clip to conterminous USA, specify extent to ensure same grid for all, rasterize
-
-# conterminous USA:
-US_albers_sf <- read_sf(file.path("data", "US_outline_ESRI102003.shp")) # output of 1_0_dataprep_climate.R
-# extent:
+# extent USA:
 extent_US <- st_bbox(US_albers_sf)
 
 # iterate over species:
+spec_names <- bbs_dt %>% 
+  select(English_Common_Name, Scientific_Name) %>% 
+  distinct %>% 
+  filter(English_Common_Name %in% spec_attr)
 
 for(s in 1:nrow(spec_names)){
   
@@ -141,19 +119,11 @@ for(s in 1:nrow(spec_names)){
 
 ## add impact categories and driver importance as attributes: ------------------
 
-# attribution metrics:
-load(file = file.path(dir, "results", "attribution", "attribution_metrics_final.RData")) # output of 5_1_attribution_metrics.R
-attr_metr_df
-
 rel_imp_df <- attr_metr_df %>%
   select(-matches("(slope)|(p_)")) %>%
   mutate(imp_clim = mape_cfclim - mape_fact,
          imp_lu = mape_cflu - mape_fact,
          imp_climlu = mape_cfclimlu - mape_fact)
-
-# impact categories:
-load(file =  file.path(dir, "results", "attribution", "trend_categories.RData")) # output of 5_2_attribution_plots_trend_categories.R
-flow_df
 
 imp_cat_df <- flow_df %>% 
   select(species, starts_with("trend")) %>% 
@@ -174,7 +144,7 @@ imp_cat_df <- flow_df %>%
                                           "absolute global change loser" ~ 5))
 
 
-# species ranges as multilayer tifs with attributon data:
+# species ranges as multilayer tifs with attribution data:
 
 for(s in 1:nrow(spec_names)){
   
@@ -199,49 +169,7 @@ for(s in 1:nrow(spec_names)){
 # maps: ------------------------------------------------------------------------
 
 
-# elevation contour lines as background map:
-
-# # elevation data, downloaded from https://www.sciencebase.gov/catalog/item/581d051de4b08da350d523c3
-# US_contours <- read_sf(file.path("data", "USGS_contours_small_scale", "cont49l010a.shp")) %>%
-#   st_transform(crs = "ESRI:102003") %>%
-#   # clip to conterminous USA:
-#   st_intersection(y = US_albers_sf) 
-# table(US_contours$Contour)
-# 
-# # subset of elevation values to use:
-# contour_subset <- c(100, 200, 500, 700, 1000, 1500, 2100, 2500, 2900)
-# 
-# US_contours_subset <- US_contours %>%
-#   filter(Contour %in% contour_subset) # large
-# rm(US_contours)
-# 
-# # simplify geometry:
-# US_contours_subset_simpl_all <- vector(mode = "list", length = length(contour_subset))
-# 
-# for(i in 1:length(contour_subset)){
-# 
-#   print(contour_subset[i])
-# 
-#   US_contours_subset_simpl <- ms_simplify(US_contours_subset %>%  filter(Contour == contour_subset[i]), # fatal error if trying all at once
-#                                           keep = 0.0005,
-#                                           keep_shapes = FALSE) %>%
-#     filter(!st_is_empty(.))
-# 
-#   US_contours_subset_simpl_all[[i]] <- US_contours_subset_simpl
-# 
-#   print(US_contours_subset_simpl_all)
-# 
-# }
-# 
-# US_contours_subset_simpl <- bind_rows(US_contours_subset_simpl_all)
-# plot(US_contours_subset_simpl["Contour"])
-# 
-# st_write(US_contours_subset_simpl, file.path("data", "US_elev_contours_simplified.shp"), append = FALSE)
-
-US_contours_subset_simpl <- st_read(file.path("data", "US_elev_contours_simplified.shp")) 
-
-
-## 1) general species richness map (locations of ranges of the species in our selection): ----
+## 1) general species richness map (Fig. S 3): ----
 
 raster_list <- list.files(file.path(output_dir, "tifs"), pattern = "tif", full.names = TRUE)
 ranges <- rast(raster_list)
@@ -259,12 +187,12 @@ sr_map <- ggplot() +
         plot.margin = margin(0,0,0,0))
 sr_map
 
-ggsave(filename = file.path("plots", "attribution", "maps", "species_richness.svg"), 
-       plot = sr_map,
-       device = "svg",
-       width = 29.7,
-       height = 18, # A4
-       units = "cm")
+# ggsave(filename = file.path(plot_dir, "species_richness.svg"),
+#        plot = sr_map,
+#        device = "svg",
+#        width = 29.7,
+#        height = 18, # A4
+#        units = "cm")
 
 
 ## 2) climate change mean importance: ----
@@ -277,15 +205,10 @@ mean_clim_imp <- mean(ranges_clim, na.rm = TRUE)
 # use color scale matching boxplots:
 # viridis purple for climate change importance
 clim_col <- viridis::viridis(n = 3)[1]
-
 clim_imp_map <- ggplot() +
-  geom_spatraster(data = mean_clim_imp) +
-  geom_sf(data = US_contours_subset_simpl, aes(colour = Contour), linewidth = 0.2) +
-  scale_colour_gradientn(colours = c(terrain.colors(8)[-9], "grey80"),
-                         transform = "sqrt",
-                         breaks = c(100, 200, 500, 700, 1000, 1500, 2100, 2500, 2900)) +
+  geom_spatraster(data = mean_clim_imp * 100) + # as percentage
   scale_fill_gradient(low = "#FFFFFF", high = clim_col, na.value = "transparent") +
-  labs(fill = "community mean importance") +
+  labs(fill = "community mean importance [%]") +
   theme_bw() +
   guides(colour = "none") +
   theme(text = element_text(size = 24),
@@ -293,15 +216,17 @@ clim_imp_map <- ggplot() +
         legend.key.width = unit(.2, "npc"),
         legend.position = "bottom",
         legend.title.position = "top",
-        legend.box.margin = margin(0,0,0,0)) # trbl # top margin to later have label when arranging multiple plots)
+        legend.box.margin = margin(0,0,0,0),
+        legend.margin = margin(0,0,0,0),
+        plot.margin = unit(c(2, 0, 0, 0), "cm")) # trbl # top margin to later have label when arranging multiple plots)
 clim_imp_map
 
-ggsave(filename = file.path("plots", "attribution", "maps", "mean_climate_change_importance.svg"), 
-       plot = clim_imp_map,
-       device = "svg",
-       width = 29.7,
-       height = 21, # A4
-       units = "cm")
+# ggsave(filename = file.path(plot_dir, "mean_climate_change_importance.svg"), 
+#        plot = clim_imp_map,
+#        device = "svg",
+#        width = 29.7,
+#        height = 21, # A4
+#        units = "cm")
 
 
 ## 3) land use change mean importance: ----
@@ -314,14 +239,9 @@ mean_lu_imp <- mean(ranges_lu, na.rm = TRUE)
 lu_col <- viridis::viridis(n = 3)[2]
 
 lu_imp_map <- ggplot() +
-  geom_spatraster(data = mean_lu_imp) +
-  geom_sf(data = US_contours_subset_simpl, aes(colour = Contour), linewidth = 0.2) +
-  scale_colour_gradientn(colours = c(terrain.colors(8)[-9], "grey80"),
-                         transform = "sqrt", 
-                         breaks = c(100, 200, 500, 700, 1000, 1500, 2100, 2500, 2900),
-                         name = "elevation [m]") +
+  geom_spatraster(data = mean_lu_imp * 100) + # as percentage
   scale_fill_gradient(low = "#FFFFFF", high = lu_col, na.value = "transparent") +
-  labs(fill = "community mean importance") +
+  labs(fill = "community mean importance [%]") +
   guides(colour = "none") +
   theme_bw() +
   theme(text = element_text(size = 24),
@@ -329,94 +249,82 @@ lu_imp_map <- ggplot() +
         legend.key.width = unit(.2, "npc"),
         legend.position = "bottom",
         legend.title.position = "top",
-        legend.box.margin = margin(0,0,0,0))
+        legend.box.margin = margin(0,0,0,0),
+        legend.margin = margin(0,0,0,0),
+        plot.margin = unit(c(2, 0, 0, 0), "cm"))
 lu_imp_map
 
-ggsave(filename = file.path("plots", "attribution", "maps", "mean_lu_change_importance.svg"), 
-       plot = lu_imp_map,
-       device = "svg",
-       width = 29.7,
-       height = 21, # A4
-       units = "cm")
+# ggsave(filename = file.path(plot_dir, "mean_lu_change_importance.svg"), 
+#        plot = lu_imp_map,
+#        device = "svg",
+#        width = 29.7,
+#        height = 21, # A4
+#        units = "cm")
 
 
-## 3.1.) arrange climate and land use change plots for manuscript: ----
 
-## mark cells where mean importance of land use change is larger than mean importance of climate change:
 
-# difference:
-diff_clim_lu_rast <- mean_clim_imp - mean_lu_imp
-diff_clim_lu_rast$binary <- mean_lu_imp > mean_clim_imp
-# mark raster cells where lu > clim:
-diff <- terra::as.polygons(diff_clim_lu_rast, aggregate = FALSE) %>% 
-  filter(binary == 1)
+## 4) dominant driver (driver combination): ----
 
-combined_plot <- plot_grid(clim_imp_map, lu_imp_map + geom_spatvector(data = diff, fill = NA),
-                           align = 'vh',
-                           labels = c("A: climate change", "B: land use change"),
-                           label_size = 26, 
-                           nrow = 1,
-                           hjust = -0.02,
-                           vjust = 4)
+clim_col <- viridis::viridis(n = 3)[1]
+lu_col <- viridis::viridis(n = 3)[2]
+climlu_col <- viridis::viridis(n = 3)[3]
 
-combined_plot
+# dominant driver:
 
-# add legend for elevation contours:
-leg_plot <- ggplot() +
-  geom_sf(data = US_contours_subset_simpl, aes(colour = as.factor(Contour)), linewidth = 0.05) +
-  scale_colour_manual(values = c(terrain.colors(8)[-9], "grey80"),
-                      name = "elevation [m]") +
+## climate + land use change mean importance: ----
+ranges_climlu <- rast(raster_list, lyrs = seq(4, 560, by = 7))
+mean_climlu_imp <- mean(ranges_climlu, na.rm = TRUE)
+
+rast_stack <- c(mean_clim_imp, mean_lu_imp, mean_climlu_imp)
+dom_driver_rast <- app(rast_stack, which.max)
+names(dom_driver_rast) <- "dom_driver"
+
+# convert to factor:
+cls <- data.frame(id = 1:3, driver = c("climate change", "land use change", "climate & land use change"))
+levels(dom_driver_rast) <- cls
+
+# plot as binary map:
+dom_map <- ggplot() +
+  geom_spatraster(data = dom_driver_rast, aes(fill = driver)) + # colour
+  scale_fill_viridis_d(na.translate = FALSE, breaks = c("climate change", "climate & land use change", "land use change")) +
+  guides(fill = guide_legend(order = 1, ncol = 2), 
+         colour = guide_legend(order = 2)) +
   theme_bw() +
   theme(text = element_text(size = 24),
         legend.position = "bottom",
-        legend.box.margin = margin(0, 0, 0, 0),
-        legend.margin = margin(0, 0, 0, 0)) +
-  guides(colour = guide_legend(override.aes = list(linewidth = 4), nrow = 1, title.position = "top"),
-         fill = "none")
-leg_plot
-
-# extract the legend:
-legend <- get_legend(leg_plot)
-
-combined_plot_final <- plot_grid(combined_plot, NULL, legend, # add empty plot to have less empty space
-                                 nrow = 3,
-                                 rel_heights = c(1,-0.15, .1))
-combined_plot_final
-
-ggsave(filename = file.path("plots", "attribution", "maps", "clim_lu_combined.svg"), 
-       plot = combined_plot_final,
-       device = "svg",
-       width = 45,
-       height = 23,
-       units = "cm")
+        legend.title = element_blank(),
+        legend.key.spacing.y = unit(0.3, "cm"),
+        legend.box.margin = margin(0,0,0,-50),
+        legend.margin = margin(0,0,0,0),
+        legend.text = element_text(size = 24, hjust = 0),
+        plot.margin = margin(0, 0, 0, 0, unit = "cm")
+        ) #trbl
+dom_map
 
 
-## 4) climate + land use change mean importance: ----
+## -> arrange climate, land use importance and dominant driver (Fig. 5): ----
 
-ranges_climlu <- rast(raster_list, lyrs = seq(4, 560, by = 7))
+combined_plot <- plot_grid(clim_imp_map, lu_imp_map, dom_map, 
+                           align = 'vh',
+                           labels = c("A: climate change", "B: land use change", "C: dominating driver at community level"),
+                           label_size = 26, 
+                           nrow = 2,
+                           hjust = c(-0.14,-0.14,-0.05),
+                           vjust = 2
+                           )
 
-mean_climlu_imp <- mean(ranges_climlu, na.rm = TRUE)
+combined_plot
 
-climlu_imp_map <- ggplot() +
-  geom_spatraster(data = mean_climlu_imp) +
-  scale_fill_whitebox_c(palette = "viridi") +
-  labs(fill = "",
-       title = "Mean climate & land use change importance",
-       subtitle = "based on BirdLife ranges of 80 species used in attribution") +
-  theme_bw() +
-  theme(text = element_text(size = 21),
-        legend.key.height = unit(1, "cm"))
-climlu_imp_map
-
-ggsave(filename = file.path("plots", "attribution", "maps", "mean_climlu_change_importance.svg"), 
-       plot = climlu_imp_map,
-       device = "svg",
-       width = 29.7,
-       height = 21, # A4
-       units = "cm")
+# ggsave(filename = file.path(plot_dir, "clim_lu_combined_all.svg"),
+#        plot = combined_plot,
+#        device = "svg",
+#        width = 40,
+#        height = 35,
+#        units = "cm")
 
 
-## 5) climate change impact categories: ----
+## 5) climate change impact categories (Fig. S 4): ----
 
 raster_list <- list.files(file.path(output_dir, "tifs_attr"), pattern = ".tif$", full.names = TRUE)
 
@@ -446,6 +354,7 @@ clim_imp_cat <- c(aw_sum_cat, rw_sum_cat, rl_sum_cat, al_sum_cat)
 names(clim_imp_cat) <- c("absolute winners", "relative winners", "relative losers", "absolute losers")
 
 clim_cat_map <- ggplot() +
+  geom_sf(data = US_albers_sf, colour = "black", fill = NA) +
   geom_spatraster(data = clim_imp_cat) +
   facet_wrap(~lyr, ncol = 2) +
   scale_fill_whitebox_c(palette = "viridi") +
@@ -475,15 +384,15 @@ for (i in stripr) {
 
 grid::grid.draw(g)
 
-ggsave(filename = file.path("plots", "attribution", "maps", "clim_change_impact_cats.svg"), 
-       plot = g,
-       device = "svg",
-       width = 29.7,
-       height = 21, # A4
-       units = "cm")
+# ggsave(filename = file.path(plot_dir, "clim_change_impact_cats.svg"),
+#        plot = g,
+#        device = "svg",
+#        width = 29.7,
+#        height = 21, # A4
+#        units = "cm")
 
 
-## 6) land use change impact: ----
+## 6) land use change impact categories (Fig. S 5): ----
 
 #abs_winners <- imp_cat_df %>% filter(trend_change_lu == 1) %>% pull(species) # none
 rel_winners <- imp_cat_df %>% filter(trend_change_lu == 2) %>% pull(species)
@@ -511,6 +420,7 @@ lu_imp_cat <- c(aw_sum_cat, rw_sum_cat, rl_sum_cat, al_sum_cat)
 names(lu_imp_cat) <- c("absolute winners", "relative winners", "relative losers", "absolute losers")
 
 lu_cat_map <- ggplot() +
+  geom_sf(data = US_albers_sf, colour = "black", fill = NA) +
   geom_spatraster(data = lu_imp_cat) +
   facet_wrap(~lyr, ncol = 2) +
   scale_fill_whitebox_c(palette = "viridi") +
@@ -540,15 +450,15 @@ for (i in stripr) {
 
 grid::grid.draw(g)
 
-ggsave(filename = file.path("plots", "attribution", "maps", "lu_change_impact_cats.svg"), 
-       plot = g,
-       device = "svg",
-       width = 29.7,
-       height = 21, # A4
-       units = "cm")
+# ggsave(filename = file.path(plot_dir, "lu_change_impact_cats.svg"),
+#        plot = g,
+#        device = "svg",
+#        width = 29.7,
+#        height = 21, # A4
+#        units = "cm")
 
 
-## 7) climate + land use change impact categories: ----
+## 7) climate + land use change impact categories (Fig. S 6): ----
 
 abs_winners <- imp_cat_df %>% filter(trend_change_climlu == 1) %>% pull(species)
 rel_winners <- imp_cat_df %>% filter(trend_change_climlu == 2) %>% pull(species)
@@ -576,6 +486,7 @@ climlu_imp_cat <- c(aw_sum_cat, rw_sum_cat, rl_sum_cat, al_sum_cat)
 names(climlu_imp_cat) <- c("absolute winners", "relative winners", "relative losers", "absolute losers")
 
 climlu_cat_map <- ggplot() +
+  geom_sf(data = US_albers_sf, colour = "black", fill = NA) +
   geom_spatraster(data = climlu_imp_cat) +
   facet_wrap(~lyr, ncol = 2) +
   scale_fill_whitebox_c(palette = "viridi") +
@@ -605,18 +516,12 @@ for (i in stripr) {
 
 grid::grid.draw(g)
 
-ggsave(filename = file.path("plots", "attribution", "maps", "climlu_change_impact_cats.svg"), 
-       plot = g,
-       device = "svg",
-       width = 29.7,
-       height = 21, # A4
-       units = "cm")
+# ggsave(filename = file.path(plot_dir, "climlu_change_impact_cats.svg"),
+#        plot = g,
+#        device = "svg",
+#        width = 29.7,
+#        height = 21, # A4
+#        units = "cm")
 
-# (operating system info): ----
-osi <- sessionInfo()
-packages <- sort(paste0(unlist(lapply(osi$otherPkgs, "[[", "Package")),
-                        "_",
-                        unlist(lapply(osi$otherPkgs, "[[", "Version"))))
-packages
-paste(packages, collapse = ", ")
-sessionInfo()
+# session info:
+writeLines(capture.output(sessionInfo()), file.path(dir, "results", "sessionInfo", "5_4b_attribution_maps.txt"))

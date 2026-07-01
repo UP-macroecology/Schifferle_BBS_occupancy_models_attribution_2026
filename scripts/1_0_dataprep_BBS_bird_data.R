@@ -1,9 +1,21 @@
-# process data of North American Breeding Bird Survey (BBS) used to fit dynamic occupancy models:
+# Script:   1_0_dataprep_BBS_bird_data.R
+# Purpose:  Preprocess data of North American Breeding Bird Survey (BBS) used to fit dynamic occupancy models
+# Inputs:   downloaded BBS data, downloaded BBS routes shapefile
+# Outputs:  data/BBS_species_list.csv
+#           data/BBS_data_merged.RData
+#           data/BBS_for_occ_spec_records.RData
+#           data/BBS_for_occ.RData
+#           data/route_starting_points.shp
+#           data/BBS_routes_all_centroids.shp
+# Runs on:  Local
 
-# import, merge BBS files, filter data, merge records of subspecies
-# reformat data for occupancy models
-# write shapefiles of spatial data (routes starting points and centroids)
+# Steps:
+# 1) import and merge BBS files, filter data, merge records of subspecies
+# 2) reformat data for occupancy models
+# 3) write shapefiles of spatial data (routes starting points and centroids)
 
+
+source(file.path("scripts", "0_paths.R"))
 
 # packages: --------------------------------------------------------------------
 
@@ -11,12 +23,6 @@
 library(bbsAssistant)
 library(dplyr)
 library(sf)
-
-
-# directories: -----------------------------------------------------------------
-
-# directory BBS download:
-datashare_BBS <- file.path("//NAS-2-P-SN-01.ibb.uni-potsdam.de/", "daten$", "AG26", "Arbeit", "datashare", "data", "biodat", "distribution", "BBS")
 
 
 # functions: -------------------------------------------------------------------
@@ -139,8 +145,7 @@ bbs_agg <- import_bbs_data_states_2023(bbs_dir = file.path(datashare_BBS, "NABBS
 # save species list (later used to merge species ids to species names):
 bbs_agg$species_list$English_Common_Name[which(bbs_agg$species_list$Scientific_Name == "Zosterops simplex")] <- "Swinhoe's White-eye" # typo / non-UTF-8 character in SpeciesList.txt
 
-write.csv(bbs_agg$species_list[, c("AOU", "English_Common_Name", "ORDER", "Family", "Genus", "Species", "Scientific_Name")], 
-          file = file.path("data", "BBS_species_list.csv"))
+species_list <- bbs_agg$species_list[, c("AOU", "English_Common_Name", "ORDER", "Family", "Genus", "Species", "Scientific_Name")]
 
 # merge BBS datasets:
 bbs_dt <- bbs_agg$observations %>%
@@ -154,10 +159,6 @@ bbs_dt <- bbs_agg$observations %>%
   mutate(BCR = factor(BCR))
   
 rm(bbs_agg)
-
- 
-## species list:
-species_list <- read.csv(file = file.path("data", "BBS_species_list.csv"))
 
 # taxonomic adjustments:
 bbs_dt <- bbs_dt %>% 
@@ -198,7 +199,7 @@ bbs_dt <- bbs_dt %>%
   filter(!is.na(English_Common_Name))
 
 # save merged BBS data:
-save(bbs_dt, file = file.path("data", "BBS_data_merged.RData"))
+save(bbs_dt, file = file.path(dir, "data", "BBS_data_merged.RData"))
 
 
 # reformat BBS data for occupancy models: --------------------------------------
@@ -218,7 +219,7 @@ bbs_dt_occ <- bbs_dt %>%
   mutate(RTENO = as.numeric(RTENO)) %>% 
   arrange(RTENO)
 
-save(bbs_dt_occ, file = file.path("data", "BBS_for_occ_spec_records.RData"))
+save(bbs_dt_occ, file = file.path(dir, "data", "BBS_for_occ_spec_records.RData"))
 
 # expand data to have one row per route and year:
 route_dt <- tidyr::expand_grid(RTENO = unique(bbs_dt_occ$RTENO),
@@ -232,7 +233,7 @@ route_dt <- tidyr::expand_grid(RTENO = unique(bbs_dt_occ$RTENO),
   mutate(Surveyed = if_else(is.na(doy), 0, 1)) %>% 
   arrange(RTENO)
 
-save(route_dt, file = file.path("data", "BBS_for_occ.RData"))
+save(route_dt, file = file.path(dir, "data", "BBS_for_occ.RData"))
 
 
 # BBS routes - spatial data: ---------------------------------------------------
@@ -252,7 +253,7 @@ route_startpoints_sf <- bbs_dt %>%
   st_as_sf(coords = c("Longitude", "Latitude"), crs = "4269") # NAD83
 
 # write to shapefile:
-st_write(route_startpoints_sf, file.path("data", "route_starting_points.shp"), append = FALSE)
+st_write(route_startpoints_sf, file.path(dir, "data", "route_starting_points.shp"), append = FALSE)
 
 # 2) generate shapefile with centroids of routes for which full spatial information is available:
 
@@ -281,4 +282,7 @@ routes_sf_centr <- routes_sf2 %>%
   st_as_sf(coords = c("centroid_X", "centroid_Y"), crs = "ESRI:102003")
 
 # write to shapefile:
-st_write(routes_sf_centr, file.path("data", "BBS_routes_all_centroids.shp"), append = FALSE)
+st_write(routes_sf_centr, file.path(dir, "data", "BBS_routes_all_centroids.shp"), append = FALSE)
+
+# session info:
+writeLines(capture.output(sessionInfo()), file.path(dir, "results", "sessionInfo", "1_0_dataprep_BBS_bird_data.txt"))

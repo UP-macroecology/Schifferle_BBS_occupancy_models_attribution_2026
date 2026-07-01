@@ -1,10 +1,39 @@
-# check whether model fitting was successful based on MCMC diagnostics
+# Script:   2_3a_fit_DOMs_check_fit.R
+# Purpose:  Check whether dynamic occupancy model fitting was successful based on MCMC diagnostics
+# Inputs:   results/fm_buffer750km/out_<species>_fm_buffer750.RData
+#           results/fm_buffer750km/refit_2000_2000/out_<species>_fm_buffer750.RData
+#           results/temp_val_buffer_750_10yrs/out_<species>_temp_val_10yrs_buffer_750.RData
+#           results/temp_val_buffer_750_10yrs/refit_2000_2000/out_<species>_temp_val_10yrs_buffer_750.RData
+# Outputs:  results/fm_buffer750km/check_output/specs_MCMC_failed.RData
+#           results/fm_buffer750km/refit_2000_2000/check_output/specs_MCMC_failed.RData
+#           results/fm_buffer750km/check_output/check_<input-file-name>.pdf (one file per species)
+#           results/fm_buffer750km/refit_2000_2000/check_output/check_<input-file-name>.pdf
+#           results/temp_val_buffer_750_10yrs/check_output/specs_MCMC_failed.RData
+#           results/temp_val_buffer_750_10yrs/refit_2000_2000/check_output/specs_MCMC_failed.RData
+#           results/temp_val_buffer_750_10yrs/check_output/check_<input-file-name>.pdf (one file per species)
+#           results/temp_val_buffer_750_10yrs/refit_2000_2000/check_output/check_<input-file-name>.pdf
+# Runs on:  Local
+# Notes:    this script calls 2_3b_fit_DOMs_check_fit_details.qmd, which generates pdfs with details on MCMC diagnostics for model for each species
+#           this script is run four times: 
+#           1) check fit of dynamic occupancy models fitted with all data and 1000 iterations
+#           2) check fit of dynamic occupancy models fitted with all data and 2000 iterations
+#           3) check fit of dynamic occupancy models fitted with subset of years for temporal validation and 1000 iterations
+#           3) check fit of dynamic occupancy models fitted with subset of years for temporal validation and 2000 iterations
+#           -> set results directory accordingly:
 
-# 1) saves text file with check results regarding 
-# - divergent transitions
-# - effective number of MCMC samples, also in bulk and tail, 
-# - R-hat values < 1.02 
-# 2) calls 2_3b_fit_DOMs_check_fit_details.qmd which generates pdfs with more details on MCMC diagnostics
+
+source(file.path("scripts", "0_paths.R"))
+
+
+# set results directory:
+
+# models fitted with all data:
+results_dir <- file.path(dir, "results", "fm_buffer750km") # first fitting round
+# results_dir <- file.path(dir, "results", "fm_buffer750km", "refit_2000_2000") # second fitting round:
+
+# models fitted for temporal validation:
+# results_dir <- file.path(dir, "results", "temp_val_buffer_750_10yrs") # first fitting round
+# results_dir <- file.path(dir, "results", "temp_val_buffer_750_10yrs", "refit_2000_2000") # second fitting round
 
 
 # packages: --------------------------------------------------------------------
@@ -20,22 +49,7 @@ library(brms)
 
 # directories: -----------------------------------------------------------------
 
-set_cmdstan_path("C:/Users/schifferle1/Documents/cmdstan-2.34.1")
-
-# project directory:
-dir <- file.path("//NAS-2-P-SN-01.ibb.uni-potsdam.de", "daten$", "AG26", "Transfer", "Schifferle_BBS_occupancy_models_2023")
-
-# full models:
-# first fitting round:
-# results_dir <- file.path(dir, "results", "fm_buffer750km")
-# second fitting round:
-# results_dir <- file.path(dir, "results", "fm_buffer750km", "refit_2000_2000")
-
-# models fitted for temporal validation:
-# first fitting round:
-# results_dir <- file.path(dir, "results", "temp_val_buffer_750_10yrs")
-# second fitting round:
-results_dir <- file.path(dir, "results", "temp_val_buffer_750_10yrs", "refit_2000_2000")
+set_cmdstan_path(path = NULL) # for HPC; local: set_cmdstan_path("C:/Users/schifferle1/Documents/cmdstan-2.34.1")
 
 
 # MCMC diagnostics: ------------------------------------------------------------
@@ -114,7 +128,7 @@ for(i in 1:length(model_file)){
 
   file_name <-  paste0("check_", gsub(pattern = ".RData", replacement = "", x = model_file[i]), ".pdf")
 
-  quarto::quarto_render("2_3b_fit_DOMs_check_fit_details.qmd",
+  quarto::quarto_render("scripts/2_3b_fit_DOMs_check_fit_details.qmd",
                         output_file = file_name,
                         output_format = "pdf",
                         execute_params = list(spec = spec,
@@ -122,10 +136,13 @@ for(i in 1:length(model_file)){
                                               results_dir = results_dir,
                                               model_file = model_file[i]),
                         #quarto_args = c("output-dir" = results_dir), # didn't work (permissions denied) -> file saved in working directory
-                        quiet = TRUE)
+                        quiet = FALSE)
 }
 sink(file = NULL)
 
 # save species names with fitting issues:
 specs_MCMC_failed <- unique(specs_MCMC_failed)
 save(specs_MCMC_failed, file = file.path(results_dir, "check_output", "specs_MCMC_failed.RData"))
+
+# session info:
+writeLines(capture.output(sessionInfo()), file.path(dir, "results", "sessionInfo", "2_3a_fit_DOMs_check_fit.txt"))

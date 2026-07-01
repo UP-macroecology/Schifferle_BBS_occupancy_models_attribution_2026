@@ -1,13 +1,31 @@
+# Script:   4_0_DOMs_predictions_y_routes_scenarios.R
+# Purpose:  Simulate occupancy dynamics with fitted dynamic occupancy models for different scenarios
+# Inputs:   data/BBS_for_occ_spec_records.RData
+#           data/route_selection_1995_2019_surv_beg_end_max_5y_miss_v2_spat_thin_100km_max_30_r_per_BCR_centroids.shp
+#           data/selected_variables.RData
+#           data/BBS_for_occ_selection.RData
+#           data/route_year_env_data.RData
+#           data/route_year_env_data_cf.RData
+#           data/route_env_dt_scale_pars.RData
+#           results/temp_val_buffer_750_10yrs/temp_eval/10_years/spec_set_temp_val_ok.RData
+#           results/CV_buffer750km/CV_eval/CV_eval_summary.csv
+#           results/fm_buffer750km/out_<species>_fm_buffer750.RData
+#           results/fm_buffer750km/refit_2000_2000/out_<species>_fm_buffer750.RData 
+# Outputs:  results/species_DOM_val_okay.RData
+#           results/attribution/fm_y_preds_routes_cf_1995_all/<species>_y_preds_cf_<scenario>.RData (one file per species with acceptable model performance and scenario)
+# Runs on:  HPC (NAS Potsdam)
+
+# Steps:
 # use fitted dynamic occupancy models to simulate occupancy dynamics of species
 # for which models show acceptable performance in space and time for the scenarios:
 # - no climate change since 1995, but land use change
 # - no land use change since 1995, but climate change
 # - no climate and no land use change since 1995
+# (simulates observations (y), not Z, to compare to real observations;
+# uses counterfactual environmental data to simulate colonisation and extinction probability,
+# factual data for initial occupancy)
 
-# (simulate observations (y), not Z, to compare to real observations)
-
-# counterfactual environmental data to simulate colonisation and extinction probability,
-# factual data for initial occupancy
+source(file.path("scripts", "0_paths.R"))
 
 
 # packages: --------------------------------------------------------------------
@@ -23,19 +41,15 @@ library(cmdstanr)
 
 set_cmdstan_path(path = NULL) # for HPC; local: set_cmdstan_path("C:/Users/schifferle1/Documents/cmdstan-2.34.1")
 
-# project directory:
-#dir <- file.path("//NAS-2-P-SN-01.ibb.uni-potsdam.de", "daten$", "AG26", "Transfer", "Schifferle_BBS_occupancy_models_2023")
-dir <- file.path("/mnt", "ibb_share", "zurell_transfer", "Schifferle_BBS_occupancy_models_2023")
-
 # logfiles:
-log_dir <- file.path("logfiles", "attribution", "y_preds_routes_cf_1995")
+log_dir <- file.path(hpc_dir, "logfiles", "attribution", "y_preds_routes_cf_1995")
 if(!dir.exists(log_dir)){dir.create(log_dir, recursive = TRUE)}
 
 # directory with fitted models:
-res_dir <- file.path(dir, "results", "fm_buffer750km")
+res_dir <- file.path(hpc_dir, "results", "fm_buffer750km")
 
 # directory to store predictions:
-preds_dir <- file.path(dir, "results", "attribution", "fm_y_preds_routes_cf_1995_all")
+preds_dir <- file.path(hpc_dir, "results", "attribution", "fm_y_preds_routes_cf_1995_all")
 if(!dir.exists(preds_dir)){dir.create(preds_dir, recursive = TRUE)}
 
 
@@ -47,33 +61,26 @@ source(file.path("scripts", "0_functions.R"))
 # load data: -------------------------------------------------------------------
 
 # route-year-species information (only surveyed)
-load(file = file.path("data", "BBS_for_occ_spec_records.RData")) # bbs_dt_occ; output of 1_0_dataprep_BBS_bird_data.R
+load(file = file.path(hpc_dir, "data", "BBS_for_occ_spec_records.RData")) # bbs_dt_occ; output of 1_0_dataprep_BBS_bird_data.R
 
 # selected routes spatial data (to buffer presences):
-routes_sel_sf <- st_read(file.path("data", "route_selection_1995_2019_surv_beg_end_max_5y_miss_v2_spat_thin_100km_max_30_r_per_BCR_centroids.shp")) # output of 1_1_dataprep_BBS_route_selection.R
-
-# species:
-load(file = file.path("data", "species_set_analysis.RData")) # output of 3_1_DOM_CV_evaluation_metrics.R
-final_species
+routes_sel_sf <- st_read(file.path(hpc_dir, "data", "route_selection_1995_2019_surv_beg_end_max_5y_miss_v2_spat_thin_100km_max_30_r_per_BCR_centroids.shp")) # output of 1_1_dataprep_BBS_route_selection.R
 
 # selected variables:
-load(file = file.path("data", "selected_variables.RData")) # selvar_final; output of 1_2a_dataprep_env_variable_selection.R
+load(file = file.path(hpc_dir, "data", "selected_variables.RData")) # selvar_final; output of 1_2a_dataprep_env_variable_selection.R
 
 # routes-years:
-load(file = file.path("data", "BBS_for_occ_selection.RData")) # route_sel_dt; output of 1_3_dataprep_match_BBS_routes_env_data.R
-
-# selected routes and focal years matched to environmental data:
-load(file = file.path("data", "route_year_env_data.RData")) # route_sel_env_dt_final; output 1_3_dataprep_match_BBS_routes_env_data.R
+load(file = file.path(hpc_dir, "data", "BBS_for_occ_selection.RData")) # route_sel_dt; output of 1_3_dataprep_match_BBS_routes_env_data.R
 
 # environmental data:
 
 # factual data:
-load(file.path("data", "route_year_env_data.RData")) # route_sel_env_dt_final; output of 1_3_dataprep_match_BBS_routes_env_data.R
+load(file = file.path(hpc_dir, "data", "route_year_env_data.RData")) # route_sel_env_dt_final; output 1_3_dataprep_match_BBS_routes_env_data.R
 f_env_data <- route_sel_env_dt_final %>% 
   select(-c(Latitude, Longitude, BCR, ObsN, doy, Surveyed))
 
 # counterfactual data:
-load(file.path("data", "route_year_env_data_cf.RData")) # route_sel_env_dt_final; output of 1_3_dataprep_match_BBS_routes_env_data.R
+load(file.path(hpc_dir, "data", "route_year_env_data_cf.RData")) # route_sel_env_dt_final; output of 1_3_dataprep_match_BBS_routes_env_data.R
 cf_env_data <- route_sel_env_dt_final %>% 
   select(-c(Latitude, Longitude, BCR, ObsN, doy, Surveyed))
 
@@ -81,7 +88,7 @@ cf_env_data <- route_sel_env_dt_final %>%
 # scale environmental data: ----------------------------------------------------
 
 # load mean and sd with which training data were scaled:
-load(file.path("data", "route_env_dt_scale_pars.RData")) # output of 2_1_fit_DOMs_full_model.R; env_scale_pars
+load(file.path(hpc_dir, "data", "route_env_dt_scale_pars.RData")) # output of 2_1_fit_DOMs_full_model.R; env_scale_pars
 
 # factual data:
 f_env_data_scaled <- f_env_data
@@ -107,18 +114,18 @@ for(c in colnames(cf_env_data[, 3:ncol(cf_env_data)])){
 # species for which DOMs show acceptable predictive performance: ---------------
 
 # okay in time:
-load(file.path(dir, "results", "temp_val_buffer_750_10yrs", "temp_eval", "10_years", "spec_set_temp_val_ok.RData")) # output of 3_2_eval_DOMs_temp.R
+load(file.path(hpc_dir, "results", "temp_val_buffer_750_10yrs", "temp_eval", "10_years", "spec_set_temp_val_ok.RData")) # output of 3_2_eval_DOMs_temp.R
 spec_temp_okay <- specs_thresh
 
 # okay in space:
-CV_eval_summary <- read.csv(file = file.path(dir, "results", "CV_buffer750km", "CV_eval", "CV_eval_summary.csv")) # output of 3_1_eval_DOMs_CV.R
+CV_eval_summary <- read.csv(file = file.path(hpc_dir, "results", "CV_buffer750km", "CV_eval", "CV_eval_summary.csv")) # output of 3_1_eval_DOMs_CV.R
 spec_spat_okay <- CV_eval_summary %>% 
   filter(y_spat_auc_mean >= 0.7) %>% 
   pull(species)
 
 # okay in both:
 spec_attr <- intersect(spec_temp_okay, spec_spat_okay) # 80
-#save(spec_attr, file = file.path("data", "species_DOM_val_okay.RData"))
+#save(spec_attr, file = file.path(hpc_dir, "results", "species_DOM_val_okay.RData"))
 
 
 # load model for species and predict: ------------------------------------------
@@ -283,5 +290,9 @@ foreach(spec = spec_attr,
         }
 
 stopCluster(cl)
+
+# session info:
+writeLines(capture.output(sessionInfo()), file.path(hpc_dir, "results", "sessionInfo", "4_0_DOMs_predictions_y_routes_scenarios.txt"))
+
 rm(list=ls())
 gc()

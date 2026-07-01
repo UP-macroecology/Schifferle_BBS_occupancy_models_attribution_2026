@@ -1,4 +1,9 @@
 #!/usr/bin/env bash
+
+# this script is written for the HPC cluster of the MacroEco and PENC lab at the University of Potsdam
+# running with 78 cores and 750 GB of memory on Debian GNU/Linux and the workload manager slurm,
+# paths must be adapted before job submission
+
 #SBATCH --job-name="attrici_tas"
 #SBATCH --mail-type=ALL
 #SBATCH --mail-user=schifferle1@uni-potsdam.de
@@ -13,9 +18,7 @@
 #   or: spack load ...
 
 # load virtual environment if you don't queue with it activated:
-# e.e.: source venv/bin/activate
-
-#source env/bin/activate
+source env/bin/activate
 
 export OMP_NUM_THREADS=$SLURM_CPUS_PER_TASK
 
@@ -29,7 +32,7 @@ exec attrici \
      --variable tas \
 	 --start-date 1995-01-01 \
      --stop-date 2019-12-31 \
-	 --mask-file /mnt/ibb_share/zurell_transfer/Schifferle_BBS_occupancy_models_2023/data/Counterfactual_env_data/ISIMIP_GSWP3_W5E5/attrici_detrending/input_files/US_mask3.nc \
+	 --mask-file /mnt/ibb_share/zurell_transfer/Schifferle_BBS_occupancy_models_2023/data/Counterfactual_env_data/ISIMIP_GSWP3_W5E5/attrici_detrending/input_files/US_mask.nc \
      --report-variables y cfact logp \
      --overwrite \
      --task-id "$SLURM_PROCID" \

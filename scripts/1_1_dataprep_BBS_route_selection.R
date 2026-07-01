@@ -1,9 +1,21 @@
-# select BBS routes used to fit dynamic occupancy models:
+# Script:   1_1_dataprep_BBS_route_selection.R
+# Purpose:  Select subset of BBS routes used to fit dynamic occupancy models
+# Inputs:   data/BBS_for_occ.RData
+#           data/BBS_routes_all_centroids.shp
+#           data/US_outline_ESRI102003.shp
+#           data/BCR_Terrestrial/BCR_Terrestrial_master_International.shp (https://www.birdscanada.org/bird-science/nabci-bird-conservation-regions)
+# Outputs:  data/route_selection_1995_2019_surv_beg_end_max_5y_miss_v2_spat_thin_100km_max_30_r_per_BCR.RData
+#           data/route_selection_1995_2019_surv_beg_end_max_5y_miss_v2_spat_thin_100km_max_30_r_per_BCR_centroids.shp
+#           plots/route_selection_BCRs_no_labels.svg (Fig. S1)
+# Runs on:  Local
 
-# routes selected based on:
+# Steps for route selection, filter based on:
 # 1) time period, number of years a route was surveyed (test different versions)
 # 2) spatial thinning 1: minimum distance 100 km
 # 3) spatial thinning 2: maximum 30 routes per Bird Conservation Region (BCR)
+
+
+source(file.path("scripts", "0_paths.R"))
 
 
 # packages: --------------------------------------------------------------------
@@ -23,11 +35,11 @@ source(file.path("scripts", "0_functions.R")) # to get thin() and thin.max()
 # load data: -------------------------------------------------------------------
 
 # BBS data formatted for occupancy modelling:
-load(file = file.path("data", "BBS_for_occ.RData")) # output of 1_0_dataprep_BBS_bird_data.R
+load(file = file.path(dir, "data", "BBS_for_occ.RData")) # output of 1_0_dataprep_BBS_bird_data.R
 route_dt
 
 # spatial data on routes (centroids):
-routes_sf <- read_sf(file.path("data", "BBS_routes_all_centroids.shp")) # output of 1_0_dataprep_BBS_bird_data.R
+routes_sf <- read_sf(file.path(dir, "data", "BBS_routes_all_centroids.shp")) # output of 1_0_dataprep_BBS_bird_data.R
 
 
 # route selection: -------------------------------------------------------------
@@ -164,7 +176,7 @@ routes_sel_sf <- routes_sf %>%
   summarise
 
 # save this intermediate route selection step:
-st_write(routes_sel_sf, file.path("data", "route_selection_1995_2019_surv_beg_end_max_5y_miss.shp"), append = FALSE) 
+st_write(routes_sel_sf, file.path(dir, "data", "route_selection_1995_2019_surv_beg_end_max_5y_miss.shp"), append = FALSE) 
 
 
 ## 2) spatial thinning: ----
@@ -176,7 +188,7 @@ nrow(routes_sel_sf)
 nrow(routes_sf_thinned) # 1991-2015: 533, 1995-2019: 632, 1991 - 2019: 491
 
 # save intermediate route selection step:
-st_write(routes_sf_thinned, file.path("data", "route_selection_1995_2019_surv_beg_end_max_5y_miss_v2_spat_thin_100km_centroids.shp"), append = FALSE) 
+st_write(routes_sf_thinned, file.path(dir, "data", "route_selection_1995_2019_surv_beg_end_max_5y_miss_v2_spat_thin_100km_centroids.shp"), append = FALSE) 
 
 
 ## 3) spatial coverage: ----
@@ -260,28 +272,28 @@ sel_routes_final <- route_dt_spat_temp_ss %>%
   unique %>% 
   sort
 save(sel_routes_final, 
-     file = file.path("data", "route_selection_1995_2019_surv_beg_end_max_5y_miss_v2_spat_thin_100km_max_30_r_per_BCR.RData"))
+     file = file.path(dir, "data", "route_selection_1995_2019_surv_beg_end_max_5y_miss_v2_spat_thin_100km_max_30_r_per_BCR.RData"))
 
 
 # save selected routes as shapefile - centroids:
 routes_sel_sf %>% 
   filter(RTENO_BBS %in% sel_routes_final) %>% 
-  st_write(file.path("data", "route_selection_1995_2019_surv_beg_end_max_5y_miss_v2_spat_thin_100km_max_30_r_per_BCR_centroids.shp"),
+  st_write(file.path(dir, "data", "route_selection_1995_2019_surv_beg_end_max_5y_miss_v2_spat_thin_100km_max_30_r_per_BCR_centroids.shp"),
            append = FALSE)
 
 
-# map of selected routes: ------------------------------------------------------
+# map of selected routes : -----------------------------------------------------
 
 # load data:
 
 ## selected routes:
-routes_sel_sf <- read_sf(file.path("data", "route_selection_1995_2019_surv_beg_end_max_5y_miss_v2_spat_thin_100km_max_30_r_per_BCR_centroids.shp"))
+routes_sel_sf <- read_sf(file.path(dir, "data", "route_selection_1995_2019_surv_beg_end_max_5y_miss_v2_spat_thin_100km_max_30_r_per_BCR_centroids.shp"))
 
 ## conterminous USA:
-US_albers_sf <- read_sf(file.path("data", "US_outline_ESRI102003.shp")) # output of 1_0_dataprep_climate.R
+US_albers_sf <- read_sf(file.path(dir, "data", "US_outline_ESRI102003.shp")) # output of 1_0_dataprep_climate.R
 
 ## Bird Conservation Regions, clipped to conterminous US:
-bcr_sf <- read_sf(file.path("data", "BCR_Terrestrial", "BCR_Terrestrial_master_International.shp")) %>% # from: https://www.birdscanada.org/bird-science/nabci-bird-conservation-regions
+bcr_sf <- read_sf(file.path(dir, "data", "BCR_Terrestrial", "BCR_Terrestrial_master_International.shp")) %>% # from: https://www.birdscanada.org/bird-science/nabci-bird-conservation-regions
   st_transform(crs = "ESRI:102003") %>% 
   st_intersection(US_albers_sf) %>% 
   # add centroid coordinate for label placement:
@@ -316,10 +328,12 @@ route_map <- ggplot() +
   )
 route_map
 
-# ggsave(filename = file.path("plots", "route_selection_BCRs_no_labels.svg"),
-#        plot = route_map,
-#        device = "svg",
-#        width = 32,
-#        height = 29.7, # A4
-#        units = "cm")
+ggsave(filename = file.path(dir, "plots", "route_selection_BCRs_no_labels.svg"),
+       plot = route_map,
+       device = "svg",
+       width = 32,
+       height = 29.7, # A4
+       units = "cm")
 
+# session info:
+writeLines(capture.output(sessionInfo()), file.path(dir, "results", "sessionInfo", "1_1_dataprep_BBS_route_selection.txt"))

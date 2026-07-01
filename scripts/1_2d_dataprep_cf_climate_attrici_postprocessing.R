@@ -1,8 +1,18 @@
-# Generate counterfactual climate data by removing climate change from 1995,
-# the beginning of our time series, onwards with the ATTRICI approach (Mengel et al. 2021)
+# Script:   1_2d_dataprep_cf_climate_attrici_postprocessing.R
+# Purpose:  Generate counterfactual variables from ATTRICI output to simulate counterfactual occupancy dynamics with dynamic occupancy models
+# Inputs:   data/Counterfactual_env_data/ISIMIP_GSWP3_W5E5/attrici_detrending/output/<var>_detrended/US_<var>_detrended_1901_2019.nc
+#           data/US_outline_ESRI102003.shp
+#           data/selected_variables.RData
+# Outputs:  data/Counterfactual_env_data/ISIMIP_GSWP3_W5E5/attrici_detrending/output/ATTRICI_CLIM_ESRI102003_tifs/<var>_<yyyymm>_ESRI102003.tif
+#           data/Counterfactual_env_data/ISIMIP_GSWP3_W5E5/attrici_detrending/output/ATTRICI_CLIM_ESRI102003_tifs/bioclim/<var>_<year>.tif
+#           data/Counterfactual_env_data/ISIMIP_GSWP3_W5E5/attrici_detrending/output/ATTRICI_CLIM_ESRI102003_tifs/seasonal/<var>_<year>.tif
+# Runs on:  Local
 
+# Steps:
 # 1) convert ATTRICI output to tifs, postprocess temperature
-# 2) calculate variables that will then be used to simulate occupancy dynamics with fitted dynamic occupancy models
+# 2) calculate counterfactual version of the climate variables used to fit dynamic occupancy models
+
+source(file.path("scripts", "0_paths.R"))
 
 
 # packages: --------------------------------------------------------------------
@@ -17,10 +27,8 @@ library(ggplot2)
 # directories: -----------------------------------------------------------------
 
 # directory where ATTRICI stores output:
-attrici_out <- file.path("T:", "Schifferle_BBS_occupancy_models_2023", "data", "Counterfactual_env_data", 
+attrici_out <- file.path(dir, "data", "Counterfactual_env_data", 
                          "ISIMIP_GSWP3_W5E5", "attrici_detrending", "output")
-#attrici_out <- file.path("/mnt", "ibb_share", "Schifferle_BBS_occupancy_models_2023", "data", "Counterfactual_env_data", 
-#                         "ISIMIP_GSWP3_W5E5", "attrici_detrending", "output")
 
 # directory to store postprocessed ATTRICI output:
 res_dir_proj <- file.path(attrici_out, "ATTRICI_CLIM_ESRI102003_tifs")
@@ -38,10 +46,10 @@ if(!dir.exists(seasonal_folder)){dir.create(seasonal_folder, recursive = TRUE)}
 # load data: -------------------------------------------------------------------
 
 # US outline:
-US_albers_sf <- read_sf(file.path("data", "US_outline_ESRI102003.shp")) # output of 1_0_dataprep_climate.R
+US_albers_sf <- read_sf(file.path(dir, "data", "US_outline_ESRI102003.shp")) # output of 1_0_dataprep_climate.R
 
 # selected variables:
-load(file = file.path("data", "selected_variables.RData")) # selvar_final; output of 1_2a_dataprep_env_variable_selection.R
+load(file = file.path(dir, "data", "selected_variables.RData")) # selvar_final; output of 1_2a_dataprep_env_variable_selection.R
 selvar_final
 
 
@@ -104,7 +112,7 @@ for(i in 1:length(vars)){
   for(y in intersect((start-3):end, unique(lonlattime_df$year))){
   
   # example raster to align to:
-  ex_rast <- rast(file.path( "data", "Env_data", "ISIMIP_GSWP_W5E5", "ISIMIP_CLIM_ESRI102003", "pr_199501_ESRI102003.tif"))
+  ex_rast <- rast(file.path(clim_path, "ISIMIP_CLIM_ESRI102003", "pr_199501_ESRI102003.tif"))
   ex_rast
   
   for(y in start:end){  
@@ -272,6 +280,8 @@ foreach(year = 1995:2019,
           }
         }
 
+# session info:
+writeLines(capture.output(sessionInfo()), file.path(dir, "results", "sessionInfo", "1_2d_dataprep_cf_climate_attrici_postprocessing.txt"))
 
 # # explorative plots: -----------------------------------------------------------
 # 
