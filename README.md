@@ -2,17 +2,25 @@
 
 
 **Authors:** Katrin Schifferle<sup>1</sup>, Natalie J. Briscoe<sup>2</sup>, Guillermo Fandos<sup>3</sup>, Stefanie Heinicke<sup>4</sup>, Christopher P. O. Reyer<sup>4</sup>, Mark C. Urban<sup>5</sup>, Damaris Zurell<sup>1</sup>
+
+
 **Affiliations:**
 <sup>1</sup> Ecology and Macroecology, University of Potsdam, Germany.
 <sup>2</sup> School of Agriculture, Food, and Ecosystem Sciences, University of Melbourne, Parkville, Vic, Australia.
 <sup>3</sup> Department of Biodiversity Ecology and Evolution, Faculty of Biological Science, Universidad Complutense de Madrid (UCM), Madrid, Spain.
 <sup>4</sup> Potsdam Institute for Climate Impact Research (PIK), Member of the Leibniz Association, Potsdam, Germany.
 <sup>5</sup> Department of Ecology and Evolutionary Biology and Center of Biological Risk, University of Connecticut, Storrs, CT, USA.
+
+
 **Funding:** \[funding sources]
+
+
 **Corresponding author:** Katrin Schifferle: schifferle1@uni-potsdam.de
 
 
 [!\[License: GPL-3.0](https://img.shields.io/badge/License-GPL%203.0-blue.svg)](LICENSE)
+
+
 [!\[DOI](https://zenodo.org/badge/DOI/PLACEHOLDER.svg)](https://doi.org/PLACEHOLDER)
 
 
@@ -53,7 +61,7 @@ flowchart TD
     P --> R[2_4c Check CV fit<br/>refit round 2 if needed]
     Q --> S[3_1 Model evaluation CV / 3_2 Model evaluation temp]
     R --> S
-    S --> T[4_0 Predict scenarios<br/>uses FACTUAL +<br/>COUNTERFACTUAL]
+    S --> T[4_0 Simulate scenarios<br/>uses FACTUAL +<br/>COUNTERFACTUAL]
     L --> T
     T --> U[4_1 Time series]
     U --> V[5_1 Attribution metrics]
@@ -64,28 +72,21 @@ flowchart TD
 Note three branch points in the workflow:
 - **Factual / counterfactual loop** at `1_3_dataprep_match_BBS_routes_env_data.R`: run once with `data <- "factual"` and once with `data <- "counterfactual"`.
 - **Refit loop** at `2_1`, `2_2`, `2_4b`: rerun with `round <- 2` for species flagged by the MCMC diagnostic step.
-- **ATTRICI** is an external Python CLI (not R) — see "Setting up ATTRICI" in Block 3.
+- **ATTRICI** is an external Python CLI (not R) — see "Setting up ATTRICI".
 
 
 ### 0 - Set up and and functions
 
-script [0\_paths.R](scripts/0_paths.R)
-
-Defines main directories, expected folder structure and directories of downloaded data.
+Script [0\_paths.R](scripts/0_paths.R) defines main directories, expected folder structure and directories of downloaded data.
 
 
-script [0\_functions.R](scripts/0_functions.R)
-
-Functions used throughout the analyses.
-
+Script [0\_functions.R](scripts/0_functions.R) defines functions used throughout the analyses.
 
 
 ### 1 - Data preparation
 
 
-
 #### Bird data:
-
 
 
 scripts [1\_0\_dataprep\_BBS\_bird\_data.R](scripts/1_0_dataprep_BBS_bird_data.R), [1\_1\_dataprep\_BBS\_route\_selection.R](scripts/1_1_dataprep_BBS_route_selection.R), [1\_2\_dataprep\_BBS\_species\_selection.R](scripts/1_2_dataprep_BBS_species_selection.R), [1\_3\_dataprep\_BBS\_outlier\_check\_selected\_species.R](scripts/1_3_dataprep_BBS_outlier_check_selected_species.R)
@@ -313,7 +314,7 @@ Run scripts in the numerical order shown in the workflow diagram. Three branch p
 
 ### Computation notes
 
-Steps `2_1`, `2_2`, `2_4b` (model fitting), `4_0` (scenario predictions), and `1_2c` (ATTRICI detrending) are computationally heavy and were run on HPC. Local execution is feasible only for the data preparation, evaluation, and plotting steps.
+Steps `2_1`, `2_2`, `2_4b` (model fitting), `4_0` (scenario simulations), and `1_2c` (ATTRICI detrending) are computationally heavy and were run on HPC. Local execution is feasible only for the data preparation, evaluation, and plotting steps.
 
 
 ## References
