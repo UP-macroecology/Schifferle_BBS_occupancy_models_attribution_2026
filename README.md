@@ -289,12 +289,12 @@ All raw datasets must be downloaded separately — the repository does not redis
 
 | Dataset | Source | Files needed | Approx. size | Access |
 |---|---|---|---|---|
-| BBS counts | https://www.sciencebase.gov/catalog/item/66d9ed16d34eef5af66d534b | Annual count files 1966–2023 | 181 MB | Free, terms acceptance |
-| BBS routes (shapefile) | https://purl.stanford.edu/vy474dv5024 | Route lines, lower 48 | 14 MB | Free |
+| BBS counts | https://www.sciencebase.gov/catalog/item/66d9ed16d34eef5af66d534b | 1966–2023; States.zip, Routes.csv, VehicleData.csv, Weather.csv, SpeciesList.csv  | 181 MB | Free, terms acceptance |
+| BBS routes (shapefile) | https://purl.stanford.edu/vy474dv5024 | Route lines, lower 48 states | 14 MB | Free |
 | Bird Conservation Regions | https://www.birdscanada.org/bird-science/nabci-bird-conservation-regions | BCR polygons | 30 MB | Free |
-| Climate (GSWP3-W5E5) | https://doi.org/10.48364/ISIMIP.982724.3 | tas, tasmin, tasmax, pr — [year - year] daily | 430 MB | Free, terms acceptance |
-| Land use (ISIMIP3a) | https://doi.org/10.48364/ISIMIP.571261.3 | Annual land-use fractions 1995–2019 | 300 MB | Free, terms acceptance |
-| Bird ranges (BirdLife) | http://datazone.birdlife.org/species/requestdis | Range polygons for the 80 modelled species | 190 MB | Formal application |
+| Climate (GSWP3-W5E5) | https://data.isimip.org/search/tree/ISIMIP3a/InputData/climate/atmosphere/gswp3-w5e5/obsclim/ | tas, tasmin, tasmax, pr — [year - year] daily, bounding box South: 24 North: 50 West: -126 East: -66 | 430 MB | Free, terms acceptance |
+| Land use (ISIMIP3a) | https://data.isimip.org/search/tree/ISIMIP3a/InputData/socioeconomic/landuse/histsoc/ | landuse-5crops_histsoc_annual_1901_2021.nc, landuse-forests-and-natural-vegetation_histsoc_annual_1901_2021.nc, landuse-pastures_histsoc_annual_1901_2021.nc, landuse-urbanareas_histsoc_annual_1901_2021.nc| 300 MB | Free, terms acceptance |
+| Bird ranges (BirdLife) | http://datazone.birdlife.org/species/requestdis | BOTW.gdb for the 80 modelled species | 190 MB | Formal application |
 
 
 ### Setting up ATTRICI
