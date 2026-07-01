@@ -4,6 +4,7 @@
 **Authors:** Katrin Schifferle<sup>1</sup>, Natalie J. Briscoe<sup>2</sup>, Guillermo Fandos<sup>3</sup>, Stefanie Heinicke<sup>4</sup>, Christopher P. O. Reyer<sup>4</sup>, Mark C. Urban<sup>5</sup>, Damaris Zurell<sup>1</sup>
 
 
+
 **Affiliations:**
 <sup>1</sup> Ecology and Macroecology, University of Potsdam, Germany.
 <sup>2</sup> School of Agriculture, Food, and Ecosystem Sciences, University of Melbourne, Parkville, Vic, Australia.
@@ -12,16 +13,21 @@
 <sup>5</sup> Department of Ecology and Evolutionary Biology and Center of Biological Risk, University of Connecticut, Storrs, CT, USA.
 
 
+
 **Funding:** \[funding sources]
+
 
 
 **Corresponding author:** Katrin Schifferle: schifferle1@uni-potsdam.de
 
 
+
 [!\[License: GPL-3.0](https://img.shields.io/badge/License-GPL%203.0-blue.svg)](LICENSE)
 
 
+
 [!\[DOI](https://zenodo.org/badge/DOI/PLACEHOLDER.svg)](https://doi.org/PLACEHOLDER)
+
 
 
 ## Abstract
