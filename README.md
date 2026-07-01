@@ -5,12 +5,12 @@
 
 
 
-**Affiliations:**
-<sup>1</sup> Ecology and Macroecology, University of Potsdam, Germany.
-<sup>2</sup> School of Agriculture, Food, and Ecosystem Sciences, University of Melbourne, Parkville, Vic, Australia.
-<sup>3</sup> Department of Biodiversity Ecology and Evolution, Faculty of Biological Science, Universidad Complutense de Madrid (UCM), Madrid, Spain.
-<sup>4</sup> Potsdam Institute for Climate Impact Research (PIK), Member of the Leibniz Association, Potsdam, Germany.
-<sup>5</sup> Department of Ecology and Evolutionary Biology and Center of Biological Risk, University of Connecticut, Storrs, CT, USA.
+**Affiliations:**<br/>
+<sup>1</sup> Ecology and Macroecology, University of Potsdam, Germany.<br/>
+<sup>2</sup> School of Agriculture, Food, and Ecosystem Sciences, University of Melbourne, Parkville, Vic, Australia.<br/>
+<sup>3</sup> Department of Biodiversity Ecology and Evolution, Faculty of Biological Science, Universidad Complutense de Madrid (UCM), Madrid, Spain.<br/>
+<sup>4</sup> Potsdam Institute for Climate Impact Research (PIK), Member of the Leibniz Association, Potsdam, Germany.<br/>
+<sup>5</sup> Department of Ecology and Evolutionary Biology and Center of Biological Risk, University of Connecticut, Storrs, CT, USA.<br/>
 
 
 
