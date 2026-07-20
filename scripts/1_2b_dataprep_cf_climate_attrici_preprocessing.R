@@ -1,24 +1,12 @@
 # Script:   1_2b_dataprep_cf_climate_attrici_preprocessing.R
-# Purpose:  Generate counterfactual climate data by removing climate change from 1995 onwards
+# Purpose:  Create US mask as netCDF file as input for detrending climate data with ATTRICI
 # Inputs:   data/US_outline_ESRI102003.shp
-#           <clim_path>/gswp3-w5e5_obsclim_<var>_lat24.0to50.0lon-126.0to-66.0_daily_<year1>_<year2>.nc xx
+#           <clim_path>/gswp3-w5e5_obsclim_<var>_lat24.0to50.0lon-126.0to-66.0_daily_<year1>_<year2>.nc (example file)
 # Outputs:  data/Counterfactual_env_data/ISIMIP_GSWP3_W5E5/attrici_detrending/input_files/US_mask.nc
-#           xx
 # Runs on:  Local
 # Notes:    Detrending is done with the external command-line tool ATTRICI (Mengel et al. 2021), 
-#           data preparation for this is happening here,
-#           ATTRICI commands to be used via the command line are pasted at the end of this script,
-#           they are written for the HPC cluster of the MacroEco and PENC lab at the University of Potsdam,
-#           paths must be adapted
+#           data preparation for this is happening here.
 
-# xx gmt file?
-
-# Steps:
-# 1) prepare climate .nc-files from ISIMIP data that will then be used as input for
-# ATTRICI to calculate counterfactual climate data
-# 2) use external command-line tool ATTRICI via Windows command line, code pasted below
-# 3) convert ATTRICI output to tifs, postprocess temperature
-# 4) calculate variables that will then be used to simulate occupancy time series with dynamic occupancy models
 
 source(file.path("scripts", "0_paths.R"))
 
@@ -86,97 +74,64 @@ ncdf4::nc_close(ncout)
 # length(which(ncvar_get(mask_test, "mask") == 1))
 
 
-## merge climate data from 1901 to 2019 into single nc file: --------
-# xx
-vars <- c("tas", "tasmin", "tasmax", "pr") # tas needed to calculate tasrange and tasskew for ATTRICI, which are then detrended and converted back to tasmin, tasmax
+# ## merge climate data from 1901 to 2019 into single nc file:  --------
+# # -> now instead done with CDO in 1_2c_attrici_input_preps.sh
 
-for(i in 1:length(vars)){
-  
-  var_name <- vars[i]
-  
-  print(var_name)
-  
-  var_files <- list.files(clim_path, pattern = paste0("obsclim_", var_name, "_.*\\.nc$"), full.names = TRUE)
-  
-  # extract data of all files:
-  data_list <- lapply(var_files, function(f) {
-    print(f)
-    nc <- nc_open(f)
-    data <- ncvar_get(nc, var_name)
-    nc_close(nc)
-    return(data)
-  })
-  
-  # merge data:
-  data_merged <- abind::abind(
-    data_list, along = 3)
-  dim(data_merged) # 120, 52, 43464
-  
-  # get variable definition and dimension from one file:
-  example_file <- nc_open(var_files[1])
-  
-  # # note: date origin not the same across nc files!
-  # example_file$dim$time # days since 1900-01-01
-  # # 1-8 (1901-1980): days since 1860-1-1
-  # # 9-12 (1981-2019): days since 1900-1-1
-  
-  var <- example_file$var[[var_name]]
-  var$dim
-  nc_close(example_file)
-  
-  var$dim[[3]]$vals <- seq(from = var$dim[[3]]$vals[1], length = dim(data_merged)[3]) # 58438
-  var$dim[[3]]$len <- dim(data_merged)[3]
-  
-  # define variable:
-  var_def <- ncvar_def(name = var$name, units = var$units, dim = var$dim,
-                       longname = var$longname)
-  
-  # create new file:
-  file_merged <- nc_create(
-    filename = file.path(output_path, paste0("US_", var_name, "_1901_2019.nc")), 
-    vars = var_def)
-  
-  # fill in values:
-  ncvar_put(nc = file_merged, varid = var_name, vals = data_merged)
-  
-  # close file:
-  nc_close(file_merged)
-  
-}
+# vars <- c("tas", "tasmin", "tasmax", "pr") # tas needed to calculate tasrange and tasskew for ATTRICI, which are then detrended and converted back to tasmin, tasmax
+# 
+# for(i in 1:length(vars)){
+#   
+#   var_name <- vars[i]
+#   
+#   print(var_name)
+#   
+#   var_files <- list.files(clim_path, pattern = paste0("obsclim_", var_name, "_.*\\.nc$"), full.names = TRUE)
+#   
+#   # extract data of all files:
+#   data_list <- lapply(var_files, function(f) {
+#     print(f)
+#     nc <- nc_open(f)
+#     data <- ncvar_get(nc, var_name)
+#     nc_close(nc)
+#     return(data)
+#   })
+#   
+#   # merge data:
+#   data_merged <- abind::abind(
+#     data_list, along = 3)
+#   dim(data_merged) # 120, 52, 43464
+#   
+#   # get variable definition and dimension from one file:
+#   example_file <- nc_open(var_files[1])
+#   
+#   # # note: date origin not the same across nc files!
+#   # example_file$dim$time # days since 1900-01-01
+#   # # 1-8 (1901-1980): days since 1860-1-1
+#   # # 9-12 (1981-2019): days since 1900-1-1
+#   
+#   var <- example_file$var[[var_name]]
+#   var$dim
+#   nc_close(example_file)
+#   
+#   var$dim[[3]]$vals <- seq(from = var$dim[[3]]$vals[1], length = dim(data_merged)[3]) # 58438
+#   var$dim[[3]]$len <- dim(data_merged)[3]
+#   
+#   # define variable:
+#   var_def <- ncvar_def(name = var$name, units = var$units, dim = var$dim,
+#                        longname = var$longname)
+#   
+#   # create new file:
+#   file_merged <- nc_create(
+#     filename = file.path(output_path, paste0("US_", var_name, "_1901_2019.nc")), 
+#     vars = var_def)
+#   
+#   # fill in values:
+#   ncvar_put(nc = file_merged, varid = var_name, vals = data_merged)
+#   
+#   # close file:
+#   nc_close(file_merged)
+#   
+# }
 
 # session info:
 writeLines(capture.output(sessionInfo()), file.path(dir, "results", "sessionInfo", "1_2b_dataprep_cf_climate_attrici_preprocessing.txt"))
-
-# 2) detrending using ATTRICI tool (Mengel et al. 2021): -----------------------
-
-# xx
-# use via command line:
-
-# (requires CDO installation on the HPC)
-# cloned bootstrapping branch (recommended by Matthias Mengel): https://github.com/ISI-MIP/attrici/tree/bootstrapping
-# create and activate virtual environment:
-# schifferle@ecoc9:~/DEBTs/attrici$ python3 -m venv env
-# schifferle@ecoc9:~/DEBTs/attrici$ source env/bin/activate
-# install ATTRICI:
-# (env) schifferle@ecoc9:~/DEBTs/attrici$ pip install -e .[dev]
-
-# 1) preprocessing:
-
-# attrici preprocess-tas /mnt/ibb_share/zurell_transfer/Schifferle_BBS_occupancy_models_2023/data/Counterfactual_env_data/ISIMIP_GSWP3_W5E5/attrici_detrending/input_files/US_tas_1901_2019.nc
-# /mnt/ibb_share/zurell_transfer/Schifferle_BBS_occupancy_models_2023/data/Counterfactual_env_data/ISIMIP_GSWP3_W5E5/attrici_detrending/input_files/US_tasmin_1901_2019.nc
-# /mnt/ibb_share/zurell_transfer/Schifferle_BBS_occupancy_models_2023/data/Counterfactual_env_data/ISIMIP_GSWP3_W5E5/attrici_detrending/input_files/US_tasmax_1901_2019.nc 
-#/mnt/ibb_share/zurell_transfer/Schifferle_BBS_occupancy_models_2023/data/Counterfactual_env_data/ISIMIP_GSWP3_W5E5/attrici_detrending/input_files/US_tasrange_1901_2019.nc 
-#/mnt/ibb_share/zurell_transfer/Schifferle_BBS_occupancy_models_2023/data/Counterfactual_env_data/ISIMIP_GSWP3_W5E5/attrici_detrending/input_files/US_tasskew_1901_2019.nc 
-
-# 2) detrending, see scripts:
-# 1_2c_attrici_US_pr.sh
-# 1_2c_attrici_US_tas.sh
-# 1_2c_attrici_US_tasrange.sh
-# 1_2c_attrici_US_tasskew.sh
-
-# 3) merge outputs:
-
-# (env) schifferle@ecoc9z:~/DEBTs/attrici$ attrici merge-output /mnt/ibb_share/zurell_transfer/Schifferle_BBS_occupancy_models_2023/data/Counterfactual_env_data/ISIMIP_GSWP3_W5E5/attrici_detrending/output/pr_detrended/timeseries/pr /mnt/ibb_share/zurell_transfer/Schifferle_BBS_occupancy_models_2023/data/Counterfactual_env_data/ISIMIP_GSWP3_W5E5/attrici_detrending/output/pr_detrended/US_pr_detrended_1901_2019.nc  
-# (env) schifferle@ecoc9z:~/DEBTs/attrici$ attrici merge-output /mnt/ibb_share/zurell_transfer/Schifferle_BBS_occupancy_models_2023/data/Counterfactual_env_data/ISIMIP_GSWP3_W5E5/attrici_detrending/output/tas_detrended/timeseries/tas /mnt/ibb_share/zurell_transfer/Schifferle_BBS_occupancy_models_2023/data/Counterfactual_env_data/ISIMIP_GSWP3_W5E5/attrici_detrending/output/tas_detrended/US_tas_detrended_1901_2019.nc 
-# (env) schifferle@ecoc9z:~/DEBTs/attrici$ attrici merge-output /mnt/ibb_share/zurell_transfer/Schifferle_BBS_occupancy_models_2023/data/Counterfactual_env_data/ISIMIP_GSWP3_W5E5/attrici_detrending/output/tasskew_detrended/timeseries/tasskew /mnt/ibb_share/zurell_transfer/Schifferle_BBS_occupancy_models_2023/data/Counterfactual_env_data/ISIMIP_GSWP3_W5E5/attrici_detrending/output/tasskew_detrended/US_tasskew_detrended_1901_2019.nc
-# (env) schifferle@ecoc9z:~/DEBTs/attrici$ attrici merge-output /mnt/ibb_share/zurell_transfer/Schifferle_BBS_occupancy_models_2023/data/Counterfactual_env_data/ISIMIP_GSWP3_W5E5/attrici_detrending/output/tasrange_detrended/timeseries/tasrange /mnt/ibb_share/zurell_transfer/Schifferle_BBS_occupancy_models_2023/data/Counterfactual_env_data/ISIMIP_GSWP3_W5E5/attrici_detrending/output/tasrange_detrended/US_tasrange_detrended_1901_2019.nc

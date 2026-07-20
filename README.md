@@ -1,40 +1,110 @@
-# Disentangling climate and land-use forcing of continental bird occupancy change
+# North American bird occupancy dynamics attributed to climate and land use change
+
+
+**Authors:** Katrin Schifferle<sup>1</sup>, Natalie J. Briscoe<sup>2</sup>, Guillermo Fandos<sup>3</sup>, Stefanie Heinicke<sup>4</sup>, Christopher P. O. Reyer<sup>4</sup>, Mark C. Urban<sup>5</sup>, Damaris Zurell<sup>1</sup>
 
 
 
-Authors, institutions, funding: ...
+**Affiliations:**<br/>
+<sup>1</sup> Ecology and Macroecology, University of Potsdam, Germany.<br/>
+<sup>2</sup> School of Agriculture, Food, and Ecosystem Sciences, University of Melbourne, Parkville, Vic, Australia.<br/>
+<sup>3</sup> Department of Biodiversity Ecology and Evolution, Faculty of Biological Science, Universidad Complutense de Madrid (UCM), Madrid, Spain.<br/>
+<sup>4</sup> Potsdam Institute for Climate Impact Research (PIK), Member of the Leibniz Association, Potsdam, Germany.<br/>
+<sup>5</sup> Department of Ecology and Evolutionary Biology and Center of Biological Risk, University of Connecticut, Storrs, CT, USA.<br/>
 
 
 
-### Abstract
+**Funding:** 
 
+This study was supported by the German Research Foundation DFG (grant no. ZU 361.6-1 to to DZ).
+
+
+**Corresponding author:** Katrin Schifferle: schifferle1@uni-potsdam.de
+
+
+
+[!\[License: GPL-3.0](https://img.shields.io/badge/License-GPL%203.0-blue.svg)](LICENSE)
+
+
+
+[!\[DOI](https://zenodo.org/badge/DOI/PLACEHOLDER.svg)](https://doi.org/PLACEHOLDER)
+
+
+
+## Abstract
+
+Evidence is accumulating that global change is altering species distributions. Yet, detailed knowledge is missing about the relative and joint contribution of different drivers to observed species responses. 
+
+Here, we implemented an impact attribution framework based on counterfactual simulations to assess the impact of climate and land use change on occupancy dynamics of North American breeding birds. We used a Bayesian framework to fit process-explicit dynamic occupancy models to long-term survey data for 159 species from 1995 to 2019, and quantified predictive performance using spatial and temporal cross-validation. We then assessed the relative importance and effect direction of climate and land use change while accounting for model predictive accuracy. 
+
+Our results indicate that during the study period, 75 % of the species were negatively affected by climate change while 21 % benefited. Conversely, land use change negatively impacted nearly all species. Climate change was the most important driver for bird communities in the western USA, while land use change was more important for species occurring in the southeast. Overall, climate change was approximately twice as important as land use change for driving changes in occupancy across species. Remarkably, the effects of both drivers were often partially offset by each other rather than acting additively or synergistically. 
+
+Our analysis demonstrates that recent changes in North American bird distributions are shaped by multiple global change drivers acting in concert. The effect of recent climate and land use change were mostly antagonistic, and thus trends in bird occupancy dynamics could not be understood by studying the impact of those drivers in isolation. By disentangling the effects of climate and land use change on biodiversity trends, impact attribution approaches can improve our understanding of global change impacts and can support conservation planning and more accurate and realistic projections of biodiversity response to global change.
+
+Keywords: biodiversity change, impact attribution, causal inference, climate change, land-use change, dynamic occupancy models, North American breeding birds
+
+
+## Citation
+
+If you use this code or build on this work, please cite both the paper and the archived code:
+
+> Schifferle, K., et al. (2026). *North American bird occupancy dynamics attributed to climate and land use change.* [Journal], [vol(issue)], [pages]. https://doi.org/[paper-DOI]
+
+> Schifferle, K., et al. (2026). *UP-macroecology/Schifferle_BBS_occupancy_models_attribution_2026* [Code]. Zenodo. https://doi.org/[Zenodo-DOI]
 
 
 ## Workflow
 
+```mermaid
+flowchart TD
+    A[1_0 BBS bird data] --> B[1_1 Route selection]
+    B --> C[1_2 Species selection]
+    C --> D[1_3 Outlier check]
+    E[1_0 Climate data] --> F[1_2a Variable selection]
+    G[1_0 Land-use data] --> F
+    F --> H[1_3 Match BBS x env<br/>FACTUAL]
+    F --> I[1_2b/ 1_2c ATTRICI preprocessing]
+    I --> J[1_2d ATTRICI detrending]
+    J --> K[1_2e ATTRICI postprocessing]
+    K --> L[1_3 Match BBS x env<br/>COUNTERFACTUAL]
+    H --> M[2_1 Fit full DOMs]
+    H --> N[2_2 Fit tempval DOMs]
+    H --> O[2_4a CV fold assignment]
+    O --> P[2_4b Fit CV DOMs]
+    M --> Q[2_3 Check fit<br/>refit round 2 if needed]
+    N --> Q
+    P --> R[2_4c Check CV fit<br/>refit round 2 if needed]
+    Q --> S[3_1 Model evaluation CV / 3_2 Model evaluation temp]
+    R --> S
+    S --> T[4_0 Simulate scenarios<br/>uses FACTUAL +<br/>COUNTERFACTUAL]
+    L --> T
+    T --> U[4_1 Time series]
+    U --> V[5_1 Attribution metrics]
+    V --> W[5_2 Trend categories<br/>5_3 Relative importance<br/>5_4 Maps]
+```
 
 
-### 0 - Functions
+Note three branch points in the workflow:
+- **Factual / counterfactual loop** at `1_3_dataprep_match_BBS_routes_env_data.R`: run once with `data <- "factual"` and once with `data <- "counterfactual"`.
+- **Refit loop** at `2_1`, `2_2`, `2_4b`: rerun with `round <- 2` for species flagged by the MCMC diagnostic step.
+- **ATTRICI** is an external Python CLI (not R) — see "Setting up ATTRICI".
 
 
+### 0 - Set up and and functions
 
-script [0\_functions.R](https://github.com/UP-macroecology/Schifferle_BBS_occupancy_models_2023/blob/master/scripts/0_functions.R)
+Script [0\_paths.R](scripts/0_paths.R) defines main directories, expected folder structure and directories of downloaded data.
 
 
-
-Functions used throughout the analyses.
-
+Script [0\_functions.R](scripts/0_functions.R) defines functions used throughout the analyses.
 
 
 ### 1 - Data preparation
 
 
-
 #### Bird data:
 
 
-
-scripts [1\_0\_dataprep\_BBS\_bird\_data.R](https://github.com/UP-macroecology/Schifferle_BBS_occupancy_models_2023/blob/master/scripts/1_0_dataprep_BBS_bird_data.R), [1\_1\_dataprep\_BBS\_route\_selection.R](https://github.com/UP-macroecology/Schifferle_BBS_occupancy_models_2023/blob/master/scripts/1_1_dataprep_BBS_route_selection.R), [1\_2\_dataprep\_BBS\_species\_selection.R](https://github.com/UP-macroecology/Schifferle_BBS_occupancy_models_2023/blob/master/scripts/1_2_dataprep_BBS_species_selection.R), [1\_3\_dataprep\_BBS\_outlier\_check\_selected\_species.R](https://github.com/UP-macroecology/Schifferle_BBS_occupancy_models_2023/blob/master/scripts/1_3_dataprep_BBS_outlier_check_selected_species.R)
+scripts [1\_0\_dataprep\_BBS\_bird\_data.R](scripts/1_0_dataprep_BBS_bird_data.R), [1\_1\_dataprep\_BBS\_route\_selection.R](scripts/1_1_dataprep_BBS_route_selection.R), [1\_2\_dataprep\_BBS\_species\_selection.R](scripts/1_2_dataprep_BBS_species_selection.R), [1\_3\_dataprep\_BBS\_outlier\_check\_selected\_species.R](scripts/1_3_dataprep_BBS_outlier_check_selected_species.R)
 
 
 
@@ -42,19 +112,19 @@ We fitted dynamic occupancy models (DOMs) based on bird observations from the [N
 
 
 
-We downloaded, cleaned and filtered the BBS data and reformatted them for occupancy modelling (presences and absences for each route section, year and species). We defined the centroid of the route as the route location (script [1\_0\_dataprep\_BBS\_bird\_data.R](https://github.com/UP-macroecology/Schifferle_BBS_occupancy_models_2023/blob/master/scripts/1_0_dataprep_BBS_bird_data.R)).
+We downloaded, cleaned and filtered the BBS data and reformatted them for occupancy modelling (presences and absences for each route section, year and species). We defined the centroid of the route as the route location (script [1\_0\_dataprep\_BBS\_bird\_data.R](scripts/1_0_dataprep_BBS_bird_data.R)).
 
 
 
-We limited our analyses to the time period 1995 - 2019 during which a large number of routes was sampled annually. We initially selected the subset of the routes that had been surveyed in at least 20 years, including the first and last year of the time period. These routes were then spatially thinned (minimum distance 100 km) and a maximum of 30 routes per [Bird Conservation Region](https://www.birdscanada.org/bird-science/nabci-bird-conservation-regions) (Bird Studies Canada and NABCI, 2014) was retained to get an equal coverage of the conterminous USA. This resulted in 539 routes (script [1\_1\_dataprep\_BBS\_route\_selection.R](https://github.com/UP-macroecology/Schifferle_BBS_occupancy_models_2023/blob/master/scripts/1_1_dataprep_BBS_route_selection.R)).
+We limited our analyses to the time period 1995 - 2019 during which a large number of routes was sampled annually. We initially selected the subset of the routes that had been surveyed in at least 20 years, including the first and last year of the time period. These routes were then spatially thinned (minimum distance 100 km) and a maximum of 30 routes per [Bird Conservation Region](https://www.birdscanada.org/bird-science/nabci-bird-conservation-regions) (Bird Studies Canada and NABCI, 2014) was retained to get an equal coverage of the conterminous USA. This resulted in 539 routes (script [1\_1\_dataprep\_BBS\_route\_selection.R](scripts/1_1_dataprep_BBS_route_selection.R)).
 
 
 
-Of all species observed in the BBS from 1995 to 2019, we discarded nocturnal and water-related species for which the BBS methodology is not suited. We further excluded rare species that were detected on less than 50 different routes, as well as widespread species, for which there are less than 50 routes where they have never been detected. This resulted 192 species (script [1\_2\_dataprep\_BBS\_species\_selection.R](https://github.com/UP-macroecology/Schifferle_BBS_occupancy_models_2023/blob/master/scripts/1_2_dataprep_BBS_species_selection.R)).
+Of all species observed in the BBS from 1995 to 2019, we discarded nocturnal and water-related species for which the BBS methodology is not suited. We further excluded rare species that were detected on less than 50 different routes, as well as widespread species, for which there are less than 50 routes where they have never been detected. This resulted 192 species (script [1\_2\_dataprep\_BBS\_species\_selection.R](scripts/1_2_dataprep_BBS_species_selection.R)).
 
 
 
-Finally, we checked whether observations of the selected species are plausible and removed few detections located more than 1000 km away from all other detections of a species (script [1\_3\_dataprep\_BBS\_outlier\_check\_selected\_species.R](https://github.com/UP-macroecology/Schifferle_BBS_occupancy_models_2023/blob/master/scripts/1_3_dataprep_BBS_outlier_check_selected_species.R)).
+Finally, we checked whether observations of the selected species are plausible and removed few detections located more than 1000 km away from all other detections of a species (script [1\_3\_dataprep\_BBS\_outlier\_check\_selected\_species.R](scripts/1_3_dataprep_BBS_outlier_check_selected_species.R)).
 
 
 
@@ -62,7 +132,7 @@ Finally, we checked whether observations of the selected species are plausible a
 
 
 
-scripts [1\_0\_dataprep\_climate.R](https://github.com/UP-macroecology/Schifferle_BBS_occupancy_models_2023/blob/master/scripts/1_0_dataprep_climate.R), [1\_0\_dataprep\_landuse.R](https://github.com/UP-macroecology/Schifferle_BBS_occupancy_models_2023/blob/master/scripts/1_0_dataprep_landuse.R), [1\_2a\_dataprep\_env\_variable\_selection.R](https://github.com/UP-macroecology/Schifferle_BBS_occupancy_models_2023/blob/master/scripts/1_2a_dataprep_env_variable_selection.R), [1\_3\_dataprep\_match\_BBS\_routes\_env\_data.R](https://github.com/UP-macroecology/Schifferle_BBS_occupancy_models_2023/blob/master/scripts/1_3_dataprep_match_BBS_routes_env_data.R)
+scripts [1\_0\_dataprep\_climate.R](1_0_dataprep_climate.R), [1\_0\_dataprep\_landuse.R](scripts/1_0_dataprep_landuse.R), [1\_2a\_dataprep\_env\_variable\_selection.R](scripts/1_2a_dataprep_env_variable_selection.R), [1\_3\_dataprep\_match\_BBS\_routes\_env\_data.R](scripts/1_3_dataprep_match_BBS_routes_env_data.R)
 
 
 
@@ -70,19 +140,19 @@ As environmental data we used climate and land use data from the Inter-Sectoral 
 
 
 
-As climate data, we used the [GSWP3-W5E5 dataset](https://doi.org/10.48364/ISIMIP.982724.3) (Lange et al., 2025). We aggregated daily to monthly data and computed annual 19 bioclimatic variables based on the twelve months before the survey period, as well as mean temperature and precipitation of each season (spring, summer, autumn, winter). Additionally, we computed the same variables based on three years before our study period as covariates for initial occupancy (script [1\_0\_dataprep\_climate.R](https://github.com/UP-macroecology/Schifferle_BBS_occupancy_models_2023/blob/master/scripts/1_0_dataprep_climate.R)).
+As climate data, we used the [GSWP3-W5E5 dataset](https://doi.org/10.48364/ISIMIP.982724.3) (Lange et al., 2025). We aggregated daily to monthly data and computed annual 19 bioclimatic variables based on the twelve months before the survey period, as well as mean temperature and precipitation of each season (spring, summer, autumn, winter). Additionally, we computed the same variables based on three years before our study period as covariates for initial occupancy (script [1\_0\_dataprep\_climate.R](scripts/1_0_dataprep_climate.R)).
 
 
 
-As land use data, we used [ISIMIP3a landuse input data](https://doi.org/10.48364/ISIMIP.571261.3) (Volkholz \& Ostberg, 2024). It is derived from the Land-Use Harmonization (LUH2) data set (Hurtt et al., 2020). We extracted annual data of the land use categories “forest and natural vegetation”, “managed pastures and rangeland”, “urban areas” and “five crop types” and summarised C3, C4 and C3 nitrogen fixing crops as annual crops. As for the climate data, we additionally computed mean values across the three years before our study period as covariates for initial occupancy (script [1\_0\_dataprep\_landuse.R](https://github.com/UP-macroecology/Schifferle_BBS_occupancy_models_2023/blob/master/scripts/1_0_dataprep_landuse.R)).
+As land use data, we used [ISIMIP3a landuse input data](https://doi.org/10.48364/ISIMIP.571261.3) (Volkholz \& Ostberg, 2024). It is derived from the Land-Use Harmonization (LUH2) data set (Hurtt et al., 2020). We extracted annual data of the land use categories “forest and natural vegetation”, “managed pastures and rangeland”, “urban areas” and “five crop types” and summarised C3, C4 and C3 nitrogen fixing crops as annual crops. As for the climate data, we additionally computed mean values across the three years before our study period as covariates for initial occupancy (script [1\_0\_dataprep\_landuse.R](scripts/1_0_dataprep_landuse.R)).
 
 
 
-To assess the impacts of climate and land use change across species, we fitted DOMs based on the same set of covariates for each species. We selected climatic and land use variables that capture most environmental variation across the conterminous USA, based on a principal component analysis, and that are not substantially correlated. The resulting variable set contains ten climatic and five land use related variables (script [1\_2a\_dataprep\_env\_variable\_selection.R](https://github.com/UP-macroecology/Schifferle_BBS_occupancy_models_2023/blob/master/scripts/1_2a_dataprep_env_variable_selection.R)).
+To assess the impacts of climate and land use change across species, we fitted DOMs based on the same set of covariates for each species. We selected climatic and land use variables that capture most environmental variation across the conterminous USA, based on a principal component analysis, and that are not substantially correlated. The resulting variable set contains ten climatic and five land use related variables (script [1\_2a\_dataprep\_env\_variable\_selection.R](scripts/1_2a_dataprep_env_variable_selection.R)).
 
 
 
-We finally extracted the values of the selected climate and land use variables at the route locations (script [1\_3\_dataprep\_match\_BBS\_routes\_env\_data.R](https://github.com/UP-macroecology/Schifferle_BBS_occupancy_models_2023/blob/master/scripts/1_3_dataprep_match_BBS_routes_env_data.R); set `data <- "factual"`).
+We finally extracted the values of the selected climate and land use variables at the route locations (script [1\_3\_dataprep\_match\_BBS\_routes\_env\_data.R](scripts/1_3_dataprep_match_BBS_routes_env_data.R); set `data <- "factual"`).
 
 
 
@@ -92,15 +162,15 @@ We finally extracted the values of the selected climate and land use variables a
 
 
 
-scripts [1\_2b\_dataprep\_cf\_climate\_attrici\_preprocessing.R](https://github.com/UP-macroecology/Schifferle_BBS_occupancy_models_2023/blob/master/scripts/1_2b_dataprep_cf_climate_attrici_preprocessing.R), [1\_2c\_attrici\_US\_pr.sh](https://github.com/UP-macroecology/Schifferle_BBS_occupancy_models_2023/blob/master/scripts/1_2c_attrici_US_pr.sh), [1\_2c\_attrici\_US\_tas.sh](https://github.com/UP-macroecology/Schifferle_BBS_occupancy_models_2023/blob/master/scripts/1_2c_attrici_US_tas.sh), [1\_2c\_attrici\_US\_tasrange.sh](https://github.com/UP-macroecology/Schifferle_BBS_occupancy_models_2023/blob/master/scripts/1_2c_attrici_US_tasrange.sh), [1\_2c\_attrici\_US\_tasskew.sh](https://github.com/UP-macroecology/Schifferle_BBS_occupancy_models_2023/blob/master/scripts/1_2c_attrici_US_tasskew.sh), [1\_2d\_dataprep\_cf\_climate\_attrici\_postprocessing.R](https://github.com/UP-macroecology/Schifferle_BBS_occupancy_models_2023/blob/master/scripts/1_2d_dataprep_cf_climate_attrici_postprocessing.R), [1\_3\_dataprep\_match\_BBS\_routes\_env\_data.R](https://github.com/UP-macroecology/Schifferle_BBS_occupancy_models_2023/blob/master/scripts/1_3_dataprep_match_BBS_routes_env_data.R)
+scripts [1\_2b\_dataprep\_cf\_climate\_attrici\_preprocessing.R](scripts/1_2b_dataprep_cf_climate_attrici_preprocessing.R), [1\_2c\_attrici_input_preps.sh](scripts/1_2c_attrici_input_preps.sh), [1\_2d\_attrici\_US\_pr.sh](scripts/1_2d_attrici_US_pr.sh), [1\_2d\_attrici\_US\_tas.sh](scripts/1_2d_attrici_US_tas.sh), [1\_2d\_attrici\_US\_tasrange.sh](scripts/1_2d_attrici_US_tasrange.sh), [1\_2d\_attrici\_US\_tasskew.sh](scripts/1_2d_attrici_US_tasskew.sh), [1\_2e\_dataprep\_cf\_climate\_attrici\_postprocessing.R](scripts/1_2e_dataprep_cf_climate_attrici_postprocessing.R), [1\_3\_dataprep\_match\_BBS\_routes\_env\_data.R](scripts/1_3_dataprep_match_BBS_routes_env_data.R)
 
 
 
-We generated counterfactual climate data that are detrended from 1995 onwards with the ATTRICI (ATTRIbuting Climate Impacts) [command line tool](https://github.com/ISI-MIP/attrici) (Mengel et al., 2021). We prepared input files for ATTRICI (script [1\_2b\_dataprep\_cf\_climate\_attrici\_preprocessing.R](https://github.com/UP-macroecology/Schifferle_BBS_occupancy_models_2023/blob/master/scripts/1_2b_dataprep_cf_climate_attrici_preprocessing.R)). We then ran ATTRICI's preprocessing function (see comments in [1\_2b\_dataprep\_cf\_climate\_attrici\_preprocessing.R](https://github.com/UP-macroecology/Schifferle_BBS_occupancy_models_2023/blob/master/scripts/1_2b_dataprep_cf_climate_attrici_preprocessing.R)), detrending function (for precipitation: [1\_2c\_attrici\_US\_pr.sh](https://github.com/UP-macroecology/Schifferle_BBS_occupancy_models_2023/blob/master/scripts/1_2c_attrici_US_pr.sh), for temperature: [1\_2c\_attrici\_US\_tas.sh](https://github.com/UP-macroecology/Schifferle_BBS_occupancy_models_2023/blob/master/scripts/1_2c_attrici_US_tas.sh), [1\_2c\_attrici\_US\_tasrange.sh](https://github.com/UP-macroecology/Schifferle_BBS_occupancy_models_2023/blob/master/scripts/1_2c_attrici_US_tasrange.sh), [1\_2c\_attrici\_US\_tasskew.sh](https://github.com/UP-macroecology/Schifferle_BBS_occupancy_models_2023/blob/master/scripts/1_2c_attrici_US_tasskew.sh)), and output merging function (see comments in [1\_2b\_dataprep\_cf\_climate\_attrici\_preprocessing.R](https://github.com/UP-macroecology/Schifferle_BBS_occupancy_models_2023/blob/master/scripts/1_2b_dataprep_cf_climate_attrici_preprocessing.R)). Afterwards we computed minimum and maximum temperature from tas, tasrange and tasskew and calculated the climatic variables that we used to fit the DOMs, but with counterfactual values (script [1\_2d\_dataprep\_cf\_climate\_attrici\_postprocessing.R](https://github.com/UP-macroecology/Schifferle_BBS_occupancy_models_2023/blob/master/scripts/1_2d_dataprep_cf_climate_attrici_postprocessing.R)).
+We generated counterfactual climate data that are detrended from 1995 onwards with the ATTRICI (ATTRIbuting Climate Impacts) [command line tool](https://github.com/ISI-MIP/attrici) (Mengel et al., 2021). We prepared input files for ATTRICI (script [1\_2b\_dataprep\_cf\_climate\_attrici\_preprocessing.R](scripts/1_2b_dataprep_cf_climate_attrici_preprocessing.R) and script [1\_2c\_attrici_input_preps.sh](scripts/1_2c_attrici_input_preps.sh). We then ran ATTRICI's detrending function (for precipitation: [1\_2d\_attrici\_US\_pr.sh](scripts/1_2d_attrici_US_pr.sh), for temperature: [1\_2d\_attrici\_US\_tas.sh](scripts/1_2d_attrici_US_tas.sh), [1\_2d\_attrici\_US\_tasrange.sh](scripts/1_2d_attrici_US_tasrange.sh), [1\_2d\_attrici\_US\_tasskew.sh](scripts/1_2d_attrici_US_tasskew.sh)). Afterwards we computed minimum and maximum temperature from tas, tasrange and tasskew and calculated the climatic variables that we used to fit the DOMs, but with counterfactual values (script [1\_2e\_dataprep\_cf\_climate\_attrici\_postprocessing.R](scripts/1_2e_dataprep_cf_climate_attrici_postprocessing.R)).
 
 
 
-Finally, we extracted the counterfactual values of the selected climate and land use variables at the route locations (rerun [1\_3\_dataprep\_match\_BBS\_routes\_env\_data.R](https://github.com/UP-macroecology/Schifferle_BBS_occupancy_models_2023/blob/master/scripts/1_3_dataprep_match_BBS_routes_env_data.R) with `data <- "counterfactual"`).
+Finally, we extracted the counterfactual values of the selected climate and land use variables at the route locations (rerun [1\_3\_dataprep\_match\_BBS\_routes\_env\_data.R](scripts/1_3_dataprep_match_BBS_routes_env_data.R) with `data <- "counterfactual"`).
 
 
 
@@ -110,18 +180,18 @@ Finally, we extracted the counterfactual values of the selected climate and land
 
 
 
-scripts [2\_1\_fit\_DOMs\_full\_model.R](https://github.com/UP-macroecology/Schifferle_BBS_occupancy_models_2023/blob/master/scripts/2_1_fit_DOMs_full_model.R), [2\_2\_fit\_DOMs\_tempval.R](https://github.com/UP-macroecology/Schifferle_BBS_occupancy_models_2023/blob/master/scripts/2_2_fit_DOMs_tempval.R), [2\_3a\_fit\_DOMs\_check\_fit.R](https://github.com/UP-macroecology/Schifferle_BBS_occupancy_models_2023/blob/master/scripts/2_3a_fit_DOMs_check_fit.R), [2\_3b\_fit\_DOMs\_check\_fit\_details.qmd](https://github.com/UP-macroecology/Schifferle_BBS_occupancy_models_2023/blob/master/scripts/2_3b_fit_DOMs_check_fit_details.qmd), [2\_4a\_fit\_DOMs\_CV\_fold\_assignment.R](https://github.com/UP-macroecology/Schifferle_BBS_occupancy_models_2023/blob/master/scripts/2_4a_fit_DOMs_CV_fold_assignment.R), [2\_4b\_fit\_DOMs\_CV\_fit\_models.R](https://github.com/UP-macroecology/Schifferle_BBS_occupancy_models_2023/blob/master/scripts/2_4b_fit_DOMs_CV_fit_models.R), [2\_4c\_fit\_DOMs\_CV\_check\_fit.R](https://github.com/UP-macroecology/Schifferle_BBS_occupancy_models_2023/blob/master/scripts/2_4c_fit_DOMs_CV_check_fit.R)
+scripts [2\_1\_fit\_DOMs\_full\_model.R](scripts/2_1_fit_DOMs_full_model.R), [2\_2\_fit\_DOMs\_tempval.R](scripts/2_2_fit_DOMs_tempval.R), [2\_3a\_fit\_DOMs\_check\_fit.R](scripts/2_3a_fit_DOMs_check_fit.R), [2\_3b\_fit\_DOMs\_check\_fit\_details.qmd](scripts/2_3b_fit_DOMs_check_fit_details.qmd), [2\_4a\_fit\_DOMs\_CV\_fold\_assignment.R](scripts/2_4a_fit_DOMs_CV_fold_assignment.R), [2\_4b\_fit\_DOMs\_CV\_fit\_models.R](scripts/2_4b_fit_DOMs_CV_fit_models.R), [2\_4c\_fit\_DOMs\_CV\_check\_fit.R](scripts/2_4c_fit_DOMs_CV_check_fit.R)
 
 
 
-We fitted single species DOMs based on bird observations and climate and land use variables and generated posterior predictions for observations (= y, the combination of occupancy probability and detection probability; script [2\_1\_fit\_DOMs\_full\_model.R](https://github.com/UP-macroecology/Schifferle_BBS_occupancy_models_2023/blob/master/scripts/2_1_fit_DOMs_full_model.R)). We then checked whether fitting worked based on MCMC diagnostics (scripts [2\_3a\_fit\_DOMs\_check\_fit.R](https://github.com/UP-macroecology/Schifferle_BBS_occupancy_models_2023/blob/master/scripts/2_3a_fit_DOMs_check_fit.R) and [2\_3b\_fit\_DOMs\_check\_fit\_details.qmd](https://github.com/UP-macroecology/Schifferle_BBS_occupancy_models_2023/blob/master/scripts/2_3b_fit_DOMs_check_fit_details.qmd)). For species for which MCMC diagnostics suggested issues in model fitting, we tried to refit the models with more iterations (rerun [2\_1\_fit\_DOMs\_full\_model.R](https://github.com/UP-macroecology/Schifferle_BBS_occupancy_models_2023/blob/master/scripts/2_1_fit_DOMs_full_model.R) with `round <- 2`). We again checked the resulting model fits (rerun [2\_3a\_fit\_DOMs\_check\_fit.R](https://github.com/UP-macroecology/Schifferle_BBS_occupancy_models_2023/blob/master/scripts/2_3a_fit_DOMs_check_fit.R) and [2\_3b\_fit\_DOMs\_check\_fit\_details.qmd](https://github.com/UP-macroecology/Schifferle_BBS_occupancy_models_2023/blob/master/scripts/2_3b_fit_DOMs_check_fit_details.qmd) with adjusted file paths). Species for which MCMC diagnostics still suggested issues in model fitting were discarded from further analyses.
+We fitted single species DOMs based on bird observations and climate and land use variables and generated posterior predictions for observations (= y, the combination of occupancy probability and detection probability; script [2\_1\_fit\_DOMs\_full\_model.R](scripts/2_1_fit_DOMs_full_model.R)). We then checked whether fitting worked based on MCMC diagnostics (scripts [2\_3a\_fit\_DOMs\_check\_fit.R](scripts/2_3a_fit_DOMs_check_fit.R) and [2\_3b\_fit\_DOMs\_check\_fit\_details.qmd](scripts/2_3b_fit_DOMs_check_fit_details.qmd)). For species for which MCMC diagnostics suggested issues in model fitting, we tried to refit the models with more iterations (rerun [2\_1\_fit\_DOMs\_full\_model.R](scripts/2_1_fit_DOMs_full_model.R) with `round <- 2`). We again checked the resulting model fits (rerun [2\_3a\_fit\_DOMs\_check\_fit.R](scripts/2_3a_fit_DOMs_check_fit.R) and [2\_3b\_fit\_DOMs\_check\_fit\_details.qmd](scripts/2_3b_fit_DOMs_check_fit_details.qmd) with adjusted file paths). Species for which MCMC diagnostics still suggested issues in model fitting were discarded from further analyses.
 
 
 
 To evaluate the predictive performance of the resulting models, we refitted them to subsets of the data:
 
-* for temporal validation, we fitted the same model based on data of the first 15 years and then predicted observations over all 25 years (script [2\_2\_fit\_DOMs\_tempval.R](https://github.com/UP-macroecology/Schifferle_BBS_occupancy_models_2023/blob/master/scripts/2_2_fit_DOMs_tempval.R)). As for the models fitted based on all data, we checked whether fitting worked based on MCMC diagnostics (rerun [2\_3a\_fit\_DOMs\_check\_fit.R](https://github.com/UP-macroecology/Schifferle_BBS_occupancy_models_2023/blob/master/scripts/2_3a_fit_DOMs_check_fit.R) and [2\_3b\_fit\_DOMs\_check\_fit\_details.qmd](https://github.com/UP-macroecology/Schifferle_BBS_occupancy_models_2023/blob/master/scripts/2_3b_fit_DOMs_check_fit_details.qmd) with adjusted file paths) and refitted the models with more iterations for species for which MCMC diagnostics indicated issues (rerun [2\_2\_fit\_DOMs\_tempval.R](https://github.com/UP-macroecology/Schifferle_BBS_occupancy_models_2023/blob/master/scripts/2_2_fit_DOMs_tempval.R) with `round <- 2`). Species for which MCMC diagnostics still suggested issues in model fitting were discarded from further analyses.
-* for spatial validation we conducted a five-fold spatially blocked cross validation. We first assigned routes to folds (script [2\_4a\_fit\_DOMs\_CV\_fold\_assignment.R](https://github.com/UP-macroecology/Schifferle_BBS_occupancy_models_2023/blob/master/scripts/2_4a_fit_DOMs_CV_fold_assignment.R)). We then left out one fold at a time, fitted DOMs based on the remaining data and predicted observations for the left-out fold (script [2\_4b\_fit\_DOMs\_CV\_fit\_models.R](https://github.com/UP-macroecology/Schifferle_BBS_occupancy_models_2023/blob/master/scripts/2_4b_fit_DOMs_CV_fit_models.R)). Again, we checked whether fitting worked based on MCMC diagnostics (script [2\_4c\_fit\_DOMs\_CV\_check\_fit.R](https://github.com/UP-macroecology/Schifferle_BBS_occupancy_models_2023/blob/master/scripts/2_4c_fit_DOMs_CV_check_fit.R)) and refitted models with more iterations in cases where MCMC diagnostics indicated issues (rerun [2\_4b\_fit\_DOMs\_CV\_fit\_models.R](https://github.com/UP-macroecology/Schifferle_BBS_occupancy_models_2023/blob/master/scripts/2_4b_fit_DOMs_CV_fit_models.R) with `round <- 2`). Species for which MCMC diagnostics still suggested issues in model fitting were discarded from further analyses.
+* for temporal validation, we fitted the same model based on data of the first 15 years and then predicted observations over all 25 years (script [2\_2\_fit\_DOMs\_tempval.R](scripts/2_2_fit_DOMs_tempval.R)). As for the models fitted based on all data, we checked whether fitting worked based on MCMC diagnostics (rerun [2\_3a\_fit\_DOMs\_check\_fit.R](scripts/2_3a_fit_DOMs_check_fit.R) and [2\_3b\_fit\_DOMs\_check\_fit\_details.qmd](scripts/2_3b_fit_DOMs_check_fit_details.qmd) with adjusted file paths) and refitted the models with more iterations for species for which MCMC diagnostics indicated issues (rerun [2\_2\_fit\_DOMs\_tempval.R](scripts/2_2_fit_DOMs_tempval.R) with `round <- 2`). Species for which MCMC diagnostics still suggested issues in model fitting were discarded from further analyses.
+* for spatial validation we conducted a five-fold spatially blocked cross validation. We first assigned routes to folds (script [2\_4a\_fit\_DOMs\_CV\_fold\_assignment.R](scripts/2_4a_fit_DOMs_CV_fold_assignment.R)). We then left out one fold at a time, fitted DOMs based on the remaining data and predicted observations for the left-out fold (script [2\_4b\_fit\_DOMs\_CV\_fit\_models.R](scripts/2_4b_fit_DOMs_CV_fit_models.R)). Again, we checked whether fitting worked based on MCMC diagnostics (script [2\_4c\_fit\_DOMs\_CV\_check\_fit.R](scripts/2_4c_fit_DOMs_CV_check_fit.R)) and refitted models with more iterations in cases where MCMC diagnostics indicated issues (rerun [2\_4b\_fit\_DOMs\_CV\_fit\_models.R](scripts/2_4b_fit_DOMs_CV_fit_models.R) with `round <- 2`). Species for which MCMC diagnostics still suggested issues in model fitting were discarded from further analyses.
 
 
 
@@ -135,7 +205,7 @@ Fitting DOMs for each subset of data was successful for 159 of the 192 selected 
 
 
 
-scripts [3\_1\_eval\_DOMs\_CV.R](https://github.com/UP-macroecology/Schifferle_BBS_occupancy_models_2023/blob/master/scripts/3_1_eval_DOMs_CV.R), [3\_2\_eval\_DOMs\_temp.R](https://github.com/UP-macroecology/Schifferle_BBS_occupancy_models_2023/blob/master/scripts/3_2_eval_DOMs_temp.R)
+scripts [3\_1\_eval\_DOMs\_CV.R](scripts/3_1_eval_DOMs_CV.R), [3\_2\_eval\_DOMs\_temp.R](scripts/3_2_eval_DOMs_temp.R)
 
 
 
@@ -143,11 +213,11 @@ We evaluated the predictive performance of the DOMs for 159 species for which mo
 
 
 
-To evaluate the predictive performance in space, we compared bird observations to predicted observations. For each year, we calculated the AUC (area under the receiver operating characteristic (ROC) curve) and considered a mean yearly AUC of > 0.7 to indicate acceptable discrimination ability in space (script [3\_1\_eval\_DOMs\_CV.R](https://github.com/UP-macroecology/Schifferle_BBS_occupancy_models_2023/blob/master/scripts/3_1_eval_DOMs_CV.R)). This was the case for 157 species.
+To evaluate the predictive performance in space, we compared bird observations to predicted observations. For each year, we calculated the AUC (area under the receiver operating characteristic (ROC) curve) and considered a mean yearly AUC of > 0.7 to indicate acceptable discrimination ability in space (script [3\_1\_eval\_DOMs\_CV.R](scripts/3_1_eval_DOMs_CV.R)). This was the case for 157 species.
 
 
 
-To evaluate temporal predictive performance, we summed the occupied sites across the conterminous USA for each year based on observations and model predictions. We then compared the later ten years of the observed and the predicted time series, which were not used to fit the models. We considered the predictive performance of the model to be acceptable if either (a) the error was comparatively small, which we defined as either the observations being within the 95 % prediction credible interval or the mean absolute percentage error being < 10 %, or (b) the overall trend was captured, which we defined as the Pearson correlation between time series being > 0.5, and additionally (c) if there was no large deviation from expectation, which we defined as the Pearson correlation being not significantly negative and the mean absolute error showing no significant positive trend over the test years. This was the case for 81 species (script [3\_2\_eval\_DOMs\_temp.R](https://github.com/UP-macroecology/Schifferle_BBS_occupancy_models_2023/blob/master/scripts/3_2_eval_DOMs_temp.R)).
+To evaluate temporal predictive performance, we summed the occupied sites across the conterminous USA for each year based on observations and model predictions. We then compared the later ten years of the observed and the predicted time series, which were not used to fit the models. We considered the predictive performance of the model to be acceptable if either (a) the error was comparatively small, which we defined as either the observations being within the 95 % prediction credible interval or the mean absolute percentage error being < 10 %, or (b) the overall trend was captured, which we defined as the Pearson correlation between time series being > 0.5, and additionally (c) if there was no large deviation from expectation, which we defined as the Pearson correlation being not significantly negative and the mean absolute error showing no significant positive trend over the test years. This was the case for 81 species (script [3\_2\_eval\_DOMs\_temp.R](scripts/3_2_eval_DOMs_temp.R)).
 
 
 
@@ -163,23 +233,23 @@ Overall, the DOMs showed acceptable predictive performance in space and time for
 
 
 
-scripts [4\_0\_DOMs\_predictions\_y\_routes\_scenarios.R](https://github.com/UP-macroecology/Schifferle_BBS_occupancy_models_2023/blob/master/scripts/4_0_DOMs_predictions_y_routes_scenarios.R), [4\_1\_DOMs\_predictions\_time\_series.R](https://github.com/UP-macroecology/Schifferle_BBS_occupancy_models_2023/blob/master/scripts/4_1_DOMs_predictions_time_series.R)
+scripts [4\_0\_DOMs\_predictions\_y\_routes\_scenarios.R](scripts/4_0_DOMs_predictions_y_routes_scenarios.R), [4\_1\_DOMs\_predictions\_time\_series.R](scripts/4_1_DOMs_predictions_time_series.R)
 
 
 
 With the DOMS of the 80 species for which the predictive performance of the models was acceptable we simulated observations at each route and year from 1995 to 2019 for the following counterfactual scenarios:
 
 * no climate change since 1995, but factual land use change
-* no land use change since 1995, but factual climate change
-* no climate and no land use change since 1995.
+* constant land use since 1995, but factual climate change
+* no climate change and constant land use since 1995.
 
 
 
-For the scenarios with no climate change since 1995, we used annual counterfactual climate data as covariates for colonisation and extinction probabilities. For the scenarios with no land use change since 1995, we used the land use values of 1995 as covariates for colonisation and extinction probabilities for each year until 2019 (script [4\_0\_DOMs\_predictions\_y\_routes\_scenarios.R](https://github.com/UP-macroecology/Schifferle_BBS_occupancy_models_2023/blob/master/scripts/4_0_DOMs_predictions_y_routes_scenarios.R)).
+For the scenarios with no climate change since 1995, we used annual counterfactual climate data as covariates for colonisation and extinction probabilities. For the scenarios with no land use change since 1995, we used the land use values of 1995 as covariates for colonisation and extinction probabilities for each year until 2019 (script [4\_0\_DOMs\_predictions\_y\_routes\_scenarios.R](scripts/4_0_DOMs_predictions_y_routes_scenarios.R)).
 
 
 
-From these predictions, we computed time series of the number of occupied routes across the conterminous USA for each scenario (script: [4\_1\_DOMs\_predictions\_time\_series.R](https://github.com/UP-macroecology/Schifferle_BBS_occupancy_models_2023/blob/master/scripts/4_1_DOMs_predictions_time_series.R)). Additionally, we computed time series from model predictions for factual climate and land use data (output of [2\_1\_fit\_DOMs\_full\_model.R](https://github.com/UP-macroecology/Schifferle_BBS_occupancy_models_2023/blob/master/scripts/2_1_fit_DOMs_full_model.R)) and from observations. Based on these time series we assessed the relative importance of climate and land use change for changes in occupancy dynamics.
+From these predictions, we computed time series of the number of occupied routes across the conterminous USA for each scenario (script: [4\_1\_DOMs\_predictions\_time\_series.R](scripts/4_1_DOMs_predictions_time_series.R)). Additionally, we computed time series from model predictions for factual climate and land use data (output of [2\_1\_fit\_DOMs\_full\_model.R](scripts/2_1_fit_DOMs_full_model.R)) and from observations. Based on these time series we assessed the relative importance of climate and land use change for changes in occupancy dynamics.
 
 
 
@@ -189,46 +259,88 @@ From these predictions, we computed time series of the number of occupied routes
 
 
 
-scripts [5\_1\_attribution\_metrics.R](https://github.com/UP-macroecology/Schifferle_BBS_occupancy_models_2023/blob/master/scripts/5_1_attribution_metrics.R), [5\_2\_attribution\_plots\_trend\_categories.R](https://github.com/UP-macroecology/Schifferle_BBS_occupancy_models_2023/blob/master/scripts/5_2_attribution_plots_trend_categories.R), [5\_3\_attribution\_plots\_relative\_importance.R](https://github.com/UP-macroecology/Schifferle_BBS_occupancy_models_2023/blob/master/scripts/5_3_attribution_plots_relative_importance.R), [5\_4\_attribution\_map.R](https://github.com/UP-macroecology/Schifferle_BBS_occupancy_models_2023/blob/master/scripts/5_4_attribution_map.R)
+scripts [5\_1\_attribution\_metrics.R](scripts/5_1_attribution_metrics.R), [5\_2\_attribution\_plots\_trend\_categories.R](scripts/5_2_attribution_plots_trend_categories.R), [5\_3\_attribution\_plots\_relative\_importance.R](scripts/5_3_attribution_plots_relative_importance.R), [5_4a_attribution_maps_extract_species_ranges.R](scripts/5_4a_attribution_maps_extract_species_ranges.R), [5\_4b\_attribution\_maps.R](scripts/5_4b_attribution_maps.R)
 
 
 
-To assess the importance of climate and land use change for the observed occupancy dynamics, we compared the predicted time series of the number of occupied routes across the conterminous USA under factual and counterfactual scenarios without climate and / or land use change. We quantified the trend in occupancy dynamics for each scenario by fitting a linear model and extracting the slope, p-value and confidence interval of the slope. We further computed the mean absolute percentage error of the predicted time series for each scenario based on the observations (script [5\_1\_attribution\_metrics.R](https://github.com/UP-macroecology/Schifferle_BBS_occupancy_models_2023/blob/master/scripts/5_1_attribution_metrics.R)).
+To assess the importance of climate and land use change for the observed occupancy dynamics, we compared the predicted time series of the number of occupied routes across the conterminous USA under factual and counterfactual scenarios without climate and / or land use change. We quantified the trend in occupancy dynamics for each scenario by fitting a linear model and extracting the slope, p-value and confidence interval of the slope. We further computed the mean absolute percentage error of the predicted time series for each scenario based on the observations (script [5\_1\_attribution\_metrics.R](scripts/5_1_attribution_metrics.R)).
 
 
 
-Based on the trends in occupancy dynamics under factual and counterfactual scenarios, we categorized each species as either absolute or relative loser of either climate change, land use change or climate and land use change combined, or as stable, if confidence intervals of slopes overlap. We visualized patterns across species with alluvial plots (script [5\_2\_attribution\_plots\_trend\_categories.R](https://github.com/UP-macroecology/Schifferle_BBS_occupancy_models_2023/blob/master/scripts/5_2_attribution_plots_trend_categories.R)).
+Based on the trends in occupancy dynamics under factual and counterfactual scenarios, we categorized each species as either absolute or relative loser of either climate change, land use change or climate and land use change combined, or as stable, if confidence intervals of slopes overlap. We visualized patterns across species with alluvial plots (script [5\_2\_attribution\_plots\_trend\_categories.R](scripts/5_2_attribution_plots_trend_categories.R)).
 
 
 
-We defined the relative importance of climate and land use change for the observed occupancy dynamics as the difference in mean absolute percentage error between counterfactual and factual simulations and visualized patterns across species (script [5\_3\_attribution\_plots\_relative\_importance.R](https://github.com/UP-macroecology/Schifferle_BBS_occupancy_models_2023/blob/master/scripts/5_3_attribution_plots_relative_importance.R)).
+We defined the relative importance of climate and land use change for the observed occupancy dynamics as the difference in mean absolute percentage error between counterfactual and factual simulations and visualized patterns across species (script [5\_3\_attribution\_plots\_relative\_importance.R](scripts/5_3_attribution_plots_relative_importance.R)).
 
 
 
-To assess spatial patterns, we mapped the community mean relative importance of climate change and land use change and the distributions of species classified as relative or absolute winners or losers of climate or land use change at the species range level (script [5\_4\_attribution\_map.R](https://github.com/UP-macroecology/Schifferle_BBS_occupancy_models_2023/blob/master/scripts/5_4_attribution_map.R)). Species ranges were extracted from BirdLife (BirdLife International and Handbook of the Birds of the World, 2022).
+To assess spatial patterns, we mapped the community mean relative importance of climate change and land use change and the distributions of species classified as relative or absolute winners or losers of climate or land use change at the species range level (script [5\_4b\_attribution\_maps.R](scripts/5_4b_attribution_maps.R)). Species ranges were extracted from BirdLife (BirdLife International and Handbook of the Birds of the World, 2022; (script [5_4a_attribution_maps_extract_species_ranges.R](scripts/5_4a_attribution_maps_extract_species_ranges.R).
 
 
 
+## Reproducing the analysis
+
+### Software requirements
+
+| Tool | Version | Notes |
+|---|---|---|
+| R | 4.3.1 and  4.5.1  | See [results/sessionInfo](results/sessionInfo) for full session info |
+| CmdStan | ≥ 2.34 | Installed via `cmdstanr::install_cmdstan()` |
+| ATTRICI | 2.0.2.dev19+ge5a89c563 | https://github.com/ISI-MIP/attrici/tree/fix-oscillations (Python; SLURM) |
+| Climate Data Operators (CDO) | 2.5.1 | https://mpimet.mpg.de/cdo |
+| GDAL | ≥ 3.6 | System dependency for `terra`, `sf` |
+
+R packages: see [results/sessionInfo](results/sessionInfo).
+
+### External data
+
+All raw datasets must be downloaded separately — the repository does not redistribute any third-party data. Small-sized files of intermediate data processing steps and results can be found in the [data](data) and [results](results) folders.
+
+| Dataset | Source | Files needed | Approx. size | Access | Download to |
+|---|---|---|---|---|
+| BBS counts | https://www.sciencebase.gov/catalog/item/66d9ed16d34eef5af66d534b | 1966–2023; States.zip, Routes.csv, VehicleData.csv, Weather.csv, SpeciesList.csv  | 181 MB | Free, terms acceptance |
+| BBS routes (shapefile) | https://purl.stanford.edu/vy474dv5024 | Route lines, lower 48 states | 14 MB | Free |
+| Bird Conservation Regions | https://www.birdscanada.org/bird-science/nabci-bird-conservation-regions | BCR polygons | 30 MB | Free |
+| Climate (GSWP3-W5E5) | https://data.isimip.org/search/tree/ISIMIP3a/InputData/climate/atmosphere/gswp3-w5e5/obsclim/ | tas, tasmin, tasmax, pr (1991 - 2019), daily, bounding box South: 24 North: 50 West: -126 East: -66; tas (1991 - 2019), daily, global | 6 GB | Free, terms acceptance |
+| Land use (ISIMIP3a) | https://data.isimip.org/search/tree/ISIMIP3a/InputData/socioeconomic/landuse/histsoc/ | landuse-5crops_histsoc_annual_1901_2021.nc, landuse-forests-and-natural-vegetation_histsoc_annual_1901_2021.nc, landuse-pastures_histsoc_annual_1901_2021.nc, landuse-urbanareas_histsoc_annual_1901_2021.nc| 300 MB | Free, terms acceptance |
+| Bird ranges (BirdLife) | http://datazone.birdlife.org/species/requestdis | BOTW.gdb for the 80 modelled species | 190 MB | Formal application |
 
 
-## Operating system info
+### Setting up ATTRICI
+
+ATTRICI is an external command-line tool used in step 1.2 to generate counterfactual climate. Install it from its repository before running scripts `1_2b`–`1_2d`:
+
+```bash
+git clone https://github.com/ISI-MIP/attrici.git
+cd attrici && git checkout fix-oscillations
+# create a virtual Python environment:
+python3 -m venv env
+# activate it:
+source env/bin/activate
+# install ATTRICI:
+pip install -e .[dev]
+# check installation:
+attrici --version
+```
+The SLURM submission scripts 1_2c_attrici_US_*.sh are written for our HPC environment and contain hard-coded paths — adapt them to your cluster before submission.
 
 
+### Execution order
 
-* Platform: x86\_64-w64-mingw32/x64 (64-bit)
-* Running under: Windows 11 x64 (build 26100)
-* R version 4.3.1 (2023-06-16 ucrt)
+Run scripts in the numerical order shown in the workflow diagram. Three branch points:
 
-  * Attached packages: ade4\_1.7-22, bayesplot\_1.11.1, bayestestR\_0.15.3, bbsAssistant\_2.0.0, blockCV\_3.1-4, brms\_2.21.0, cmdstanr\_0.7.1, collapse\_2.0.6, CoordinateCleaner\_3.0.1, cowplot\_1.2.0, doParallel\_1.0.17, dplyr\_1.1.2, factoextra\_1.0.7, flocker\_1.0-0, foreach\_1.5.2, gdalUtilities\_1.2.5, ggalluvial\_0.12.5, ggnewscale\_0.5.2, ggplot2\_3.5.2, ggrepel\_0.9.3, gridExtra\_2.3, iterators\_1.0.14, ncdf4\_1.22, Rcpp\_1.0.11, rmapshaper\_0.5.0, rphylopic\_1.6.0, sf\_1.0-14, terra\_1.7-39, tidyr\_1.3.0, tidyterra\_0.6.0
-* ATTRICI version 1.1.1
-
+1. After `1_2a`, prepare both factual and counterfactual environmental data: run `1_3_dataprep_match_BBS_routes_env_data.R` with `data <- "factual"`, then run the ATTRICI chain (`1_2b` → `1_2c` shell jobs → `1_2d`), then rerun `1_3` with `data <- "counterfactual"`.
+2. After each fit step (`2_1`, `2_2`, `2_4b`), run the corresponding check script (`2_3a`/`2_3b` for full and tempval, `2_4c` for CV). For species flagged with MCMC issues, rerun the fit with `round <- 2`. Discard species that still fail.
+3. Fitting the DOMs across all subsets is successful for 159 of the 192 selected species; 80 of these pass the spatial + temporal predictive performance filter and enter the attribution step.
 
 
+### Computation notes
+
+Steps `2_1`, `2_2`, `2_4b` (model fitting), `4_0` (scenario simulations), and `1_2c` (ATTRICI detrending) are computationally heavy and were run on HPC. Local execution is feasible only for the data preparation, evaluation, and plotting steps.
 
 
 ## References
-
-
 
 * BirdLife International and Handbook of the Birds of the World. (2022). Bird species distribution maps of the world. Version 2022.2 \[Dataset]. http://datazone.birdlife.org/species/requestdis.
 * Bird Studies Canada and NABCI. (2014). Bird Conservation Regions \[Dataset]. Bird Studies Canada on behalf of the North American Bird Conservation Initiative. https://www.birdscanada.org/bird-science/nabci-bird-conservation-regions.

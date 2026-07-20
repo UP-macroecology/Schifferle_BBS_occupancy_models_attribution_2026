@@ -221,7 +221,7 @@ clim_imp_map <- ggplot() +
         plot.margin = unit(c(2, 0, 0, 0), "cm")) # trbl # top margin to later have label when arranging multiple plots)
 clim_imp_map
 
-# ggsave(filename = file.path(plot_dir, "mean_climate_change_importance.svg"), 
+# ggsave(filename = file.path(plot_dir, "mean_climate_change_importance.svg"),
 #        plot = clim_imp_map,
 #        device = "svg",
 #        width = 29.7,
@@ -254,7 +254,7 @@ lu_imp_map <- ggplot() +
         plot.margin = unit(c(2, 0, 0, 0), "cm"))
 lu_imp_map
 
-# ggsave(filename = file.path(plot_dir, "mean_lu_change_importance.svg"), 
+# ggsave(filename = file.path(plot_dir, "mean_lu_change_importance.svg"),
 #        plot = lu_imp_map,
 #        device = "svg",
 #        width = 29.7,

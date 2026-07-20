@@ -131,7 +131,7 @@ spec_attr <- intersect(spec_temp_okay, spec_spat_okay) # 80
 # load model for species and predict: ------------------------------------------
 
 # register cores for parallel computation:
-ncores <- 17
+ncores <- 20
 cl <- makeCluster(ncores, setup_timeout = 0.5)
 registerDoParallel(cl)
 
@@ -192,6 +192,14 @@ foreach(spec = spec_attr,
           for(v in scenarios){
             
             print(v)
+            
+            # check whether scenario has run already:
+            sim_run <- file.exists(file.path(preds_dir,  paste0(spec, "_y_preds_cf_", v, ".RData")))
+
+            if(sim_run) {
+              print(paste(spec, "ran already."))
+              next
+            }
             
             # gather environmental data:
             
@@ -284,6 +292,8 @@ foreach(spec = spec_attr,
             save(y_preds_route_cf, file = file.path(preds_dir,  paste0(spec, "_y_preds_cf_", v, ".RData")))
             
           }
+          
+          rm(fd_new, y_predictions, y_preds_route_cf)
           
           sink(type="message")
           sink(type="output")

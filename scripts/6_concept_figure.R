@@ -135,14 +135,6 @@ ggsave(filename = file.path(dir, "plots", "concept_apply_model.svg"),
        height = 7.75, # A4 # 6
        units = "cm")
 
-# ggsave(filename = file.path(dir, "plots", "concept_apply_model.png"), 
-#        plot = plot,
-#        device = "png",
-#        width = 10,
-#        height = 20, 
-#        units = "cm",
-#        dpi = 300)
-
 
 # absolute and relative winner and loser categories: ---------------------------
 

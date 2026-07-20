@@ -102,89 +102,89 @@ foreach(s = 1:length(spec_attr),
   spec <- spec_attr[s]
   print(paste(s, spec))
   
-  # observations: -----------------------------
-  
-  print("observations")
-  
-  rel_routes <- training_routes(species = spec, buffer_km = 750, output = "RTENOs")
-  occ_dt_spec <- BBS_pres_abs_spec(species = spec) %>%
-    filter(RTENO %in% rel_routes)
-  
-  # sum presences across all routes within buffer for each year:
-  ts_obs <- occ_dt_spec %>%
-    rename("year" = Year) %>% 
-    group_by(year) %>%
-    summarise(Npres = sum(presence, na.rm = TRUE))
-  
-  save(ts_obs, file = file.path(obs_dir, paste0(spec, "_obs_ts_sum_occ_routes.RData")))
-  
-  
-  # predictions for factual environmental data: ---------
-  
-  print("factual predictions")
-  
-  # check where to look for model output (did MCMC fitting work with less or only with more iterations?)
-  if(file.exists(file.path(res_dir, "refit_2000_2000", paste0("out_", spec, "_fm_buffer_750.RData")))){ # output of 2_1_fit_DOMs_full_model.R
-    output_dir <- file.path(res_dir, "refit_2000_2000")
-  } else {
-    output_dir <- res_dir
-  }
-  
-  # aggregate predicted y for route sections at route level:
-  
-  # load(file.path(output_dir, paste0("postproc_", spec, "_fm_buffer750.RData")))
-  # preds_routes <- apply(res_list$y_preds, MAR = c(1,3,4), FUN = max)
-  # save(preds_routes, file = file.path(res_dir, "y_preds_route_level_section_sum", paste0(spec, "_y_preds_route_level_section_sum.RData")))
-  load(file.path(res_dir, "y_preds_route_level_section_sum", paste0(spec, "_y_preds_route_level_section_sum.RData"))) 
-  preds_routes # sites, years, draws
-  
-  # aggregate across the conterminous USA:
-  # sum across routes for each year:
-  preds_years <- apply(preds_routes, MAR = c(2,3), FUN = sum, na.rm = TRUE) 
-  
-  # median:
-  ts_median <- apply(preds_years, MAR = 1, FUN = median)
-  
-  # 100 draws of posterior distribution for each year:
-  n_draws <- 100
-  draws <- t(apply(preds_years, MAR = 1, FUN = function(x) sample(x = x, size = n_draws, replace = FALSE))) 
-  colnames(draws) <- paste0("draw", 1:n_draws)
-  draws <- draws %>% 
-    as_tibble() %>% 
-    mutate(year = 1995:2019) %>% 
-    select(year, everything())
-  
-  # 90% credible interval
-  ts_ci90 <- apply(preds_years, MAR = 1, FUN = bayestestR::ci, ci = 0.9, method = "ETI")
-  ts_ci90_low <- unlist(lapply(ts_ci90, FUN = function(x) x$CI_low))
-  ts_ci90_high <- unlist(lapply(ts_ci90, FUN = function(x) x$CI_high))
-  # 80% credible interval
-  ts_ci80 <- apply(preds_years, MAR = 1, FUN = bayestestR::ci, ci = 0.8, method = "ETI")
-  ts_ci80_low <- unlist(lapply(ts_ci80, FUN = function(x) x$CI_low))
-  ts_ci80_high <- unlist(lapply(ts_ci80, FUN = function(x) x$CI_high))
-  
-  # assemble df:
-  ts_preds_fact <- tibble(year = 1995:2019, 
-                          median_Nocc = ts_median, 
-                          CI90low = ts_ci90_low, 
-                          CI90high = ts_ci90_high,
-                          CI80low = ts_ci80_low, 
-                          CI80high = ts_ci80_high) %>% 
-    left_join(draws)
-  
-  # # plot:
-  # ggplot(ts_preds_fact) +
-  #   geom_line(aes(x = year, y = median_Nocc)) +
-  #   geom_ribbon(aes(x = year, ymax = CI90high, ymin = CI90low),
-  #               alpha = 0.2, fill = "cornflowerblue") +
-  #   geom_point(data = ts_preds_fact %>% tidyr::pivot_longer(starts_with("draw"), names_to = "draw", values_to = "value"),
-  #              aes(x = year, y = value)) +
-  #   ggtitle(spec) +
-  #   ylab("N routes") +
-  #   theme_bw()
-  
-  save(ts_preds_fact, file = file.path(fact_dir, paste0(spec, "_ts_sum_occ_routes_f_preds.RData")))
-  
+  # # observations: -----------------------------
+  # 
+  # print("observations")
+  # 
+  # rel_routes <- training_routes(species = spec, buffer_km = 750, output = "RTENOs")
+  # occ_dt_spec <- BBS_pres_abs_spec(species = spec) %>%
+  #   filter(RTENO %in% rel_routes)
+  # 
+  # # sum presences across all routes within buffer for each year:
+  # ts_obs <- occ_dt_spec %>%
+  #   rename("year" = Year) %>%
+  #   group_by(year) %>%
+  #   summarise(Npres = sum(presence, na.rm = TRUE))
+  # 
+  # save(ts_obs, file = file.path(obs_dir, paste0(spec, "_obs_ts_sum_occ_routes.RData")))
+  # 
+  # 
+  # # predictions for factual environmental data: ---------
+  # 
+  # print("factual predictions")
+  # 
+  # # check where to look for model output (did MCMC fitting work with less or only with more iterations?)
+  # if(file.exists(file.path(res_dir, "refit_2000_2000", paste0("out_", spec, "_fm_buffer_750.RData")))){ # output of 2_1_fit_DOMs_full_model.R
+  #   output_dir <- file.path(res_dir, "refit_2000_2000")
+  # } else {
+  #   output_dir <- res_dir
+  # }
+  # 
+  # # aggregate predicted y for route sections at route level:
+  # 
+  # # load(file.path(output_dir, paste0("postproc_", spec, "_fm_buffer750.RData")))
+  # # preds_routes <- apply(res_list$y_preds, MAR = c(1,3,4), FUN = max)
+  # # save(preds_routes, file = file.path(res_dir, "y_preds_route_level_section_sum", paste0(spec, "_y_preds_route_level_section_sum.RData")))
+  # load(file.path(res_dir, "y_preds_route_level_section_sum", paste0(spec, "_y_preds_route_level_section_sum.RData")))
+  # preds_routes # sites, years, draws
+  # 
+  # # aggregate across the conterminous USA:
+  # # sum across routes for each year:
+  # preds_years <- apply(preds_routes, MAR = c(2,3), FUN = sum, na.rm = TRUE)
+  # 
+  # # median:
+  # ts_median <- apply(preds_years, MAR = 1, FUN = median)
+  # 
+  # # 100 draws of posterior distribution for each year:
+  # n_draws <- 100
+  # draws <- t(apply(preds_years, MAR = 1, FUN = function(x) sample(x = x, size = n_draws, replace = FALSE)))
+  # colnames(draws) <- paste0("draw", 1:n_draws)
+  # draws <- draws %>%
+  #   as_tibble() %>%
+  #   mutate(year = 1995:2019) %>%
+  #   select(year, everything())
+  # 
+  # # 90% credible interval
+  # ts_ci90 <- apply(preds_years, MAR = 1, FUN = bayestestR::ci, ci = 0.9, method = "ETI")
+  # ts_ci90_low <- unlist(lapply(ts_ci90, FUN = function(x) x$CI_low))
+  # ts_ci90_high <- unlist(lapply(ts_ci90, FUN = function(x) x$CI_high))
+  # # 80% credible interval
+  # ts_ci80 <- apply(preds_years, MAR = 1, FUN = bayestestR::ci, ci = 0.8, method = "ETI")
+  # ts_ci80_low <- unlist(lapply(ts_ci80, FUN = function(x) x$CI_low))
+  # ts_ci80_high <- unlist(lapply(ts_ci80, FUN = function(x) x$CI_high))
+  # 
+  # # assemble df:
+  # ts_preds_fact <- tibble(year = 1995:2019,
+  #                         median_Nocc = ts_median,
+  #                         CI90low = ts_ci90_low,
+  #                         CI90high = ts_ci90_high,
+  #                         CI80low = ts_ci80_low,
+  #                         CI80high = ts_ci80_high) %>%
+  #   left_join(draws)
+  # 
+  # # # plot:
+  # # ggplot(ts_preds_fact) +
+  # #   geom_line(aes(x = year, y = median_Nocc)) +
+  # #   geom_ribbon(aes(x = year, ymax = CI90high, ymin = CI90low),
+  # #               alpha = 0.2, fill = "cornflowerblue") +
+  # #   geom_point(data = ts_preds_fact %>% tidyr::pivot_longer(starts_with("draw"), names_to = "draw", values_to = "value"),
+  # #              aes(x = year, y = value)) +
+  # #   ggtitle(spec) +
+  # #   ylab("N routes") +
+  # #   theme_bw()
+  # 
+  # save(ts_preds_fact, file = file.path(fact_dir, paste0(spec, "_ts_sum_occ_routes_f_preds.RData")))
+
   
   # predictions for counterfactual environmental data: ---------
   
@@ -257,8 +257,8 @@ foreach(s = 1:length(spec_attr),
   }
 
 
-# # plot time series: ------------------------------------------------------------
-# 
+# plot time series: ------------------------------------------------------------
+
 # start <- 1995
 # end <- 2019
 # 

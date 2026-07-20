@@ -615,7 +615,7 @@ climlu_plot <- plot_df_climlu %>%
         legend.key.spacing.y = unit(0.2, "cm"), 
         legend.title=element_blank())
 
-# ggsave(filename = file.path(dir, "plots", "attribution", "alluvial_climlu_manuscript.svg"), 
+# ggsave(filename = file.path(dir, "plots", "attribution", "alluvial_climlu_manuscript.svg"),
 #        plot = climlu_plot,
 #        device = "svg",
 #        width = 21,

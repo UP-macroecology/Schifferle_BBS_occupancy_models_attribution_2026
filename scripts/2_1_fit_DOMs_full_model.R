@@ -17,8 +17,8 @@
 #           MCMC fitting was checked with 2_3a_fit_DOMs_check_fit.R, for subset of species 
 #           with model fitting issues with 2000 iterations (set round <- 2)
 
-# round <- 1
-round <- 2
+round <- 1
+#round <- 2
 
 source(file.path("scripts", "0_paths.R"))
 
@@ -124,7 +124,7 @@ env_sds <- route_sel_env_dt_final %>%
   summarise(across(!c(RTENO, Year, Surveyed), sd))
 
 env_scale_pars <- list("center" = env_means, "scale" =  env_sds)
-save(env_scale_pars, file = file.path(hpc_dir, "data", "route_env_dt_scale_pars.RData"))
+#save(env_scale_pars, file = file.path(hpc_dir, "data", "route_env_dt_scale_pars.RData"))
 
 route_sel_env_dt_scaled <- route_sel_env_dt_final %>% 
   select(-c(Latitude, Longitude, BCR, ObsN, doy)) %>% 

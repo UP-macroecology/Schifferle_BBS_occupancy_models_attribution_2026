@@ -41,17 +41,21 @@ if(!dir.exists(sessioninfo_dir)){dir.create(sessioninfo_dir, recursive = TRUE)}
 # directories downloaded data: --------------------------------------------
 
 # directory BBS download:
-datashare_BBS <- file.path("//NAS-2-P-SN-01.ibb.uni-potsdam.de/", "daten$", "AG26", "Arbeit", "datashare", "data", "biodat", "distribution", "BBS")
+datashare_BBS <- file.path("//NAS-2-P-SN-01.ibb.uni-potsdam.de/", "daten$", "AG26", "Arbeit", "datashare", "data", "biodat", "distribution", "BBS", "NABBS_2023")
+
+# BBS routes download:
+bbs_routes_file <- file.path(datashare_BBS, "bbs_routes", "bbsrtsl020.shp")
 
 # BirdLife range maps:
-datashare_Birdlife <- file.path("/mnt", "ibb_share", "zurell", "biodat", "distribution", "Birdlife", "BOTW_2022")
+datashare_Birdlife <- file.path("/mnt", "ibb_share", "zurell", "biodat", "distribution", "Birdlife", "BOTW_2022", "BOTW.gdb")
 
 # Bird Conservation Region:
 bcr_dir <- file.path(dir, "data", "BCR_Terrestrial")
 
 # climate and land use data:
 
-# data stored as "pr.zip", "tasmin.zip", "tasmax.zip" here:
+# save data here as:
+# gswp3-w5e5_obsclim_<var>_lat24.0to50.0lon-126.0to-66.0_daily_<year1>_<year2>.nc
 clim_path <- file.path(dir, "data", "Env_data", "ISIMIP_GSWP3_W5E5")
 if(!dir.exists(clim_path)){dir.create(clim_path, recursive = TRUE)}
 

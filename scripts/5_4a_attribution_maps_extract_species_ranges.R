@@ -72,7 +72,7 @@ foreach(s = 1:nrow(spec_names),
           }
           
           # extract shapefile:
-          gdalUtilities::ogr2ogr(src_datasource_name = file.path(datashare_Birdlife, "BOTW.gdb"),
+          gdalUtilities::ogr2ogr(src_datasource_name = file.path(datashare_Birdlife),
                                  layer = "All_Species",
                                  where = paste0("sci_name = '", spec, "' AND (SEASONAL = '1' OR SEASONAL = '2') AND PRESENCE = '1'"), # SEASONAL = 1: resident throughout the year, SEASONAL = 2: breeding season
                                  dst_datasource_name = file.path(output_dir, paste0(spec_names$English_Common_Name[s], ".shp")),

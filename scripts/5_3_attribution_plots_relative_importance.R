@@ -3,7 +3,7 @@
 # Inputs:   results/species_DOM_val_okay.RData
 #           results/attribution/attribution_metrics_final.RData
 #           results/attribution/trend_categories.RData
-#           data/BBS_data_merged.RData"
+#           data/BBS_data_merged.RData
 # Outputs:  plots/attribution/boxplot_rel_importance_manuscript.svg (Fig. 3)
 #           plots/attribution/lollipop_rel_importance_manuscript.svg (Fig. 4)
 # Runs on:  Local
@@ -142,6 +142,7 @@ boxplot_rel_imp <- boxplot_overall_df %>%
 #        width = 16,
 #        height = 16,
 #        units = "cm")
+
 
 # lollipop plot: relative importance of different drivers: ---------------------
 
@@ -302,7 +303,7 @@ lollipop2 <- lollipop +
         plot.tag = element_text(hjust = 0, size = 16))
 
 # requires manual adjustments of legend item:
-# ggsave(filename = file.path(dir, "plots", "attribution", "lollipop_rel_importance_manuscript.svg"), 
+# ggsave(filename = file.path(dir, "plots", "attribution", "lollipop_rel_importance_manuscript.svg"),
 #        plot = lollipop2,
 #        device = "svg",
 #        width = 25,

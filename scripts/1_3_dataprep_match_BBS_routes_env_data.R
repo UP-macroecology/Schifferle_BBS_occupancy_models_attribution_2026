@@ -42,8 +42,8 @@ library(patchwork)
 
 # choose which environmental data set to process:
 
-data <- "factual"
-#data <- "counterfactual"
+#data <- "factual"
+data <- "counterfactual"
 
 # load data: -------------------------------------------------------------------
 
@@ -338,7 +338,7 @@ max_lu_change <- max(global(lu_change, "max", na.rm = TRUE))
 
 plot_list <- vector(mode = "list", length = length(selvar_final))
 
-names_long <- c("annual temperature", "diurnal temperature range", "isothermality", "annual temperature range",
+names_long <- c("annual mean temperature", "diurnal temperature range", "isothermality", "annual temperature range",
                 "precipitation driest month", "precipitation seasonality",
                 "precipitation spring", "precipitation summer", "precipitation autumn", "precipitation winter",
                 "urban", "managed pastures", "primary non-forests", "secondary non-forests",

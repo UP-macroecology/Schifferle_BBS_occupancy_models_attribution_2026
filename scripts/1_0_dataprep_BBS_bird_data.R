@@ -140,7 +140,7 @@ import_bbs_data_states_2023 <- function(bbs_dir) {
 # BBS data prep: ---------------------------------------------------------------
 
 # import BBS counts (aggregated to 5 sections - States.zip):
-bbs_agg <- import_bbs_data_states_2023(bbs_dir = file.path(datashare_BBS, "NABBS_2023"))
+bbs_agg <- import_bbs_data_states_2023(bbs_dir = file.path(datashare_BBS))
 
 # save species list (later used to merge species ids to species names):
 bbs_agg$species_list$English_Common_Name[which(bbs_agg$species_list$Scientific_Name == "Zosterops simplex")] <- "Swinhoe's White-eye" # typo / non-UTF-8 character in SpeciesList.txt
@@ -238,7 +238,7 @@ save(route_dt, file = file.path(dir, "data", "BBS_for_occ.RData"))
 
 # BBS routes - spatial data: ---------------------------------------------------
 
-routes_sf <- read_sf(file.path(datashare_BBS, "bbs_routes", "bbsrtsl020.shp")) %>% # downloaded from https://purl.stanford.edu/vy474dv5024
+routes_sf <- read_sf(bbs_routes_file) %>% # downloaded from https://purl.stanford.edu/vy474dv5024
   st_transform(crs = "ESRI:102003") %>% # Albers Equal Area projection
   mutate(RTENO_BBS = as.integer(paste0("840", stringr::str_pad(RTENO, width = 5, side = "left", pad = "0")))) # reformat RTENO to match RTENO from BBS data imported with the bbsAssistant package
 

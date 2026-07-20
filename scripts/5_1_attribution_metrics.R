@@ -200,7 +200,7 @@ for(s in 1:nrow(attr_metr_df)){
                                                 predicted = ts_preds_cfact$cf_clim_1995soc$median_Nocc)
 }
 
-#save(attr_metr_df, file = file.path(dir, "results", "attribution", "attribution_metrics_final.RData"))
+save(attr_metr_df, file = file.path(dir, "results", "attribution", "attribution_metrics_final.RData"))
 
 
 

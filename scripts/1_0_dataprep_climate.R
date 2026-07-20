@@ -71,13 +71,6 @@ foreach(var = c("tasmin", "tasmax", "pr"),
           
           print(var)
   
-          # list files:
-          zipfiles <- utils::unzip(file.path(clim_path, paste0(var, ".zip")), list = TRUE)
-          nc_files <- grep(x = zipfiles$Name, pattern = ".nc", value = TRUE) # every nc file contains daily values of 10 years
-          
-          # unzip files:
-          #utils::unzip(file.path(clim_path, paste0(var, ".zip")), exdir = clim_path) # unzip the top directory
-
           # iterate over files:
 
           nc_files <- list.files(clim_path, pattern = paste0(var, ".*.nc")) # every nc file contains daily values of 10 years
