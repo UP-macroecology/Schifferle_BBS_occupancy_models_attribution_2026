@@ -23,11 +23,11 @@ This study was supported by the German Research Foundation DFG (grant no. ZU 361
 
 
 
-[!\[License: GPL-3.0](https://img.shields.io/badge/License-GPL%203.0-blue.svg)](LICENSE)
+[![License: GPL-3.0](https://img.shields.io/badge/License-GPL%203.0-blue.svg)](LICENSE)
 
 
 
-[!\[DOI](https://zenodo.org/badge/DOI/PLACEHOLDER.svg)](https://doi.org/PLACEHOLDER)
+[![DOI](https://zenodo.org/badge/DOI/PLACEHOLDER.svg)](https://doi.org/PLACEHOLDER)
 
 
 
@@ -286,10 +286,11 @@ To assess spatial patterns, we mapped the community mean relative importance of 
 | Tool | Version | Notes |
 |---|---|---|
 | R | 4.3.1 and  4.5.1  | See [results/sessionInfo](results/sessionInfo) for full session info |
+| GDAL | ≥ 3.6 | System dependency for `terra`, `sf` |
 | CmdStan | ≥ 2.34 | Installed via `cmdstanr::install_cmdstan()` |
 | ATTRICI | 2.0.2.dev19+ge5a89c563 | https://github.com/ISI-MIP/attrici/tree/fix-oscillations (Python; SLURM) |
 | Climate Data Operators (CDO) | 2.5.1 | https://mpimet.mpg.de/cdo |
-| GDAL | ≥ 3.6 | System dependency for `terra`, `sf` |
+
 
 R packages: see [results/sessionInfo](results/sessionInfo).
 
@@ -297,7 +298,7 @@ R packages: see [results/sessionInfo](results/sessionInfo).
 
 All raw datasets must be downloaded separately — the repository does not redistribute any third-party data. Small-sized files of intermediate data processing steps and results can be found in the [data](data) and [results](results) folders.
 
-| Dataset | Source | Files needed | Approx. size | Access | Download to |
+| Dataset | Source | Files needed | Approx. size | Access | 
 |---|---|---|---|---|
 | BBS counts | https://www.sciencebase.gov/catalog/item/66d9ed16d34eef5af66d534b | 1966–2023; States.zip, Routes.csv, VehicleData.csv, Weather.csv, SpeciesList.csv  | 181 MB | Free, terms acceptance |
 | BBS routes (shapefile) | https://purl.stanford.edu/vy474dv5024 | Route lines, lower 48 states | 14 MB | Free |
