@@ -21,10 +21,10 @@ This study was supported by the German Research Foundation DFG (grant no. ZU 361
 
 **Corresponding author:** Katrin Schifferle: schifferle1@uni-potsdam.de
 
+Scripts were written by Katrin Schifferle.
 
 
 [![License: GPL-3.0](https://img.shields.io/badge/License-GPL%203.0-blue.svg)](LICENSE)
-
 
 
 [![DOI](https://zenodo.org/badge/DOI/PLACEHOLDER.svg)](https://doi.org/PLACEHOLDER)
@@ -294,6 +294,7 @@ To assess spatial patterns, we mapped the community mean relative importance of 
 
 R packages: see [results/sessionInfo](results/sessionInfo).
 
+
 ### External data
 
 All raw datasets must be downloaded separately — the repository does not redistribute any third-party data. Small-sized files of intermediate data processing steps and results can be found in the [data](data) and [results](results) folders.
@@ -307,6 +308,56 @@ All raw datasets must be downloaded separately — the repository does not redis
 | Land use (ISIMIP3a) | https://data.isimip.org/search/tree/ISIMIP3a/InputData/socioeconomic/landuse/histsoc/ | landuse-5crops_histsoc_annual_1901_2021.nc, landuse-forests-and-natural-vegetation_histsoc_annual_1901_2021.nc, landuse-pastures_histsoc_annual_1901_2021.nc, landuse-urbanareas_histsoc_annual_1901_2021.nc| 300 MB | Free, terms acceptance |
 | Bird ranges (BirdLife) | http://datazone.birdlife.org/species/requestdis | BOTW.gdb for the 80 modelled species | 190 MB | Formal application |
 
+
+### Folder structure
+
+This is the folder structure underlying the analyses. Further subdirectories are created when running the scripts.
+
+```
+├── data
+	├── BCR_Terrestrial				            # shapefiles of Bird Conservation Regions
+	├── Birdlife_range_maps			            # shapefiles of species ranges, extracted from BirdLife geodatabase
+	├── Counterfactual_env_data			        # counterfactual climate data generated with ATTRICI
+		├── ISIMIP_GSWP3_W5E5
+			├── attrici_detrending
+                ├── input_files	                # input files for running ATTRICI detrending
+				├── output		                # ATTRICI output: detrended climate data
+	├── CV_route_block_allocation			    # routes to blocks allocation for cross validation
+		├── block_size_500km
+	├── Env_data					            # factual climate and land use data
+		├── ISIMIP_GSWP3_W5E5			        # factual climate data 
+        ├── ISIMIP_land_use_and_irrigation	    # factual land use data
+	├── observed_time_series_1995_2019		    # time series of number of routes with BBS observations per species
+├── plots
+	├── attribution				                # plots for manuscript
+		├── maps				                # maps for manuscript
+		├── time_series			                # plotted time series of number of occupied routes per species based on observations and factual and counterfactual simulations
+	├── blockCV_folds				            # plots of route allocation to blocks for cross validation for each species
+		├── block_size_500km
+├── results
+	├── attribution
+		├── cfact_pred_time_series_1995_2019    # simulated time series of number of occupied routes under counterfactual scenarios
+		├── fm_y_preds_routes_cf_1995_all	    # simulated y for each species, route and year under counterfactual scenarios
+	├── CV_buffer750km				            # fitted DOMs and predictions for each species and cross validation fold
+		├── check_output			            # results of checking whether model fitting was successful
+		├── CV_eval				                # results of model evaluation in space based on cross validation
+		├── refit_2000_2000			            # refitted DOMs with more iterations and predictions for each species and cross validation fold
+			├── check_output		            # results of checking whether model re-fitting was successful
+	├── fm_buffer750km				            # fitted DOMs and predictions for each species
+		├── check_output			            # results of checking whether model fitting was successful
+		├── fact_pred_time_series_1995_2019	    # simulated time series of number of occupied routes under factual climate and land use
+		├── refit_2000_2000			            # refitted DOMs with more iterations and predictions for each species
+			├── check_output		            # results of checking whether model re-fitting was successful
+		├── y_preds_route_level_section_sum	    # simulated y for each species, route and year under factual climate and land use
+	├── temp_val_buffer_750_10yrs			    # fitted DOMs for each species based on first 15 years of data, predictions for all 25 years
+		├── check_output			            # results of checking whether model fitting was successful
+		├── refit_2000_2000			            # refitted DOMs with more iterations and predictions for each species based on first 15 years of data
+			├── check_output		            # results of checking whether model re-fitting was successful
+		├── temp_eval				            # results of model evaluation in time
+	├── sessionInfo  				            # R version and packages used by each script
+├── scripts
+  
+```
 
 ### Setting up ATTRICI
 
