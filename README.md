@@ -1,7 +1,7 @@
 # North American bird occupancy dynamics attributed to climate and land use change
 
 
-**Authors:** Katrin Schifferle<sup>1</sup>, Natalie J. Briscoe<sup>2</sup>, Guillermo Fandos<sup>3</sup>, Stefanie Heinicke<sup>4</sup>, Christopher P. O. Reyer<sup>4</sup>, Mark C. Urban<sup>5</sup>, Damaris Zurell<sup>1</sup>
+**Authors:** Katrin Schifferle<sup>1</sup>, Natalie J. Briscoe<sup>2</sup>, Guillermo Fandos<sup>3</sup>, Stefanie Heinicke<sup>4</sup>, Christopher P. O. Reyer<sup>4</sup>, Inga J. Sauer<sup>4</sup>, Mark C. Urban<sup>5</sup>, Damaris Zurell<sup>1</sup>
 
 
 
@@ -288,7 +288,7 @@ To assess spatial patterns, we mapped the community mean relative importance of 
 | R | 4.3.1 and  4.5.1  | See [results/sessionInfo](results/sessionInfo) for full session info |
 | GDAL | ≥ 3.6 | System dependency for `terra`, `sf` |
 | CmdStan | ≥ 2.34 | Installed via `cmdstanr::install_cmdstan()` |
-| ATTRICI | 2.0.2.dev19+ge5a89c563 | https://github.com/ISI-MIP/attrici/tree/fix-oscillations (Python; SLURM) |
+| ATTRICI | 2.0.2.dev22+g1880478a3 | https://github.com/ISI-MIP/attrici/tree/fix-oscillations (Python; SLURM) |
 | Climate Data Operators (CDO) | 2.5.1 | https://mpimet.mpg.de/cdo |
 
 
@@ -332,6 +332,7 @@ This is the folder structure underlying the analyses. Further subdirectories are
 	├── attribution				                # plots for manuscript
 		├── maps				                # maps for manuscript
 		├── time_series			                # plotted time series of number of occupied routes per species based on observations and factual and counterfactual simulations
+	├── attrici									# plots to check detrended climate data
 	├── blockCV_folds				            # plots of route allocation to blocks for cross validation for each species
 		├── block_size_500km
 ├── results
@@ -361,7 +362,7 @@ This is the folder structure underlying the analyses. Further subdirectories are
 
 ### Setting up ATTRICI
 
-ATTRICI is an external command-line tool used in step 1.2 to generate counterfactual climate. Install it from its repository before running scripts `1_2b`–`1_2d`:
+ATTRICI is an external command-line tool used in step 1.2 to generate counterfactual climate. Install it from its repository before running scripts `1_2c`–`1_2d`:
 
 ```bash
 git clone https://github.com/ISI-MIP/attrici.git
@@ -375,7 +376,7 @@ pip install -e .[dev]
 # check installation:
 attrici --version
 ```
-The SLURM submission scripts 1_2c_attrici_US_*.sh are written for our HPC environment and contain hard-coded paths — adapt them to your cluster before submission.
+The SLURM submission scripts 1_2c_attrici_input_preps.sh and 1_2d_attrici_US_*.sh are written for our HPC environment and contain hard-coded paths — adapt them to your cluster before submission.
 
 
 ### Execution order
