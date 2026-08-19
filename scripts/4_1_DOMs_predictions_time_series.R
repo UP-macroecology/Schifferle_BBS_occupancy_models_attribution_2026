@@ -206,11 +206,11 @@ foreach(s = 1:length(spec_attr),
     
     # aggregate predictions across the conterminous USA:
     # sum across routes for each year:
-    load(cf_files[v]) # y_preds_route_cf
-    preds_years <- apply(y_preds_route_cf, MAR = c(2,3), FUN = sum, na.rm = TRUE)
+    load(cf_files[v]) # y_preds_route_cf; dim: routes - years - draws
+    preds_years <- apply(y_preds_route_cf, MAR = c(2,3), FUN = sum, na.rm = TRUE) # dim: years - draws
     
     # median:
-    ts_median <- apply(preds_years, MAR = 1, FUN = median)
+    ts_median <- apply(preds_years, MAR = 1, FUN = median) # median number of routes per year with observation
     
     # 100 draws of posterior distribution for each year:
     n_draws <- 100
@@ -259,123 +259,123 @@ foreach(s = 1:length(spec_attr),
 
 # plot time series: ------------------------------------------------------------
 
-# start <- 1995
-# end <- 2019
-# 
-# for(s in 1:length(spec_attr)){
-# 
-#   spec <- spec_attr[s]
-# 
-#   print(paste(s, spec))
-# 
-#   # observations time series:
-#   load(file.path(dir, "data", "observed_time_series_1995_2019", paste0(spec, "_obs_ts_sum_occ_routes.RData")))
-#   ts_obs
-# 
-#   # factual predictions time series:
-#   load(file.path(dir, "results", "fm_buffer750km", "fact_pred_time_series_1995_2019",
-#                  paste0(spec, "_ts_sum_occ_routes_f_preds.RData")))
-#   ts_preds_f <- ts_preds_fact
-# 
-#   # counterfactual predictions time series:
-#   load(file.path(dir, "results", "attribution", "cfact_pred_time_series_1995_2019",
-#                  paste0(spec, "_ts_sum_occ_routes_cf_preds.RData")))
-#   ts_preds_cfact
-# 
-#   # assemble df:
-# 
-#   time_series_df <- tibble(spec = spec, year = start:end) %>%
-#     left_join(ts_obs, by = "year")
-# 
-#   # factual:
-#   time_series_df$fact <- ts_preds_f$median_Nocc
-#   time_series_df$fact_CIlow <- ts_preds_f$CI80low
-#   time_series_df$fact_CIhigh <- ts_preds_f$CI80high
-# 
-#   # counterfactual climate:
-#   time_series_df$cfclim <- ts_preds_cfact$cf_clim$median_Nocc
-#   time_series_df$cfclim_CIlow <- ts_preds_cfact$cf_clim$CI80low
-#   time_series_df$cfclim_CIhigh <- ts_preds_cfact$cf_clim$CI80high
-# 
-#   # counterfactual land use:
-#   time_series_df$cflu <- ts_preds_cfact$cf_1995soc$median_Nocc
-#   time_series_df$cflu_CIlow <- ts_preds_cfact$cf_1995soc$CI80low
-#   time_series_df$cflu_CIhigh <- ts_preds_cfact$cf_1995soc$CI80high
-# 
-#   # counterfactual climate + land use:
-#   time_series_df$cfclimlu <- ts_preds_cfact$cf_clim_1995soc$median_Nocc
-#   time_series_df$cfclimlu_CIlow <- ts_preds_cfact$cf_clim_1995soc$CI80low
-#   time_series_df$cfclimlu_CIhigh <- ts_preds_cfact$cf_clim_1995soc$CI80high
-# 
-#   # plot:
-#   # https://r-graph-gallery.com/web-line-chart-with-labels-at-end-of-line.html
-# 
-#   # line plot:
-# 
-#   # data:
-#   time_series_df_lf <- time_series_df %>%
-#     select(-matches("CI")) %>%
-#     tidyr::pivot_longer(cols = -c(spec, year), names_to = "scenario", values_to = "N_routes_median") %>%
-#     mutate(scenario = factor(scenario),
-#            name_lab = if_else(year == 2019, scenario, NA_character_),
-#            name_lab = case_match(name_lab,
-#                                  "Npres" ~ "observations",
-#                                  "fact" ~ "all factual",
-#                                  "cfclim" ~ "all climate counterfact.",
-#                                  "cflu" ~ "all land use counterfact.",
-#                                  "cfclimlu" ~ "all counterfact."))
-# 
-#   # colours:
-#   cols <- c("cfclim" = "#0D98BA",
-#             "cflu" = "#B7410E",
-#             "cfclimlu" = "#046865",
-#             "Npres" = "black",
-#             "fact" = "#85CB33")
-# 
-#   # linetype:
-#   line_type <- c("Npres" = 1,
-#                  "fact" = 1,
-#                  "cfclim" = 5,
-#                  "cflu" = 5,
-#                  "cfclimlu" = 5)
-#   # plot:
-#   p <- ggplot(data = time_series_df_lf,
-#               aes(x = year, y = N_routes_median, group = scenario)) +
-#     # geometric annotations that play the role of grid lines (to avoud grid lines on the right where labels are)
-#     geom_vline(xintercept = seq(1995, 2020, by = 5), color = "grey90", linewidth = .6) +
-#     geom_segment(data = tibble(y = seq(round(min(time_series_df_lf$N_routes_median), digits = -1),
-#                                        round(max(time_series_df_lf$N_routes_median), digits = -1), length = 5),
-#                                x1 = 1995, x2 = 2020),
-#                  aes(x = x1, xend = x2, y = y, yend = y), inherit.aes = FALSE, color = "grey90", linewidth = .6) +
-#     # data lines:
-#     geom_line(aes(colour = scenario, linetype = scenario), linewidth = 1) +
-#     geom_point(data = time_series_df_lf %>%  filter(scenario == "Npres"),
-#                aes(colour = scenario), size = 3) +
-#     ylab("N routes with presences") +
-#     theme_bw() +
-#     ggtitle(spec) +
-#     geom_text_repel(
-#       aes(color = scenario, label = name_lab),
-#       fontface = "bold",
-#       size = 6,
-#       direction = "y", xlim = c(2020, NA), hjust = 0,
-#       segment.size = .7, segment.alpha = .5, segment.linetype = 1,
-#       #box.padding = .4,
-#       segment.curvature = -0.1, segment.ncp = 3, segment.angle = 20,
-#       max.overlaps = 30
-#     ) +
-#     scale_x_continuous(expand = c(0, 0), limits = c(1995, 2027)) +
-#     scale_linetype_manual(values = line_type) +
-#     scale_colour_manual(values = cols) +
-#     theme(legend.position = "none", panel.grid = element_blank(),
-#           text = element_text(size = 20))
-#   p
-# 
-#   jpeg(file = file.path(plot_dir, paste0(spec, "_ts_y_preds_cf_1995_all_line.jpg")),
-#        width = 1000, height = 700, quality = 100)
-#   print(p)
-#   dev.off()
-# }
+start <- 1995
+end <- 2019
+
+for(s in 1:length(spec_attr)){
+
+  spec <- spec_attr[s]
+
+  print(paste(s, spec))
+
+  # observations time series:
+  load(file.path(dir, "data", "observed_time_series_1995_2019", paste0(spec, "_obs_ts_sum_occ_routes.RData")))
+  ts_obs
+
+  # factual predictions time series:
+  load(file.path(dir, "results", "fm_buffer750km", "fact_pred_time_series_1995_2019",
+                 paste0(spec, "_ts_sum_occ_routes_f_preds.RData")))
+  ts_preds_f <- ts_preds_fact
+
+  # counterfactual predictions time series:
+  load(file.path(dir, "results", "attribution", "cfact_pred_time_series_1995_2019",
+                 paste0(spec, "_ts_sum_occ_routes_cf_preds.RData")))
+  ts_preds_cfact
+
+  # assemble df:
+
+  time_series_df <- tibble(spec = spec, year = start:end) %>%
+    left_join(ts_obs, by = "year")
+
+  # factual:
+  time_series_df$fact <- ts_preds_f$median_Nocc
+  time_series_df$fact_CIlow <- ts_preds_f$CI80low
+  time_series_df$fact_CIhigh <- ts_preds_f$CI80high
+
+  # counterfactual climate:
+  time_series_df$cfclim <- ts_preds_cfact$cf_clim$median_Nocc
+  time_series_df$cfclim_CIlow <- ts_preds_cfact$cf_clim$CI80low
+  time_series_df$cfclim_CIhigh <- ts_preds_cfact$cf_clim$CI80high
+
+  # counterfactual land use:
+  time_series_df$cflu <- ts_preds_cfact$cf_1995soc$median_Nocc
+  time_series_df$cflu_CIlow <- ts_preds_cfact$cf_1995soc$CI80low
+  time_series_df$cflu_CIhigh <- ts_preds_cfact$cf_1995soc$CI80high
+
+  # counterfactual climate + land use:
+  time_series_df$cfclimlu <- ts_preds_cfact$cf_clim_1995soc$median_Nocc
+  time_series_df$cfclimlu_CIlow <- ts_preds_cfact$cf_clim_1995soc$CI80low
+  time_series_df$cfclimlu_CIhigh <- ts_preds_cfact$cf_clim_1995soc$CI80high
+
+  # plot:
+  # https://r-graph-gallery.com/web-line-chart-with-labels-at-end-of-line.html
+
+  # line plot:
+
+  # data:
+  time_series_df_lf <- time_series_df %>%
+    select(-matches("CI")) %>%
+    tidyr::pivot_longer(cols = -c(spec, year), names_to = "scenario", values_to = "N_routes_median") %>%
+    mutate(scenario = factor(scenario),
+           name_lab = if_else(year == 2019, scenario, NA_character_),
+           name_lab = case_match(name_lab,
+                                 "Npres" ~ "observations",
+                                 "fact" ~ "all factual",
+                                 "cfclim" ~ "all climate counterfact.",
+                                 "cflu" ~ "all land use counterfact.",
+                                 "cfclimlu" ~ "all counterfact."))
+
+  # colours:
+  cols <- c("cfclim" = "#0D98BA",
+            "cflu" = "#B7410E",
+            "cfclimlu" = "#046865",
+            "Npres" = "black",
+            "fact" = "#85CB33")
+
+  # linetype:
+  line_type <- c("Npres" = 1,
+                 "fact" = 1,
+                 "cfclim" = 5,
+                 "cflu" = 5,
+                 "cfclimlu" = 5)
+  # plot:
+  p <- ggplot(data = time_series_df_lf,
+              aes(x = year, y = N_routes_median, group = scenario)) +
+    # geometric annotations that play the role of grid lines (to avoud grid lines on the right where labels are)
+    geom_vline(xintercept = seq(1995, 2020, by = 5), color = "grey90", linewidth = .6) +
+    geom_segment(data = tibble(y = seq(round(min(time_series_df_lf$N_routes_median), digits = -1),
+                                       round(max(time_series_df_lf$N_routes_median), digits = -1), length = 5),
+                               x1 = 1995, x2 = 2020),
+                 aes(x = x1, xend = x2, y = y, yend = y), inherit.aes = FALSE, color = "grey90", linewidth = .6) +
+    # data lines:
+    geom_line(aes(colour = scenario, linetype = scenario), linewidth = 1) +
+    geom_point(data = time_series_df_lf %>%  filter(scenario == "Npres"),
+               aes(colour = scenario), size = 3) +
+    ylab("N routes with presences") +
+    theme_bw() +
+    ggtitle(spec) +
+    geom_text_repel(
+      aes(color = scenario, label = name_lab),
+      fontface = "bold",
+      size = 6,
+      direction = "y", xlim = c(2020, NA), hjust = 0,
+      segment.size = .7, segment.alpha = .5, segment.linetype = 1,
+      #box.padding = .4,
+      segment.curvature = -0.1, segment.ncp = 3, segment.angle = 20,
+      max.overlaps = 30
+    ) +
+    scale_x_continuous(expand = c(0, 0), limits = c(1995, 2027)) +
+    scale_linetype_manual(values = line_type) +
+    scale_colour_manual(values = cols) +
+    theme(legend.position = "none", panel.grid = element_blank(),
+          text = element_text(size = 20))
+  p
+
+  jpeg(file = file.path(plot_dir, paste0(spec, "_ts_y_preds_cf_1995_all_line.jpg")),
+       width = 1000, height = 700, quality = 100)
+  print(p)
+  dev.off()
+}
 
 # session info:
 writeLines(capture.output(sessionInfo()), file.path(dir, "results", "sessionInfo", "4_1_DOMs_predictions_time_series.txt"))

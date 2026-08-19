@@ -6,6 +6,7 @@
 #           data/BBS_data_merged.RData
 # Outputs:  plots/attribution/boxplot_rel_importance_manuscript.svg (Fig. 3)
 #           plots/attribution/lollipop_rel_importance_manuscript.svg (Fig. 4)
+#           plots/attribution/boxplot_additivity_index.svg (Fig. S3)
 # Runs on:  Local
 
 source(file.path("scripts", "0_paths.R"))
@@ -63,6 +64,46 @@ comb <- rel_imp_df %>%
 # don't normalise since negative values for one species causes problems
 summary(comb$combined_effect)
 summary(comb$combined_effect[-which(comb$species == "Cassin's Sparrow")])
+
+# boxplot:
+add_boxplot <- comb %>% 
+  mutate(outlier = ifelse(combined_effect < quantile(combined_effect, 0.25) - 1.5 * IQR(combined_effect) | combined_effect > quantile(combined_effect, 0.75) + 1.5 * IQR(combined_effect), Scientific_Name, NA)) %>% 
+  mutate(x_jit = jitter(rep(0, nrow(comb)), factor = 5)) %>% 
+  ggplot(aes(y = combined_effect * 100)) + 
+  # below y = 0 background
+  geom_rect(xmin = -Inf, xmax = Inf, ymin = -Inf, ymax = 0, 
+            fill = "#D7F0FF", alpha = 0.1) +
+  # above y = 0 background
+  geom_rect(xmin = -Inf, xmax = Inf, ymin = 0, ymax = Inf, 
+            fill = "#FFE4A5", alpha = 0.1) +
+  # # add half-violin from {ggdist} package
+  # ggdist::stat_halfeye(adjust = 1, # density: bandwidth multiplied with this
+  #                      justification = -1.5,
+  #                      .width = 0, point_colour = NA,
+  #                      width = 0.3) + # does not work with ggplot2 version 4; downgrade via remotes::install_version("ggplot2", version = "3.5.2", repos = "https://cran.r-project.org")
+  geom_boxplot(width = 0.6, outlier.shape = NA) +
+  geom_point(aes(x = x_jit), shape = 21, size = 1.5, alpha = .7, colour = "grey10") +
+  xlim(-1,1) +
+  geom_text(aes(label = outlier, x = x_jit ), na.rm = TRUE, hjust = -0.1, vjust = 0.8, 
+            fontface = "italic", size = 4) +
+  geom_label(x = -0.8, y = 2, label = "synergistic", colour = "grey30", hjust = 0.55, fill = "#FFE4A5") +
+  geom_label(x = -0.8, y = -0.8, label = "antagonistic", colour = "grey30", hjust = 0.5, fill = "#D7F0FF") +
+  ylab("Additivity index I") +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "grey20") +
+  theme_linedraw() +
+  theme(axis.ticks.x = element_blank(),
+        axis.text.x = element_blank(),
+        axis.title.x = element_blank(),
+        axis.title.y = element_text(size = 14),
+        axis.text.y = element_text(size = 12))
+add_boxplot
+
+ggsave(filename = file.path(dir, "plots", "attribution", "boxplot_additivity_index.svg"),
+       plot = add_boxplot,
+       device = "svg",
+       width = 12,
+       height = 12,
+       units = "cm")
 
 
 # boxplots summarising relative importance of climate vs. land use change: -----
@@ -136,12 +177,12 @@ boxplot_rel_imp <- boxplot_overall_df %>%
   ) +
   guides(fill = "none")
 
-# ggsave(filename = file.path(dir, "plots", "attribution", "boxplot_rel_importance_manuscript.svg"),
-#        plot = boxplot_rel_imp,
-#        device = "svg",
-#        width = 16,
-#        height = 16,
-#        units = "cm")
+ggsave(filename = file.path(dir, "plots", "attribution", "boxplot_rel_importance_manuscript.svg"),
+       plot = boxplot_rel_imp,
+       device = "svg",
+       width = 16,
+       height = 16,
+       units = "cm")
 
 
 # lollipop plot: relative importance of different drivers: ---------------------

@@ -9,11 +9,11 @@
 # Outputs:  data/Birdlife_range_maps/US_clipped/<species>_US_clipped.shp
 #           data/Birdlife_range_maps/tifs/<species>_US_clipped.tif
 #           data/Birdlife_range_maps/tifs_attr/<species>_attr.tif
-#           plots/attribution/maps/species_richness.svg (Fig. S 3)
+#           plots/attribution/maps/species_richness.svg (Fig. S4)
 #           plots/attribution/maps/clim_lu_combined_all.svg (Fig. 5)
-#           plots/attribution/maps/clim_change_impact_cats.svg (Fig. S 4)
-#           plots/attribution/maps/lu_change_impact_cats.svg (Fig. S 5)
-#           plots/attribution/maps/climlu_change_impact_cats.svg (Fig. S 6)
+#           plots/attribution/maps/clim_change_impact_cats.svg (Fig. S5)
+#           plots/attribution/maps/lu_change_impact_cats.svg (Fig. S6)
+#           plots/attribution/maps/climlu_change_impact_cats.svg (Fig. S7)
 # Runs on:  Local
 
 # Steps:
@@ -187,12 +187,12 @@ sr_map <- ggplot() +
         plot.margin = margin(0,0,0,0))
 sr_map
 
-# ggsave(filename = file.path(plot_dir, "species_richness.svg"),
-#        plot = sr_map,
-#        device = "svg",
-#        width = 29.7,
-#        height = 18, # A4
-#        units = "cm")
+ggsave(filename = file.path(plot_dir, "species_richness.svg"),
+       plot = sr_map,
+       device = "svg",
+       width = 29.7,
+       height = 18, # A4
+       units = "cm")
 
 
 ## 2) climate change mean importance: ----
@@ -221,12 +221,12 @@ clim_imp_map <- ggplot() +
         plot.margin = unit(c(2, 0, 0, 0), "cm")) # trbl # top margin to later have label when arranging multiple plots)
 clim_imp_map
 
-# ggsave(filename = file.path(plot_dir, "mean_climate_change_importance.svg"),
-#        plot = clim_imp_map,
-#        device = "svg",
-#        width = 29.7,
-#        height = 21, # A4
-#        units = "cm")
+ggsave(filename = file.path(plot_dir, "mean_climate_change_importance.svg"),
+       plot = clim_imp_map,
+       device = "svg",
+       width = 29.7,
+       height = 21, # A4
+       units = "cm")
 
 
 ## 3) land use change mean importance: ----
@@ -254,12 +254,12 @@ lu_imp_map <- ggplot() +
         plot.margin = unit(c(2, 0, 0, 0), "cm"))
 lu_imp_map
 
-# ggsave(filename = file.path(plot_dir, "mean_lu_change_importance.svg"),
-#        plot = lu_imp_map,
-#        device = "svg",
-#        width = 29.7,
-#        height = 21, # A4
-#        units = "cm")
+ggsave(filename = file.path(plot_dir, "mean_lu_change_importance.svg"),
+       plot = lu_imp_map,
+       device = "svg",
+       width = 29.7,
+       height = 21, # A4
+       units = "cm")
 
 
 
@@ -316,12 +316,12 @@ combined_plot <- plot_grid(clim_imp_map, lu_imp_map, dom_map,
 
 combined_plot
 
-# ggsave(filename = file.path(plot_dir, "clim_lu_combined_all.svg"),
-#        plot = combined_plot,
-#        device = "svg",
-#        width = 40,
-#        height = 35,
-#        units = "cm")
+ggsave(filename = file.path(plot_dir, "clim_lu_combined_all.svg"),
+       plot = combined_plot,
+       device = "svg",
+       width = 40,
+       height = 35,
+       units = "cm")
 
 
 ## 5) climate change impact categories (Fig. S 4): ----
@@ -384,12 +384,12 @@ for (i in stripr) {
 
 grid::grid.draw(g)
 
-# ggsave(filename = file.path(plot_dir, "clim_change_impact_cats.svg"),
-#        plot = g,
-#        device = "svg",
-#        width = 29.7,
-#        height = 21, # A4
-#        units = "cm")
+ggsave(filename = file.path(plot_dir, "clim_change_impact_cats.svg"),
+       plot = g,
+       device = "svg",
+       width = 29.7,
+       height = 21, # A4
+       units = "cm")
 
 
 ## 6) land use change impact categories (Fig. S 5): ----
@@ -450,12 +450,12 @@ for (i in stripr) {
 
 grid::grid.draw(g)
 
-# ggsave(filename = file.path(plot_dir, "lu_change_impact_cats.svg"),
-#        plot = g,
-#        device = "svg",
-#        width = 29.7,
-#        height = 21, # A4
-#        units = "cm")
+ggsave(filename = file.path(plot_dir, "lu_change_impact_cats.svg"),
+       plot = g,
+       device = "svg",
+       width = 29.7,
+       height = 21, # A4
+       units = "cm")
 
 
 ## 7) climate + land use change impact categories (Fig. S 6): ----
@@ -516,12 +516,12 @@ for (i in stripr) {
 
 grid::grid.draw(g)
 
-# ggsave(filename = file.path(plot_dir, "climlu_change_impact_cats.svg"),
-#        plot = g,
-#        device = "svg",
-#        width = 29.7,
-#        height = 21, # A4
-#        units = "cm")
+ggsave(filename = file.path(plot_dir, "climlu_change_impact_cats.svg"),
+       plot = g,
+       device = "svg",
+       width = 29.7,
+       height = 21, # A4
+       units = "cm")
 
 # session info:
 writeLines(capture.output(sessionInfo()), file.path(dir, "results", "sessionInfo", "5_4b_attribution_maps.txt"))

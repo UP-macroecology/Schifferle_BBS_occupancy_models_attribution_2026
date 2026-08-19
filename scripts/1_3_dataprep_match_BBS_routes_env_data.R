@@ -11,7 +11,7 @@
 # Outputs:  data/BBS_for_occ_selection.RData
 #           data/route_year_env_data.RData
 #           data/route_year_env_data_cf.RData
-#           plots/change_exposure_single_vars[1-3].svg (Fig. S7)
+#           plots/change_exposure_single_vars[1-3].svg (Fig. S8)
 # Runs on:  Local
 # Notes:    this script is run twice, once to compile factual data (set data <- "factual"),
 #           once to compile counterfactual data (set data <- "counterfactual")

@@ -1,18 +1,24 @@
 # Script:   1_2d_dataprep_cf_climate_attrici_postprocessing.R
 # Purpose:  Generate counterfactual variables from ATTRICI output to simulate counterfactual occupancy dynamics with dynamic occupancy models
-# Inputs:   data/Counterfactual_env_data/ISIMIP_GSWP3_W5E5/attrici_detrending/output/<var>_detrended/US_<var>_detrended_1901_2019.nc
+# Inputs:   data/Counterfactual_env_data/ISIMIP_GSWP3_W5E5/attrici_detrending/output/<var>_detrended/US_<var>_detrended_1994_2019.nc
 #           data/US_outline_ESRI102003.shp
 #           data/selected_variables.RData
 #           data/route_selection_1995_2019_surv_beg_end_max_5y_miss_v2_spat_thin_100km_max_30_r_per_BCR_centroids.shp
 # Outputs:  data/Counterfactual_env_data/ISIMIP_GSWP3_W5E5/attrici_detrending/output/ATTRICI_CLIM_ESRI102003_tifs/<var>_<yyyymm>_ESRI102003.tif
 #           data/Counterfactual_env_data/ISIMIP_GSWP3_W5E5/attrici_detrending/output/ATTRICI_CLIM_ESRI102003_tifs/bioclim/<var>_<year>.tif
 #           data/Counterfactual_env_data/ISIMIP_GSWP3_W5E5/attrici_detrending/output/ATTRICI_CLIM_ESRI102003_tifs/seasonal/<var>_<year>.tif
-#           plots/attrici/<var>_USA_logp.svg
+#           data/Counterfactual_env_data/ISIMIP_GSWP3_W5E5/attrici_detrending/input_files/ATTRICI_CLIM_ESRI102003_tifs/<var>_<yyyymm>_ESRI102003.tif # xx
+#           plots/attrici/gmt_raw_smoothed.svg
+#           plots/attrici/logp.svg
+#           plots/attrici/<var>_sel_routes_monthly.svg
+#           plots/attrici/<var>_sel_routes_daily.svg
 # Runs on:  Local
 
 # Steps:
-# 1) convert ATTRICI output to tifs, postprocess temperature
-# 2) calculate counterfactual version of the climate variables used to fit dynamic occupancy models
+# 1) postprocess temperature: detrended tasskew and tasrange to tasmin and tasmax
+# 2) convert netCDF output to tifs
+# 3) calculate counterfactual version of the climate variables used to fit dynamic occupancy models
+# 4) plots to check detrending
 
 source(file.path("scripts", "0_paths.R"))
 
@@ -27,6 +33,8 @@ library(ggplot2)
 library(tidyterra)
 library(doParallel)
 library(patchwork)
+library(cowplot)
+library(lubridate)
 
 
 # directories: -----------------------------------------------------------------
@@ -34,6 +42,10 @@ library(patchwork)
 # directory where ATTRICI stores output:
 attrici_out <- file.path(dir, "data", "Counterfactual_env_data", 
                          "ISIMIP_GSWP3_W5E5", "attrici_detrending", "output")
+
+# ATTRICI input files:
+attrici_in <- file.path(dir, "data", "Counterfactual_env_data", 
+                         "ISIMIP_GSWP3_W5E5", "attrici_detrending", "input_files")
 
 # directory to store postprocessed ATTRICI output:
 res_dir_proj <- file.path(attrici_out, "ATTRICI_CLIM_ESRI102003_tifs")
@@ -65,14 +77,77 @@ selvar_final
 routes_sel_sf <- st_read(file.path(dir, "data", "route_selection_1995_2019_surv_beg_end_max_5y_miss_v2_spat_thin_100km_max_30_r_per_BCR_centroids.shp")) # output of 1_1_dataprep_BBS_route_selection.R
 nrow(routes_sel_sf) # 539
 
-# 1) postprocessing ATTRICI output: --------------------------------------------
 
-## extract one tif per month from nc files: ----
+# 1) temperature postprocessing: -----------------------------------------------
+
+## get from tas, tasskew, tasrange to tasmin and tasmax
+
+# calculate tasmin and tasmax from detrended tasrange and tasskew:
+# using attrici postprocess-tas function throws errors coming from cdo,
+# I do equivalent postprocessing here:
+
+# see https://github.com/ISI-MIP/attrici/tree/main:
+# tasskew = (tas - tasmin) / tasrange
+# tasrange = tasmax - tasmin
+# ->
+# tasmin = tas - (tasskew * tasrange)
+# tasmax = tasmin + tasrange
+
+
+# counterfactual data:
+nc_cfact_tas <- ncdf4::nc_open(file.path(attrici_out, "tas_detrended", "US_tas_detrended_1994_2019.nc"))
+nc_cfact_tasskew <- ncdf4::nc_open(file.path(attrici_out, "tasskew_detrended", "US_tasskew_detrended_1994_2019.nc"))
+nc_cfact_tasrange <- ncdf4::nc_open(file.path(attrici_out, "tasrange_detrended", "US_tasrange_detrended_1994_2019.nc"))
+
+tas_data <- ncvar_get(nc_cfact_tas, "cfact")
+tasskew_data <- ncvar_get(nc_cfact_tasskew, "cfact")
+tasrange_data <- ncvar_get(nc_cfact_tasrange, "cfact")
+
+# tasmin = tas - (tasskew * tasrange)
+tasmin_data <- tas_data - (tasskew_data * tasrange_data)
+
+dims <- nc_cfact_tas$dim
+
+# define new variable:
+tasmin_var <- ncvar_def(name = "cfact", units = "K", dim = list(dims$lon, dims$lat, dims$time), missval = -9999)
+
+# create NetCDF file:
+nc_out <- nc_create(file.path(attrici_out, "US_tasmin_detrended_1994_2019.nc"), 
+                    list(tasmin_var))
+
+# write data into the NetCDF file:
+ncvar_put(nc_out, tasmin_var, tasmin_data)
+
+# tasmax = tasmin + tasrange:
+
+nc_cfact_tasmin <- ncdf4::nc_open(file.path(attrici_out, "US_tasmin_detrended_1994_2019.nc"))
+tasmin_data <- ncvar_get(nc_cfact_tasmin, "cfact")
+
+tasmax_data <- tasmin_data + tasrange_data 
+
+# define new variable:
+tasmax_var <- ncvar_def(name = "cfact", units = "K", dim = list(dims$lon, dims$lat, dims$time), missval = -9999)
+
+# create NetCDF file:
+nc_out <- nc_create(file.path(attrici_out, "US_tasmax_detrended_1994_2019.nc"), 
+                    list(tasmax_var))
+
+# write data into the NetCDF file:
+ncvar_put(nc_out, tasmax_var, tasmax_data)
+
+# close all NetCDF files when done
+nc_close(nc_cfact_tas)
+nc_close(nc_cfact_tasskew)
+nc_close(nc_cfact_tasrange)
+nc_close(nc_cfact_tasmin)
+
+
+# 2) extract monthly tifs from nc files: ---------------------------------------
 
 start <- 1994
 end <- 2019
 
-vars <- c("tas", "tasrange", "tasskew", "pr")
+vars <- c("tas", "tasrange", "tasskew", "pr", "tasmin", "tasmax")
 
 for(i in 1:length(vars)){
   
@@ -80,9 +155,15 @@ for(i in 1:length(vars)){
   print(paste(i, var))
   
   # output attrici:
-  nc_cfact <- ncdf4::nc_open(file.path(attrici_out, paste0(var, "_detrended"), 
-                                       paste0("US_", var, "_detrended_1901_2019.nc")))
-  
+  if(var %in% c("tas", "tasrange", "tasskew", "pr")){
+    nc_cfact <- ncdf4::nc_open(file.path(attrici_out, paste0(var, "_detrended"),
+                                         paste0("US_", var, "_detrended_1994_2019.nc"))) 
+  } else {
+    nc_cfact <- ncdf4::nc_open(file.path(attrici_out,
+                                         paste0("US_", var, "_detrended_1994_2019.nc"))) 
+  }
+
+
   # extract time and convert it to date:
   time <- ncvar_get(nc_cfact, "time")
   time_units <- ncatt_get(nc_cfact, "time", "units")$value
@@ -96,7 +177,7 @@ for(i in 1:length(vars)){
   
   #nc_cfact$var$cfact # detrended, counterfactual data
   #nc_cfact$var$y # factual data
-  #nc_cfact$var$logp # log posterior predictive density? lppd, to see predictive accuracy of model relating to GMT
+  #nc_cfact$var$logp # how well do estimated model parameters match prior distribution
   
   var_arr <- ncvar_get(nc_cfact, varid = "cfact")
   #dim(var_arr) # lon, lat, time in days
@@ -143,7 +224,7 @@ for(i in 1:length(vars)){
         project(y = "ESRI:102003", method = "average") %>%
         resample(y = ex_rast, method = "average") %>%
         mask(US_albers_sf) 
-      
+
       writeRaster(dt_export,
                   filename = file.path(res_dir_proj, paste0(var, "_", y, stringr::str_pad(m, 2, pad = 0),  "_ESRI102003.tif")),
                   overwrite = TRUE)
@@ -155,57 +236,7 @@ for(i in 1:length(vars)){
 }
 
 
-## postprocess temperature: ----------------------------------------------------
-## get from tas, tasskew, tasrange to tasmin and tasmax
-
-# calculate tasmin and tasmax from detrended tasrange and tasskew:
-# using attrici postprocess-tas function throws errors coming from cdo,
-# I do equivalent postprocessing here:
-
-# see https://github.com/ISI-MIP/attrici/tree/main:
-# tasskew = (tas - tasmin) / tasrange
-# tasrange = tasmax - tasmin
-# ->
-# tasmin = tas - (tasskew * tasrange)
-# tasmax = tasmin + tasrange
-
-
-# load files:
-tasskew_files <- list.files(file.path(res_dir_proj), pattern = "tasskew", full.names = TRUE)
-tasskew_rast <- rast(tasskew_files)
-
-tasrange_files <- list.files(file.path(res_dir_proj), pattern = "tasrange", full.names = TRUE)
-tasrange_rast <- rast(tasrange_files)
-
-tas_files <- list.files(file.path(res_dir_proj), pattern = "tas_", full.names = TRUE)
-tas_rast <- rast(tas_files)
-
-# convert to tasmin, tasmax:
-tasmin_rast <- tas_rast - (tasskew_rast * tasrange_rast)
-tasmin_rast
-tasmax_rast <- tasmin_rast + tasrange_rast
-tasmax_rast
-
-# save tasmin as separate tifs:
-tasmin_names <- paste0("tasmin", "_",
-                       paste0(rep(1994:2019, each = length(stringr::str_pad(1:12, 2, pad = 0))),
-                              stringr::str_pad(1:12, 2, pad = 0)), "_ESRI102003.tif")
-
-writeRaster(tasmin_rast,
-            filename = file.path(res_dir_proj, tasmin_names),
-            overwrite = TRUE)
-
-# save tasmax as separate tifs:
-tasmax_names <- paste0("tasmax", "_",
-                       paste0(rep(1994:2019, each = length(stringr::str_pad(1:12, 2, pad = 0))),
-                              stringr::str_pad(1:12, 2, pad = 0)), "_ESRI102003.tif")
-
-writeRaster(tasmax_rast,
-            filename = file.path(res_dir_proj, tasmax_names),
-            overwrite = TRUE)
-
-
-# 2) calculate variables selected as covariates in DOMs: -----------------------
+# 3) calculate variables selected as covariates in DOMs: -----------------------
 
 # register cores for parallel computation:
 ncores <- 2 
@@ -298,13 +329,73 @@ foreach(year = 1995:2019,
 
 stopCluster(cl)
 
-# session info:
-writeLines(capture.output(sessionInfo()), file.path(dir, "results", "sessionInfo", "1_2d_dataprep_cf_climate_attrici_postprocessing.txt"))
+
+# 4) explorative plots: --------------------------------------------------------
+
+## check smoothed global mean temperature file: ----
+
+# load raw global mean temperature time series:
+gmt_raw <- nc_open(file.path(dir, "data", "Counterfactual_env_data", "ISIMIP_GSWP3_W5E5", "attrici_detrending",
+                             "input_files", "gswp3-w5e5_gmt_raw_1994_2019.nc"), verbose = TRUE)
+
+# extract the time variable and convert it to date:
+time <- ncvar_get(gmt_raw, "time")
+time_units <- ncatt_get(gmt_raw, "time", "units")$value
+time_origin <- lubridate::as_date(time_units)
+time_date <- time_origin + time
+
+# extract mean temperature:
+gmt <- ncvar_get(gmt_raw, "tas", verbose = TRUE)
+gmt_C <- gmt - 273.15 # Kelvin to Celsius
+
+# compile data frame:
+df <- data.frame("date" = time_date, "gmt_raw" = gmt_C)
+
+# plot:
+ggplot(df) +
+  geom_line(aes(x = date, y = gmt_raw)) +
+  labs(y = "mean global temperature [°C]") +
+  theme_bw()
+
+nc_close(gmt_raw)
+
+# load smoothed global mean temperature time series:
+
+gmt_smoothed <- nc_open(file.path(dir, "data", "Counterfactual_env_data", "ISIMIP_GSWP3_W5E5", "attrici_detrending",
+                                  "input_files", "gswp3-w5e5_ssa_gmt_1994_2019.nc"))
+
+print(gmt_smoothed)
+
+# extract the time variable and convert it to date:
+time <- ncvar_get(gmt_smoothed, "time")
+time_units <- ncatt_get(gmt_smoothed, "time", "units")$value
+time_origin <- lubridate::as_date(time_units)
+time_date2 <- time_origin + time
+
+# extract mean temperature:
+gmt_ssa <- ncvar_get(gmt_smoothed, "tas")
+gmt_ssa_C <- gmt_ssa - 273.15 # Kelvin to Celsius
+
+# compile data frame:
+df_smoothed <- data.frame("date_smoothed" = time_date2, "gmt_smoothed" = gmt_ssa_C)
+
+# plot:
+gmt_plot <- ggplot() +
+  geom_line(aes(x = date, y = gmt_raw), data = df) +
+  geom_line(aes(x = date_smoothed, y = gmt_smoothed), data = df_smoothed, colour = "pink", alpha = 0.7, linewidth = 2) +
+  labs(y = "mean global temperature [°C]") +
+  theme_bw() +
+  ggtitle("Smoothed global mean temperature, input for ATTRICI")
+gmt_plot
+
+ggsave(filename = file.path(plot_dir, "gmt_raw_smoothed.svg"),
+       plot = gmt_plot,
+       width = 8, height = 5)
+
+nc_close(gmt_smoothed)
 
 
-# explorative plots: -----------------------------------------------------------
-
-# compare time series for single locations:
+## compare time series for single locations: ----
 
 # functions:
 
@@ -313,8 +404,8 @@ compile_plot_data <- function(var, timestep = "month", BBS_routes = routes_sel_s
   
   if(timestep == "month"){
     
-    # months:
-    d <- paste0(rep(1994:2019, each = length(stringr::str_pad(1:12, 2, pad = 0))),
+    # months: # xx change to 1994!
+    d <- paste0(rep(1995:2019, each = length(stringr::str_pad(1:12, 2, pad = 0))),
                 stringr::str_pad(1:12, 2, pad = 0))
     d <- lubridate::as_date(d, format = "%Y%m")
     
@@ -338,16 +429,26 @@ compile_plot_data <- function(var, timestep = "month", BBS_routes = routes_sel_s
     # counterfactual time series:
     files_cf <- list.files(file.path(res_dir_proj, "seasonal"), pattern = paste0(var, "_(", paste0(1995:2019, collapse = "|"), ").tif"), full.names = TRUE)
     
-  } else if(var %in% c("pr", "tasmin", "tasmax")){
+  } else if(var %in% c("pr", "tasmin", "tasmax", "tas")){
     
     # factual:
     files_f <- list.files(file.path(clim_path, "ISIMIP_CLIM_ESRI102003"),
-                          pattern = paste0(var, "_(", paste0(1994:2019, collapse = "|"), ")"), full.names = TRUE)
+                          pattern = paste0(var, "_(", paste0(1995:2019, collapse = "|"), ")"), full.names = TRUE)
     
     # counterfactual:
     files_cf <- list.files(res_dir_proj,
-                           pattern = paste0(var, "_(", paste0(1994:2019, collapse = "|"), ")"), full.names = TRUE)
-  }
+                           pattern = paste0(var, "_(", paste0(1995:2019, collapse = "|"), ")"), full.names = TRUE)
+  
+    } else if (var %in% c("tasrange", "tasskew")){
+    
+    # factual:
+    files_f <- list.files(file.path(attrici_in, "ATTRICI_CLIM_ESRI102003_tifs"),
+                          pattern = paste0(var, "_(", paste0(1995:2019, collapse = "|"), ")"), full.names = TRUE)
+    
+    # counterfactual:
+    files_cf <- list.files(res_dir_proj,
+                           pattern = paste0(var, "_(", paste0(1995:2019, collapse = "|"), ")"), full.names = TRUE)
+    }
   
   # load climatic data:
   # factual:
@@ -359,10 +460,10 @@ compile_plot_data <- function(var, timestep = "month", BBS_routes = routes_sel_s
   # plot time series for BBS routes:
   
   # extract data at route locations:
-  routes_f <- extract(x = factual_rast, y = routes_sel_sf, cells = TRUE, ID = FALSE)
-  routes_f <- cbind(routes_f, "RTENO" = routes_sel_sf$RTENO_BBS)
-  routes_cf <- extract(x = cfactual_rast, y = routes_sel_sf, cells = TRUE, ID = FALSE)
-  routes_cf <- cbind(routes_cf, "RTENO" = routes_sel_sf$RTENO_BBS)
+  routes_f <- extract(x = factual_rast, y = BBS_routes, cells = TRUE, ID = FALSE)
+  routes_f <- cbind(routes_f, "RTENO" = BBS_routes$RTENO_BBS)
+  routes_cf <- extract(x = cfactual_rast, y = BBS_routes, cells = TRUE, ID = FALSE)
+  routes_cf <- cbind(routes_cf, "RTENO" = BBS_routes$RTENO_BBS)
   
   # assemble data frame for plotting:
   plot_df <- routes_f %>%
@@ -398,8 +499,8 @@ plot_ts_fun <- function(var, route_subset, plot_data){
                                      "factual" = "#85CB33")) +
       scale_fill_manual(values = c("counterfactual" = "#0D98BA",
                                    "factual" = "#85CB33")) +
-      scale_linewidth_manual(values = c("counterfactual" = 0.3,
-                                        "factual" = 0.2), guide = "none") +
+      scale_linewidth_manual(values = c("counterfactual" = 0.2,
+                                        "factual" = 0.1), guide = "none") +
       guides(fill = guide_legend(title = "Scenario"),
              colour = guide_legend(title = "Scenario")) +
       ylab(var) +
@@ -443,7 +544,7 @@ for(i in 1:length(vars)){
   
   # output attrici:
   nc_cfact <- ncdf4::nc_open(file.path(attrici_out, paste0(var, "_detrended"), 
-                                       paste0("US_", var, "_detrended_1901_2019.nc")))
+                                       paste0("US_", var, "_detrended_1994_2019.nc")))
   
   # extract latitude and longitude
   lat <- ncvar_get(nc_cfact, "lat")
@@ -473,180 +574,15 @@ for(i in 1:length(vars)){
   nc_close(nc_cfact)
 }
 
-#save(logp_list, file = file.path(attrici_out, "logp_tifs_list.RData"))
-
-
 # plot:
-
-svg(file.path(dir, "plots", "attrici", "logp.svg"), onefile = TRUE, width = 10, height = 5)
+svg(file.path(plot_dir, "logp.svg"), onefile = TRUE, width = 10, height = 5)
 wrap_plots(logp_plot_list, ncol = 2, nrow = 2)
 dev.off()
 
 
-## selvars representative routes: ----
+## plot time series for subset of routes: ----
 
-# subset of representative routes for different logp values:
-logp_rast <- rast(logp_list)
-names(logp_rast) <- c("pr", "tas", "tasrange", "tasskew")
-
-# logp at route locations:
-logp_routes <- extract(x = logp_rast, y = routes_sel_sf, cells = TRUE, ID = FALSE)
-logp_routes <- cbind(logp_routes, "RTENO" = routes_sel_sf$RTENO_BBS)
-
-summary(logp_routes$pr)
-summary(logp_routes$tas)
-summary(logp_routes$tasrange)
-summary(logp_routes$tasskew)
-
-quantiles <- logp_routes %>% 
-  tidyr::pivot_longer(cols = vars, names_to = "var", values_to = "logp") %>% 
-  group_by(var) %>% 
-  summarise(max = max(logp),
-            q75 = quantile(logp, 0.75),
-            q50 = quantile(logp, 0.5),
-            q25 = quantile(logp, 0.25),
-            min = min(logp))
-
-pr_routes <- c(logp_routes %>% filter(pr <= quantiles$min[1]) %>% arrange(desc(pr)) %>% slice(1) %>% pull(RTENO),
-               logp_routes %>% filter(pr <= quantiles$q25[1]) %>% arrange(desc(pr)) %>% slice(1) %>% pull(RTENO),
-               logp_routes %>% filter(pr <= quantiles$q50[1]) %>% arrange(desc(pr)) %>% slice(1) %>% pull(RTENO),
-               logp_routes %>% filter(pr <= quantiles$q75[1]) %>% arrange(desc(pr)) %>% slice(1) %>% pull(RTENO),
-               logp_routes %>% filter(pr <= quantiles$max[1]) %>% arrange(desc(pr)) %>% slice(1) %>% pull(RTENO))
-
-tas_routes <- c(logp_routes %>% filter(tas <= quantiles$min[2]) %>% arrange(desc(tas)) %>% slice(1) %>% pull(RTENO),
-               logp_routes %>% filter(tas <= quantiles$q25[2]) %>% arrange(desc(tas)) %>% slice(1) %>% pull(RTENO),
-               logp_routes %>% filter(tas <= quantiles$q50[2]) %>% arrange(desc(tas)) %>% slice(1) %>% pull(RTENO),
-               logp_routes %>% filter(tas <= quantiles$q75[2]) %>% arrange(desc(tas)) %>% slice(1) %>% pull(RTENO),
-               logp_routes %>% filter(tas <= quantiles$max[2]) %>% arrange(desc(tas)) %>% slice(1) %>% pull(RTENO))
-
-tasrange_routes <- c(logp_routes %>% filter(tasrange <= quantiles$min[3]) %>% arrange(desc(tasrange)) %>% slice(1) %>% pull(RTENO),
-                logp_routes %>% filter(tasrange <= quantiles$q25[3]) %>% arrange(desc(tasrange)) %>% slice(1) %>% pull(RTENO),
-                logp_routes %>% filter(tasrange <= quantiles$q50[3]) %>% arrange(desc(tasrange)) %>% slice(1) %>% pull(RTENO),
-                logp_routes %>% filter(tasrange <= quantiles$q75[3]) %>% arrange(desc(tasrange)) %>% slice(1) %>% pull(RTENO),
-                logp_routes %>% filter(tasrange <= quantiles$max[3]) %>% arrange(desc(tasrange)) %>% slice(1) %>% pull(RTENO))
-
-tasskew_routes <- c(logp_routes %>% filter(tasskew <= quantiles$min[4]) %>% arrange(desc(tasskew)) %>% slice(1) %>% pull(RTENO),
-                     logp_routes %>% filter(tasskew <= quantiles$q25[4]) %>% arrange(desc(tasskew)) %>% slice(1) %>% pull(RTENO),
-                     logp_routes %>% filter(tasskew <= quantiles$q50[4]) %>% arrange(desc(tasskew)) %>% slice(1) %>% pull(RTENO),
-                     logp_routes %>% filter(tasskew <= quantiles$q75[4]) %>% arrange(desc(tasskew)) %>% slice(1) %>% pull(RTENO),
-                     logp_routes %>% filter(tasskew <= quantiles$max[4]) %>% arrange(desc(tasskew)) %>% slice(1) %>% pull(RTENO))
-
-route_subset <- c(pr_routes, tas_routes, tasrange_routes, tasskew_routes)
-
-# plot selected routes:
-ggplot() +
-  geom_sf(data = routes_sel_sf, size = 0.1) +
-  geom_sf(data = routes_sel_sf %>% filter(RTENO_BBS %in% route_subset), colour = "red2", size = 1.5) +
-  theme_void() +
-  theme(panel.border = element_rect(fill = NA, color = "black"))
-
-
-# iterate over climate variables:
-names_long <- c("annual mean temperature", "diurnal temperature range", "isothermality", "annual temperature range",
-                "precipitation driest month", "precipitation seasonality",
-                "precipitation spring", "precipitation summer", "precipitation autumn", "precipitation winter")
-
-plot_data_list <- vector(mode = "list", length = 10)
-
-for(v in 1:length(names_long)){
-  
-  var <- selvar_final[v]
-  
-  print(var)
-  
-  plot_data_list[[v]] <- compile_plot_data(var = var, timestep = "year")
-  
-  plot_list <- plot_ts_fun(var = var, route_subset = route_subset, plot_data = plot_data_list[[v]])
-  
-  svg(file.path(dir, "plots", "attrici", paste0(names_long[v], ".svg")), onefile = TRUE, width = 10, height = 20)
-  print(wrap_plots(plot_list, ncol = 2, nrow = 10))
-  dev.off()
-  
-}
-
-
-## monthly pr, tas, tasmin, tasmax: ----
-
-# at representative routes:
-
-vars <- c("pr", "tasmin", "tasmax")
-
-plot_data_list <- vector(mode = "list", length = length(vars))
-
-for(v in 1:length(vars)){
-  
-  var <- vars[v]
-  
-  print(var)
-  
-  plot_data_list[[v]] <- compile_plot_data(var = var, timestep = "month")
-  
-  plot_list <- plot_ts_fun(var = var, route_subset = route_subset, plot_data = plot_data_list[[v]])
-  
-  svg(file.path(dir, "plots", "attrici", paste0(var, ".svg")), onefile = TRUE, width = 13, height = 20)
-  print(wrap_plots(plot_list, ncol = 2, nrow = 10))
-  dev.off()
-  
-}
-save(plot_data_list, file = file.path(attrici_out, "attrici_check_monthly_data.RData"))
-
-
-### low logp routes: ----
-
-routes_lowlogp <- unlist(lapply(X = c("pr", "tas", "tasrange", "tasskew"), 
-               FUN = function(.x){logp_routes %>% arrange(!!sym(.x)) %>% slice(1:5) %>% pull(RTENO)}))
-
-# plot selected routes:
-ggplot() +
-  geom_sf(data = routes_sel_sf, size = 0.1) +
-  geom_sf(data = routes_sel_sf %>% filter(RTENO_BBS %in% routes_lowlogp), colour = "red2", size = 1.5) +
-  theme_bw()
-
-for(v in 1:length(vars)){
-  
-  var <- vars[v]
-  
-  print(var)
-  
-  plot_list <- plot_ts_fun(var = var, route_subset = routes_lowlogp, plot_data = plot_data_list[[v]])
-  
-  save(plot_data_list, file = file.path(attrici_out, paste0(var, ".RData")))
-  
-  svg(file.path(dir, "plots", "attrici", paste0(var, "_low_logp_routes.svg")), onefile = TRUE, width = 13, height = 20)
-  print(wrap_plots(plot_list, ncol = 2, nrow = 10))
-  dev.off()
-  
-}
-
-### high logp routes: ----
-
-routes_highlogp <- unlist(lapply(X = c("pr", "tas", "tasrange", "tasskew"), 
-                                FUN = function(.x){logp_routes %>% arrange(desc(!!sym(.x))) %>% slice(1:5) %>% pull(RTENO)}))
-
-# plot selected routes:
-ggplot() +
-  geom_sf(data = routes_sel_sf, size = 0.1) +
-  geom_sf(data = routes_sel_sf %>% filter(RTENO_BBS %in% routes_highlogp), colour = "red2", size = 1.5) +
-  theme_bw()
-
-for(v in 1:length(vars)){
-  
-  var <- vars[v]
-  
-  print(var)
-  
-  plot_list <- plot_ts_fun(var = var, route_subset = routes_highlogp, plot_data = plot_data_list[[v]])
-  
-  save(plot_data_list, file = file.path(attrici_out, paste0(var, ".RData")))
-  
-  svg(file.path(dir, "plots", "attrici", paste0(var, "_high_logp_routes.svg")), onefile = TRUE, width = 13, height = 20)
-  print(wrap_plots(plot_list, ncol = 2, nrow = 10))
-  dev.off()
-  
-}
-
-# manual selection across USA:
-
+# manually selected routes:
 routes_US_sel <- c(84014006, 84089004, 84053011, 84044036, 84090001, 84025081, 84052122, 84083315, 84080002, 84061052,
                    84085022, 84014106, 84055011, 84033226, 84006013, 84091055, 84081029, 84060080, 84051113, 84038038)
 
@@ -656,18 +592,238 @@ ggplot() +
   geom_sf(data = routes_sel_sf %>% filter(RTENO_BBS %in% routes_US_sel), colour = "red2", size = 1.5) +
   theme_bw()
 
+# # iterate over climate variables:
+# names_long <- c("annual mean temperature", "diurnal temperature range", "isothermality", "annual temperature range",
+#                 "precipitation driest month", "precipitation seasonality",
+#                 "precipitation spring", "precipitation summer", "precipitation autumn", "precipitation winter")
+# 
+# plot_data_list <- vector(mode = "list", length = 10)
+# 
+# for(v in 1:length(names_long)){
+#   
+#   var <- selvar_final[v]
+#   
+#   print(var)
+#   
+#   plot_data_list[[v]] <- compile_plot_data(var = var, timestep = "year")
+#   
+#   plot_list <- plot_ts_fun(var = var, route_subset = routes_US_sel, plot_data = plot_data_list[[v]])
+#   
+#   svg(file.path(dir, "plots", "attrici", paste0(names_long[v], ".svg")), onefile = TRUE, width = 10, height = 20)
+#   print(wrap_plots(plot_list, ncol = 2, nrow = 10))
+#   dev.off()
+#   
+# } 
+
+
+#### monthly time series extracted from netCDFs (not from tifs): -----
+
+# route selection:
+coords_sf <- routes_sel_sf %>% 
+  filter(RTENO_BBS %in% routes_US_sel) %>% 
+  st_transform(crs = "EPSG:4326")
+
+coords_sf
+
+# US mask:
+US_mask <- rast(file.path(attrici_in, "US_mask.nc"))
+coords_mask <- extract(x = US_mask, y = coords_sf, xy = TRUE)
+
+vars <- c("pr", "tas", "tasskew", "tasrange", "tasmin", "tasmax")
+
 for(v in 1:length(vars)){
   
   var <- vars[v]
   
   print(var)
   
-  plot_list <- plot_ts_fun(var = var, route_subset = routes_US_sel, plot_data = plot_data_list[[v]])
+  # factual data:
   
-  save(plot_data_list, file = file.path(attrici_out, paste0(var, ".RData")))
+  if(var %in% c("tasskew", "tasrange")){
+    nc_fact <- nc_open(file.path(attrici_in, paste0("US_", var, "_1994_2019.nc")))
+  } else {
+    nc_fact <- nc_open(file.path(clim_path, paste0("US_", var, "_1994_2019.nc")))
+    
+  }
+  if(var %in% c("tasmin", "tasmax")){
+    # counterfactual data:
+    nc_cfact <- nc_open(file.path(attrici_out,  paste0("US_", var, "_detrended_1994_2019.nc")))
+  } else {
+    # counterfactual data:
+    nc_cfact <- nc_open(file.path(attrici_out, paste0(var, "_detrended"), paste0("US_", var, "_detrended_1994_2019.nc")))
+  }
+
+  # get dates:
+  # extract time and convert it to date:
+  time <- ncvar_get(nc_fact, "time")
+  #time2 <- ncvar_get(nc_cfact, "time") # identical
+  time_units <- ncatt_get(nc_fact, "time", "units")$value
+  #time_units2 <- ncatt_get(nc_cfact, "time", "units")$value # same
+  time_origin <- lubridate::as_date(time_units)
+  #time_origin2 <- lubridate::as_date(time_units2) # same
   
-  svg(file.path(dir, "plots", "attrici", paste0(var, "_sel_routes.svg")), onefile = TRUE, width = 13, height = 20)
+  time_date <- time_origin + time
+  dates_subset <- subset(time_date, time_date >= lubridate::as_date("1994-01-01"))
+  
+  # iterate over routes:
+  
+  data_routes <- vector(mode = "list", length = nrow(coords_mask))
+  
+  for(i in 1:nrow(coords_mask)){
+    
+    print(i)
+    
+    lon <- coords_mask$x[i]  # longitude of location
+    lat <- coords_mask$y[i] # latitude  of location
+    
+    # get values at location lonlat
+    fact_out <- ncvar_get(nc_fact, varid = var,
+                          start = c(which.min(abs(nc_fact$dim$lon$vals - lon)), # look for closest long
+                                    which.min(abs(nc_fact$dim$lat$vals - lat)),  # look for closest lat
+                                    1), 
+                          count = c(1,1, length(dates_subset)))
+    
+    fact_out
+    
+    cfact_out <- ncvar_get(nc_cfact, varid = "cfact",
+                           start = c(which.min(abs(nc_cfact$dim$lon$vals - lon)), # look for closest long
+                                     which.min(abs(nc_cfact$dim$lat$vals - lat)),  # look for closest lat
+                                     1), 
+                           count = c(1,1, length(dates_subset))) 
+    
+    cfact_out
+    
+    
+    # create dataframe
+    data_routes[[i]] <- data.frame(date = dates_subset, factual_d = fact_out, counterfactual_d = cfact_out) %>% 
+      mutate(month = month(dates_subset),
+             year = year(dates_subset)) %>% 
+      group_by(month, year) %>% 
+      summarise(factual = mean(factual_d),
+                counterfactual = mean(counterfactual_d)) %>% 
+      mutate(date = as_date(paste0(year, "-", month, "-01"))) %>% 
+      tidyr::pivot_longer(cols = c(factual, counterfactual), names_to = "scenario", values_to = "value") %>% 
+      mutate(RTENO = coords_sf$RTENO_BBS[i])
+    data_routes
+    
+  }
+  data_routes_all <- do.call(rbind, data_routes)
+  
+  plot_list <- plot_ts_fun(var = var, route_subset = routes_US_sel, plot_data = data_routes_all)
+  
+  svg(file.path(dir, "plots", "attrici", paste0(var, "_sel_routes_monthly.svg")), onefile = TRUE, width = 13, height = 20)
   print(wrap_plots(plot_list, ncol = 2, nrow = 10))
   dev.off()
   
+  nc_close(nc_fact)
+  nc_close(nc_cfact)
 }
+
+
+### daily time series: ---- 
+
+# plot first few years or last few years, adjust code
+
+vars <- c("pr", "tas", "tasskew", "tasrange","tasmin", "tasmax") 
+
+for(v in 1:length(vars)){
+  
+  var <- vars[v]
+  print(var)
+  
+  # factual data:
+  
+  if(var %in% c("tasskew", "tasrange")){
+    nc_fact <- nc_open(file.path(attrici_in, paste0("US_", var, "_1994_2019.nc")))
+  } else {
+    nc_fact <- nc_open(file.path(clim_path, paste0("US_", var, "_1994_2019.nc")))
+    
+  }
+  
+  if(var %in% c("tasmin", "tasmax")){
+    # counterfactual data:
+    nc_cfact <- nc_open(file.path(attrici_out,  paste0("US_", var, "_detrended_1994_2019.nc")))
+  } else {
+    # counterfactual data:
+    nc_cfact <- nc_open(file.path(attrici_out, paste0(var, "_detrended"), paste0("US_", var, "_detrended_1994_2019.nc")))
+  }
+  
+  # get dates:
+  # extract time and convert it to date:
+  time <- ncvar_get(nc_fact, "time")
+  #time2 <- ncvar_get(nc_cfact, "time") # identical
+  time_units <- ncatt_get(nc_fact, "time", "units")$value
+  #time_units2 <- ncatt_get(nc_cfact, "time", "units")$value # same
+  time_origin <- lubridate::as_date(time_units)
+  #time_origin2 <- lubridate::as_date(time_units2) # same
+  
+  time_date <- time_origin + time
+  
+  #dates_subset <- subset(time_date, time_date <= lubridate::as_date("1997-12-31")) # first few years
+  dates_subset <- subset(time_date, time_date >= lubridate::as_date("2016-01-01")) # first few years
+  
+  # iterate over routes:
+  
+  data_routes <- vector(mode = "list", length = nrow(coords_mask))
+  
+  for(i in 1:nrow(coords_mask)){
+    
+    print(i)
+    
+    lon <- coords_mask$x[i]  # longitude of location
+    lat <- coords_mask$y[i] # latitude  of location
+    
+    # get values at location lonlat
+    # fact_out <- ncvar_get(nc_fact, varid = var,
+    #                       start = c(which.min(abs(nc_fact$dim$lon$vals - lon)), # look for closest long
+    #                                which.min(abs(nc_fact$dim$lat$vals - lat)),  # look for closest lat
+    #                                1),
+    #                       count = c(1,1, length(dates_subset))) # first few years
+    
+    fact_out <- ncvar_get(nc_fact, varid = var,
+                          start = c(which.min(abs(nc_fact$dim$lon$vals - lon)), # look for closest long
+                                    which.min(abs(nc_fact$dim$lat$vals - lat)),  # look for closest lat
+                                    length(time_date) - length(dates_subset)),
+                          count = c(1,1, length(dates_subset))) # last few years
+    
+    fact_out
+    
+    # cfact_out <- ncvar_get(nc_cfact, varid = "cfact",
+    #                        start = c(which.min(abs(nc_cfact$dim$lon$vals - lon)), # look for closest long
+    #                                 which.min(abs(nc_cfact$dim$lat$vals - lat)),  # look for closest lat
+    #                                 1),
+    #                        count = c(1,1, length(dates_subset))) # first few years
+    
+    cfact_out <- ncvar_get(nc_cfact, varid = "cfact",
+                           start = c(which.min(abs(nc_cfact$dim$lon$vals - lon)), # look for closest long
+                                     which.min(abs(nc_cfact$dim$lat$vals - lat)),  # look for closest lat
+                                     length(time_date) - length(dates_subset)),
+                           count = c(1,1, length(dates_subset))) # last few years
+    cfact_out
+    
+    
+    # create dataframe
+    data_routes[[i]] <- data.frame(date = dates_subset, factual = fact_out, counterfactual = cfact_out) %>% 
+      tidyr::pivot_longer(cols = c(factual, counterfactual), names_to = "scenario", values_to = "value") %>% 
+      mutate(RTENO = coords_sf$RTENO_BBS[i])
+    data_routes
+    
+  }
+  data_routes_all <- do.call(rbind, data_routes)
+  
+  plot_list <- plot_ts_fun(var = var, route_subset = routes_US_sel, plot_data = data_routes_all)
+  
+  # svg(file.path(plot_dir, paste0(var, "_sel_routes_daily_1994_1997.svg")), onefile = TRUE, # first few years
+  #     width = 18, height = 40)
+  svg(file.path(plot_dir, paste0(var, "_sel_routes_daily_2016_2019.svg")), onefile = TRUE, # last few years
+      width = 18, height = 40)
+  print(wrap_plots(plot_list, ncol = 1, nrow = 20))
+  dev.off()
+
+  nc_close(nc_fact)
+  nc_close(nc_cfact)
+}
+
+
+# session info:
+writeLines(capture.output(sessionInfo()), file.path(dir, "results", "sessionInfo", "1_2e_dataprep_cf_climate_attrici_postprocessing.txt"))

@@ -11,8 +11,16 @@
 #SBATCH --export=ALL,OMP_PROC_BIND=TRUE
 #SBATCH --ntasks=10
 #SBATCH --time=1-00:00:00
-#SBATCH --nodelist=ecoc9z
-#SBATCH --mem=100gb
+#SBATCH --nodelist=ecoc9
+#SBATCH --mem=150gb
+
+# Script:   1_2d_attrici_US_tasskew.sh
+# Purpose:  Detrend tasskew from 1994 onward with ATTRICI tool (from tasrange and tasskew tasmin and tasmax are derived later)
+# Inputs:   data/Counterfactual_env_data/ISIMIP_GSWP3_W5E5/attrici_detrending/input_files/gswp3-w5e5_ssa_gmt_1994_2019.nc
+#           data/Env_data/ISIMIP_GSWP3_W5E5/US_tasskew_1994_2019.nc
+#           data/Counterfactual_env_data/ISIMIP_GSWP3_W5E5/attrici_detrending/input_files/US_mask.nc
+# Outputs:  data/Counterfactual_env_data/ISIMIP_GSWP3_W5E5/attrici_detrending/output/tasskew_detrended/US_tasskew_detrended_1994_2019.nc
+# Runs on:  HPC (NAS Potsdam)
 
 
 echo "Starting"
@@ -28,18 +36,16 @@ srun bash <<'EOF'
 
 exec attrici \
      detrend \
-     --gmt-file /import/ecoc9z/data-zurell/schifferle/BBS_occupancy_models_2023/data/Counterfactual_env_data/ISIMIP_GSWP3_W5E5/attrici_detrending/input_files/gswp3-w5e5_ssa_gmt_1995_2019.nc \
-     --input-file /import/ecoc9z/data-zurell/schifferle/BBS_occupancy_models_2023/data/Counterfactual_env_data/ISIMIP_GSWP3_W5E5/attrici_detrending/input_files/US_tasskew_1901_2019.nc \
+     --gmt-file /import/ecoc9z/data-zurell/schifferle/BBS_occupancy_models_2023/data/Counterfactual_env_data/ISIMIP_GSWP3_W5E5/attrici_detrending/input_files/gswp3-w5e5_ssa_gmt_1994_2019.nc \
+     --input-file /import/ecoc9z/data-zurell/schifferle/BBS_occupancy_models_2023/data/Counterfactual_env_data/ISIMIP_GSWP3_W5E5/attrici_detrending/input_files/US_tasskew_1994_2019.nc \
      --output-dir /import/ecoc9z/data-zurell/schifferle/BBS_occupancy_models_2023/data/Counterfactual_env_data/ISIMIP_GSWP3_W5E5/attrici_detrending/output/tasskew_detrended \
      --variable tasskew \
-	 --start-date 1995-01-01 \
-     --stop-date 2019-12-31 \
 	 --mask-file /import/ecoc9z/data-zurell/schifferle/BBS_occupancy_models_2023/data/Counterfactual_env_data/ISIMIP_GSWP3_W5E5/attrici_detrending/input_files/US_mask.nc \
      --report-variables y cfact logp \
    	 --full-extrapolation \
      --task-id "$SLURM_PROCID" \
      --task-count "$SLURM_NTASKS" \
-	 --seed 123
+	   --seed 123
 EOF
 
 echo "Detrending done."
@@ -48,7 +54,7 @@ echo "Detrending done."
 
 echo "Merge output."
 
-attrici merge-output /import/ecoc9z/data-zurell/schifferle/BBS_occupancy_models_2023/data/Counterfactual_env_data/ISIMIP_GSWP3_W5E5/attrici_detrending/output/tasskew_detrended/timeseries/tasskew  /import/ecoc9z/data-zurell/schifferle/BBS_occupancy_models_2023/data/Counterfactual_env_data/ISIMIP_GSWP3_W5E5/attrici_detrending/output/tasskew_detrended/US_tasskew_detrended_1901_2019.nc
+attrici merge-output /import/ecoc9z/data-zurell/schifferle/BBS_occupancy_models_2023/data/Counterfactual_env_data/ISIMIP_GSWP3_W5E5/attrici_detrending/output/tasskew_detrended/timeseries/tasskew  /import/ecoc9z/data-zurell/schifferle/BBS_occupancy_models_2023/data/Counterfactual_env_data/ISIMIP_GSWP3_W5E5/attrici_detrending/output/tasskew_detrended/US_tasskew_detrended_1994_2019.nc
 
 
 echo "Output merging done."

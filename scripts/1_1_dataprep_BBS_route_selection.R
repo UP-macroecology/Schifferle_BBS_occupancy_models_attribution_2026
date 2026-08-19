@@ -190,7 +190,6 @@ nrow(routes_sf_thinned) # 1991-2015: 533, 1995-2019: 632, 1991 - 2019: 491
 # save intermediate route selection step:
 st_write(routes_sf_thinned, file.path(dir, "data", "route_selection_1995_2019_surv_beg_end_max_5y_miss_v2_spat_thin_100km_centroids.shp"), append = FALSE) 
 
-
 ## 3) spatial coverage: ----
 # remove routes to get approximately equal coverage of Bird Conservation Regions (BCRs):
 

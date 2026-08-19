@@ -4,15 +4,23 @@
 # running with 78 cores and 750 GB of memory on Debian GNU/Linux and the workload manager slurm,
 # paths must be adapted before job submission
 
-#SBATCH --job-name="attrici2"
+#SBATCH --job-name="attrici_pr"
 #SBATCH --mail-type=ALL
 #SBATCH --mail-user=schifferle1@uni-potsdam.de
 #SBATCH --cpus-per-task=2
 #SBATCH --export=ALL,OMP_PROC_BIND=TRUE
 #SBATCH --ntasks=10
 #SBATCH --time=23:00:00
-#SBATCH --nodelist=ecoc9z
-#SBATCH --mem=100gb
+#SBATCH --nodelist=ecoc9
+#SBATCH --mem=150gb
+
+# Script:   1_2d_attrici_US_pr.sh
+# Purpose:  Detrend precipitation from 1994 onward with ATTRICI tool
+# Inputs:   data/Counterfactual_env_data/ISIMIP_GSWP3_W5E5/attrici_detrending/input_files/gswp3-w5e5_ssa_gmt_1994_2019.nc
+#           data/Env_data/ISIMIP_GSWP3_W5E5/US_pr_1994_2019.nc
+#           data/Counterfactual_env_data/ISIMIP_GSWP3_W5E5/attrici_detrending/input_files/US_mask.nc
+# Outputs:  data/Counterfactual_env_data/ISIMIP_GSWP3_W5E5/attrici_detrending/output/pr_detrended/US_pr_detrended_1994_2019.nc
+# Runs on:  HPC (NAS Potsdam)
 
 
 echo "Starting"
@@ -30,12 +38,10 @@ srun bash <<'EOF'
 
 exec attrici \
      detrend \
-     --gmt-file /import/ecoc9z/data-zurell/schifferle/BBS_occupancy_models_2023/data/Counterfactual_env_data/ISIMIP_GSWP3_W5E5/attrici_detrending/input_files/gswp3-w5e5_ssa_gmt_1995_2019.nc \
-     --input-file /import/ecoc9z/data-zurell/schifferle/BBS_occupancy_models_2023/data/Counterfactual_env_data/ISIMIP_GSWP3_W5E5/attrici_detrending/input_files/US_pr_1901_2019.nc \
+     --gmt-file /import/ecoc9z/data-zurell/schifferle/BBS_occupancy_models_2023/data/Counterfactual_env_data/ISIMIP_GSWP3_W5E5/attrici_detrending/input_files/gswp3-w5e5_ssa_gmt_1994_2019.nc \
+     --input-file /import/ecoc9z/data-zurell/schifferle/BBS_occupancy_models_2023/data/Env_data/ISIMIP_GSWP3_W5E5/US_pr_1994_2019.nc \
      --output-dir /import/ecoc9z/data-zurell/schifferle/BBS_occupancy_models_2023/data/Counterfactual_env_data/ISIMIP_GSWP3_W5E5/attrici_detrending/output/pr_detrended \
      --variable pr \
-	   --start-date 1995-01-01 \
-     --stop-date 2019-12-31 \
 	   --mask-file /import/ecoc9z/data-zurell/schifferle/BBS_occupancy_models_2023/data/Counterfactual_env_data/ISIMIP_GSWP3_W5E5/attrici_detrending/input_files/US_mask.nc \
      --report-variables y cfact logp \
    	 --full-extrapolation \
@@ -51,7 +57,7 @@ echo "Detrending done."
 echo "Merge output."
 
 
-attrici merge-output /import/ecoc9z/data-zurell/schifferle/BBS_occupancy_models_2023/data/Counterfactual_env_data/ISIMIP_GSWP3_W5E5/attrici_detrending/output/pr_detrended/timeseries/pr  /import/ecoc9z/data-zurell/schifferle/BBS_occupancy_models_2023/data/Counterfactual_env_data/ISIMIP_GSWP3_W5E5/attrici_detrending/output/pr_detrended/US_pr_detrended_1901_2019.nc
+attrici merge-output /import/ecoc9z/data-zurell/schifferle/BBS_occupancy_models_2023/data/Counterfactual_env_data/ISIMIP_GSWP3_W5E5/attrici_detrending/output/pr_detrended/timeseries/pr  /import/ecoc9z/data-zurell/schifferle/BBS_occupancy_models_2023/data/Counterfactual_env_data/ISIMIP_GSWP3_W5E5/attrici_detrending/output/pr_detrended/US_pr_detrended_1994_2019.nc
 
 
 echo "Output merging done."

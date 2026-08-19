@@ -44,7 +44,7 @@ if(!dir.exists(sessioninfo_dir)){dir.create(sessioninfo_dir, recursive = TRUE)}
 datashare_BBS <- file.path("//NAS-2-P-SN-01.ibb.uni-potsdam.de/", "daten$", "AG26", "Arbeit", "datashare", "data", "biodat", "distribution", "BBS", "NABBS_2023")
 
 # BBS routes download:
-bbs_routes_file <- file.path(datashare_BBS, "bbs_routes", "bbsrtsl020.shp")
+bbs_routes_file <- file.path("//NAS-2-P-SN-01.ibb.uni-potsdam.de/", "daten$", "AG26", "Arbeit", "datashare", "data", "biodat", "distribution", "BBS", "bbs_routes", "bbsrtsl020.shp")
 
 # BirdLife range maps:
 datashare_Birdlife <- file.path("/mnt", "ibb_share", "zurell", "biodat", "distribution", "Birdlife", "BOTW_2022", "BOTW.gdb")
