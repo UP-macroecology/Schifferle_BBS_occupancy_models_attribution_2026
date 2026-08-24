@@ -203,15 +203,14 @@ for(s in 1:nrow(attr_metr_df)){
 save(attr_metr_df, file = file.path(dir, "results", "attribution", "attribution_metrics_final.RData"))
 
 
-
 # figure for manuscript to illustrate trend calculation (Fig. S2): -----------------------
 
 # directory to save plot:
 plot_dir <- file.path(dir, "plots", "attribution")
 
 # example species:
-spec <- "Dickcissel"
 
+spec <- "Bobolink"
 # observations time series:
 load(file.path(obs_dir, paste0(spec, "_obs_ts_sum_occ_routes.RData")))
 # time series predictions factual:

@@ -93,14 +93,18 @@ flow_df <- attr_metr_df %>%
   select(-c(slope, p)) %>% 
   tidyr::pivot_wider(names_from = scenario, values_from = dynamics)
 
-#save(flow_df, file =  file.path(dir, "results", "attribution", "trend_categories.RData"))
+save(flow_df, file =  file.path(dir, "results", "attribution", "trend_categories.RData"))
+
+flow_df %>% 
+  filter(trend_change_clim %in% c("absolute climate change loser", "relative climate change loser")) %>% 
+  pull(species) %>% 
+  length
 
 
 # Chi-square test against equal expected classes: ------------------------------
 
 clim_test <- flow_df %>% 
-  group_by(trend_change_clim) %>% 
-  summarise(n = n())
+  count(trend_change_clim, .drop = FALSE)
 clim_test$n
 chisq.test(clim_test$n, p = rep(0.2, 5))
 
@@ -110,8 +114,7 @@ lu_test$n
 chisq.test(lu_test$n, p = rep(0.2, 5))
 
 climlu_test <- flow_df %>% 
-  group_by(trend_change_climlu) %>% 
-  summarise(n = n())
+  count(trend_change_climlu, .drop = FALSE)
 climlu_test$n
 chisq.test(climlu_test$n, p = rep(0.2, 5))
 
@@ -172,8 +175,6 @@ ggsave(filename = file.path(dir, "plots", "attribution", "barplot_trend_cats_sta
        width = 21,
        height = 11, # A4
        units = "cm")
-
-# (xx maybe add bird icon)
 
 
 # alternative: alluvial plots: -------------------------------------------------

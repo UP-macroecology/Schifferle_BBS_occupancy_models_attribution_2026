@@ -52,6 +52,48 @@ rel_imp_df <- attr_metr_df %>%
             by = c(species = "English_Common_Name")) %>% 
   mutate(ORDER = factor(ORDER, levels = names(sort(table(ORDER), decreasing = TRUE))))
 
+summary(rel_imp_df)
+
+# climate change more important than land use change:
+rel_imp_df %>% 
+  select(species, Scientific_Name, imp_clim, imp_lu, imp_climlu) %>% 
+  filter(imp_clim > imp_lu) %>%  
+  View
+
+# combination of both more important than climate and land use change alone:
+rel_imp_df %>% 
+  select(species, Scientific_Name, imp_clim, imp_lu, imp_climlu) %>% 
+  filter((imp_climlu > imp_clim) & (imp_climlu > imp_lu)) %>% 
+  # # substantial difference:
+  # mutate(diff_climlu_clim = abs(imp_climlu - imp_clim),
+  #        diff_climlu_lu = abs(imp_climlu - imp_lu)) %>% 
+  # filter(diff_climlu_clim > 0.005 & diff_climlu_lu > 0.005) %>% 
+  View
+
+# combination of both roughly similar important than one of the drivers in isolation:
+rel_imp_df %>% 
+  mutate(diff_climlu_clim = abs(imp_climlu - imp_clim) * 100,
+         diff_climlu_lu = abs(imp_climlu - imp_lu)* 100) %>% 
+  select(species, Scientific_Name, diff_climlu_clim, diff_climlu_lu) %>% 
+  # below 0.5 percent:
+  filter(diff_climlu_clim < 0.5 | diff_climlu_lu < 0.5) %>% 
+  rowwise() %>% 
+  mutate(min_imp = min(diff_climlu_clim, diff_climlu_lu),
+         min_driver = if_else(diff_climlu_clim < diff_climlu_lu, "clim", "lu")) %>% 
+  View
+
+# importance of combination between importance of climate and land use change in isolation:
+rel_imp_df %>% 
+  select(species, Scientific_Name, imp_clim, imp_lu, imp_climlu) %>% 
+  mutate(diff_climlu_clim = abs(imp_climlu - imp_clim),
+         diff_climlu_lu = abs(imp_climlu - imp_lu)) %>% 
+  filter((imp_clim < imp_climlu & imp_climlu < imp_lu) | (imp_lu < imp_climlu & imp_climlu < imp_clim)) %>% 
+  filter(diff_climlu_clim > 0.005 & diff_climlu_lu > 0.005) %>% 
+  rowwise() %>% 
+  mutate(min_imp = min(diff_climlu_clim, diff_climlu_lu),
+         max_driver = if_else(imp_clim > imp_climlu, "clim", "lu")) %>% 
+  View
+
 
 # additivity index regarding antagonism / synergism: ---------------------------
 
@@ -86,7 +128,7 @@ add_boxplot <- comb %>%
   xlim(-1,1) +
   geom_text(aes(label = outlier, x = x_jit ), na.rm = TRUE, hjust = -0.1, vjust = 0.8, 
             fontface = "italic", size = 4) +
-  geom_label(x = -0.8, y = 2, label = "synergistic", colour = "grey30", hjust = 0.55, fill = "#FFE4A5") +
+  geom_label(x = -0.8, y = 0.6, label = "synergistic", colour = "grey30", hjust = 0.55, fill = "#FFE4A5") +
   geom_label(x = -0.8, y = -0.8, label = "antagonistic", colour = "grey30", hjust = 0.5, fill = "#D7F0FF") +
   ylab("Additivity index I") +
   geom_hline(yintercept = 0, linetype = "dashed", color = "grey20") +
@@ -298,7 +340,7 @@ lollipop <- ggplot(plot_df2, aes(x = forcats::fct_reorder(Scientific_Name, desc(
                                "absolute winner" = "#d7191c",
                                "relative winner" = "#fdae61",
                                "no change" = "#B18985"), drop = FALSE, na.value = NA) +
-  scale_y_continuous(limits = c(-1, 45), expand = c(0,0)) +
+  scale_y_continuous(limits = c(-1, 28), expand = c(0,0)) +
   labs(x = "Species", y = "Relative importance [%]") +
   theme_light() +
   coord_flip() +
@@ -325,7 +367,7 @@ lollipop <- ggplot(plot_df2, aes(x = forcats::fct_reorder(Scientific_Name, desc(
 
 lollipop
 
-# add oberserved trend to legend:
+# add observed trend to legend:
 lollipop2 <- lollipop +
   guides(a = guide_custom(title = "factual occupancy trend",
                           grid::rectGrob(gp = gpar(fill="#EFCA08", col=NA)),
@@ -344,12 +386,12 @@ lollipop2 <- lollipop +
         plot.tag = element_text(hjust = 0, size = 16))
 
 # requires manual adjustments of legend item:
-# ggsave(filename = file.path(dir, "plots", "attribution", "lollipop_rel_importance_manuscript.svg"),
-#        plot = lollipop2,
-#        device = "svg",
-#        width = 25,
-#        height = 35,
-#        units = "cm")
+ggsave(filename = file.path(dir, "plots", "attribution", "lollipop_rel_importance_manuscript.svg"),
+       plot = lollipop2,
+       device = "svg",
+       width = 25,
+       height = 35,
+       units = "cm")
 
 # session info:
 writeLines(capture.output(sessionInfo()), file.path(dir, "results", "sessionInfo", "5_3_attribution_plots_relative_importance.txt"))

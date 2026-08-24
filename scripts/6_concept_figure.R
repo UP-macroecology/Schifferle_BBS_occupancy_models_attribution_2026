@@ -18,7 +18,7 @@ library(ggplot2)
 
 # figure to illustrate overall steps: ------------------------------------------
 
-example_species <- "Bell's Vireo"
+example_species <- "Yellow-bellied Sapsucker"
 
 # load time series: ------------------------------------------------------------
 
@@ -218,13 +218,17 @@ dev.off()
 
 # quantification driver importance: --------------------------------------------
 
+colours <- c("Npres" = "black", "fact" = "#85CB33", 
+             "cf_clim" = "#0D98BA", "cf_lu" = "#B7410E",
+             "cf_climlu" = "#046865")
+
 plot <- ggplot(ts_dt, aes(x = year)) +
   geom_ribbon(aes(ymin=Npres,ymax=fact), fill="blue") +
   geom_ribbon(aes(ymin=Npres,ymax=cf_clim), fill="yellow") +
-  geom_line(aes(y = Npres), colour = "black", linewidth = 0.5) +
-  geom_point(aes(y = Npres), colour = "black", size = 1) +
+  geom_line(aes(y = Npres, colour = "Npres"), linewidth = 0.5) +
+  geom_point(aes(y = Npres, colour = "Npres"), size = 1) +
   geom_line(aes(y = fact, colour = "fact"), linewidth = 0.5) +
-  geom_line(aes(y = cf_clim, colour = "cf"), linewidth = 0.5) +
+  geom_line(aes(y = cf_clim, colour = "cf_clim"), linewidth = 0.5) +
   scale_x_continuous("Year", breaks = c(1995, 2019)) +
   scale_color_manual(values = colours, 
                      labels = c("counterfactual simulation", "factual simulation", "bird records")) +

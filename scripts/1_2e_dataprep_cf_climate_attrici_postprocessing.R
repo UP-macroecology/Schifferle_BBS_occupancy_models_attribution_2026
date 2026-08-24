@@ -7,7 +7,6 @@
 # Outputs:  data/Counterfactual_env_data/ISIMIP_GSWP3_W5E5/attrici_detrending/output/ATTRICI_CLIM_ESRI102003_tifs/<var>_<yyyymm>_ESRI102003.tif
 #           data/Counterfactual_env_data/ISIMIP_GSWP3_W5E5/attrici_detrending/output/ATTRICI_CLIM_ESRI102003_tifs/bioclim/<var>_<year>.tif
 #           data/Counterfactual_env_data/ISIMIP_GSWP3_W5E5/attrici_detrending/output/ATTRICI_CLIM_ESRI102003_tifs/seasonal/<var>_<year>.tif
-#           data/Counterfactual_env_data/ISIMIP_GSWP3_W5E5/attrici_detrending/input_files/ATTRICI_CLIM_ESRI102003_tifs/<var>_<yyyymm>_ESRI102003.tif # xx
 #           plots/attrici/gmt_raw_smoothed.svg
 #           plots/attrici/logp.svg
 #           plots/attrici/<var>_sel_routes_monthly.svg
@@ -399,12 +398,12 @@ nc_close(gmt_smoothed)
 
 # functions:
 
-# compile data to plot factual and counterfcatual time series:
+# compile data to plot factual and counterfactual time series:
 compile_plot_data <- function(var, timestep = "month", BBS_routes = routes_sel_sf){
   
   if(timestep == "month"){
     
-    # months: # xx change to 1994!
+    # months:
     d <- paste0(rep(1995:2019, each = length(stringr::str_pad(1:12, 2, pad = 0))),
                 stringr::str_pad(1:12, 2, pad = 0))
     d <- lubridate::as_date(d, format = "%Y%m")

@@ -279,6 +279,7 @@ mean_climlu_imp <- mean(ranges_climlu, na.rm = TRUE)
 rast_stack <- c(mean_clim_imp, mean_lu_imp, mean_climlu_imp)
 dom_driver_rast <- app(rast_stack, which.max)
 names(dom_driver_rast) <- "dom_driver"
+#writeRaster(dom_driver_rast, filename = file.path("results", "attribution", "dom_driver.tif"), overwrite = TRUE)
 
 # convert to factor:
 cls <- data.frame(id = 1:3, driver = c("climate change", "land use change", "climate & land use change"))
@@ -324,31 +325,30 @@ ggsave(filename = file.path(plot_dir, "clim_lu_combined_all.svg"),
        units = "cm")
 
 
-## 5) climate change impact categories (Fig. S 4): ----
+## 5) climate change impact categories (Fig. S 5): ----
 
 raster_list <- list.files(file.path(output_dir, "tifs_attr"), pattern = ".tif$", full.names = TRUE)
 
 abs_winners <- imp_cat_df %>% filter(trend_change_clim == 1) %>% pull(species)
-rel_winners <- imp_cat_df %>% filter(trend_change_clim == 2) %>% pull(species)
+rel_winners <- imp_cat_df %>% filter(trend_change_clim == 2) %>% pull(species) # none
 rel_losers <- imp_cat_df %>% filter(trend_change_clim == 4) %>% pull(species)
 abs_losers <- imp_cat_df %>% filter(trend_change_clim == 5) %>% pull(species)
 
 aw_raster_subset <- grep(paste(abs_winners, collapse="|"),  raster_list, value = TRUE)
-rw_raster_subset <- grep(paste(rel_winners, collapse="|"),  raster_list, value = TRUE)
 rl_raster_subset <- grep(paste(rel_losers, collapse="|"),  raster_list, value = TRUE)
 al_raster_subset <- grep(paste(abs_losers, collapse="|"),  raster_list, value = TRUE)
 
 # load rasters:
 aw_ranges <- rast(aw_raster_subset, lyrs = seq(1, 560, by = 7))
-rw_ranges <- rast(rw_raster_subset, lyrs = seq(1, 560, by = 7))
 rl_ranges <- rast(rl_raster_subset, lyrs = seq(1, 560, by = 7))
 al_ranges <- rast(al_raster_subset, lyrs = seq(1, 560, by = 7))
 
 # sum across species:
 aw_sum_cat <- sum(aw_ranges, na.rm = TRUE)
-rw_sum_cat <- sum(rw_ranges, na.rm = TRUE)
 rl_sum_cat <- sum(rl_ranges, na.rm = TRUE)
 al_sum_cat <- sum(al_ranges, na.rm = TRUE)
+# add empty raster for relative winners:
+rw_sum_cat <- ifel(!is.na(aw_sum_cat), NA, aw_sum_cat)
 
 clim_imp_cat <- c(aw_sum_cat, rw_sum_cat, rl_sum_cat, al_sum_cat)
 names(clim_imp_cat) <- c("absolute winners", "relative winners", "relative losers", "absolute losers")
@@ -392,7 +392,7 @@ ggsave(filename = file.path(plot_dir, "clim_change_impact_cats.svg"),
        units = "cm")
 
 
-## 6) land use change impact categories (Fig. S 5): ----
+## 6) land use change impact categories (Fig. S 6): ----
 
 #abs_winners <- imp_cat_df %>% filter(trend_change_lu == 1) %>% pull(species) # none
 rel_winners <- imp_cat_df %>% filter(trend_change_lu == 2) %>% pull(species)
@@ -414,7 +414,7 @@ rl_sum_cat <- sum(rl_ranges, na.rm = TRUE)
 al_sum_cat <- sum(al_ranges, na.rm = TRUE)
 
 # add empty raster for absolute winners:
-aw_sum_cat <- subst(rw_sum_cat, 1, NA)
+aw_sum_cat <- ifel(!is.na(rw_sum_cat), NA, rw_sum_cat)
 
 lu_imp_cat <- c(aw_sum_cat, rw_sum_cat, rl_sum_cat, al_sum_cat)
 names(lu_imp_cat) <- c("absolute winners", "relative winners", "relative losers", "absolute losers")
@@ -458,7 +458,7 @@ ggsave(filename = file.path(plot_dir, "lu_change_impact_cats.svg"),
        units = "cm")
 
 
-## 7) climate + land use change impact categories (Fig. S 6): ----
+## 7) climate + land use change impact categories (Fig. S 7): ----
 
 abs_winners <- imp_cat_df %>% filter(trend_change_climlu == 1) %>% pull(species)
 rel_winners <- imp_cat_df %>% filter(trend_change_climlu == 2) %>% pull(species)
