@@ -410,13 +410,13 @@ for(i in 1:length(selvar_final)){
 
 svg(file.path(dir, "plots", "change_exposure_single_vars1.svg"), 
     onefile = TRUE,
-    width = 10, height = 12)
-wrap_plots(plot_list[1:5], ncol = 1, nrow = 5)
+    width = 10, height = 10)
+wrap_plots(plot_list[1:4], ncol = 1, nrow = 4)
 dev.off()
 svg(file.path(dir, "plots", "change_exposure_single_vars2.svg"), 
     onefile = TRUE,
-      width = 10, height = 12)
-wrap_plots(plot_list[6:10], ncol = 1, nrow = 5)
+      width = 10, height = 14)
+wrap_plots(plot_list[5:10], ncol = 1, nrow = 6)
 dev.off()
 svg(file.path(dir, "plots", "change_exposure_single_vars3.svg"), 
     onefile = TRUE,
