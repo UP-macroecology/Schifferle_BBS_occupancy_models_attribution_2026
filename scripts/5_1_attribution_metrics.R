@@ -200,7 +200,16 @@ for(s in 1:nrow(attr_metr_df)){
                                                 predicted = ts_preds_cfact$cf_clim_1995soc$median_Nocc)
 }
 
+# adjust p values for multiple comparisons:
+
+attr_metr_df <- attr_metr_df %>% 
+  mutate(corr.p_fact = p.adjust(p_fact, method = "BH"),
+         corr.p_cfclim = p.adjust(p_cfclim, method = "BH"),
+         corr.p_cflu = p.adjust(p_cflu, method = "BH"),
+         corr.p_cfclimlu = p.adjust(p_cfclimlu, method = "BH"))
+
 save(attr_metr_df, file = file.path(dir, "results", "attribution", "attribution_metrics_final.RData"))
+
 
 
 # figure for manuscript to illustrate trend calculation (Fig. S2): -----------------------

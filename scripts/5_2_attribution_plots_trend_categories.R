@@ -40,30 +40,30 @@ load(file = file.path(dir, "results", "attribution", "attribution_metrics_final.
 
 flow_df <- attr_metr_df %>% 
   # categorize relative impact (based on Langhammer et al. 2024):
-  select(c(species, starts_with("slope"), starts_with("p_"))) %>% 
+  select(c(species, starts_with("slope"), starts_with("corr.p_"))) %>% 
   ## factual vs. counterfactual climate:
-  mutate(trend_change_clim = case_when(slope_fact > slope_cfclim & slope_fact > 0 & p_fact < 0.05 ~ "absolute climate change winner",
-                                       slope_fact > slope_cfclim & slope_fact > 0 & p_fact >= 0.05 ~ "relative climate change winner",
+  mutate(trend_change_clim = case_when(slope_fact > slope_cfclim & slope_fact > 0 & corr.p_fact < 0.05 ~ "absolute climate change winner",
+                                       slope_fact > slope_cfclim & slope_fact > 0 & corr.p_fact >= 0.05 ~ "relative climate change winner",
                                        slope_fact > slope_cfclim & slope_fact < 0 ~ "relative climate change winner",
                                        slope_fact < slope_cfclim & slope_fact > 0 ~ "relative climate change loser",
-                                       slope_fact < slope_cfclim & slope_fact < 0 & p_fact >= 0.05 ~ "relative climate change loser",
-                                       slope_fact < slope_cfclim & slope_fact < 0 & p_fact < 0.05 ~ "absolute climate change loser",
+                                       slope_fact < slope_cfclim & slope_fact < 0 & corr.p_fact >= 0.05 ~ "relative climate change loser",
+                                       slope_fact < slope_cfclim & slope_fact < 0 & corr.p_fact < 0.05 ~ "absolute climate change loser",
                                        .default = NA)) %>% 
   ## factual vs. counterfactual land use:
-  mutate(trend_change_lu = case_when(slope_fact > slope_cflu & slope_fact > 0 & p_fact < 0.05 ~ "absolute land use change winner",
-                                     slope_fact > slope_cflu & slope_fact > 0 & p_fact >= 0.05 ~ "relative land use change winner",
+  mutate(trend_change_lu = case_when(slope_fact > slope_cflu & slope_fact > 0 & corr.p_fact < 0.05 ~ "absolute land use change winner",
+                                     slope_fact > slope_cflu & slope_fact > 0 & corr.p_fact >= 0.05 ~ "relative land use change winner",
                                      slope_fact > slope_cflu & slope_fact < 0 ~ "relative land use change winner",
                                      slope_fact < slope_cflu & slope_fact > 0 ~ "relative land use change loser",
-                                     slope_fact < slope_cflu & slope_fact < 0 & p_fact >= 0.05 ~ "relative land use change loser",
-                                     slope_fact < slope_cflu & slope_fact < 0 & p_fact < 0.05 ~ "absolute land use change loser",
+                                     slope_fact < slope_cflu & slope_fact < 0 & corr.p_fact >= 0.05 ~ "relative land use change loser",
+                                     slope_fact < slope_cflu & slope_fact < 0 & corr.p_fact < 0.05 ~ "absolute land use change loser",
                                      .default = NA)) %>% 
   ## factual vs. counterfactual climate + land use:
-  mutate(trend_change_climlu = case_when(slope_fact > slope_cfclimlu & slope_fact > 0 & p_fact < 0.05 ~ "absolute global change winner",
-                                         slope_fact > slope_cfclimlu & slope_fact > 0 & p_fact >= 0.05 ~ "relative global change winner",
+  mutate(trend_change_climlu = case_when(slope_fact > slope_cfclimlu & slope_fact > 0 & corr.p_fact < 0.05 ~ "absolute global change winner",
+                                         slope_fact > slope_cfclimlu & slope_fact > 0 & corr.p_fact >= 0.05 ~ "relative global change winner",
                                          slope_fact > slope_cfclimlu & slope_fact < 0 ~ "relative global change winner",
                                          slope_fact < slope_cfclimlu & slope_fact > 0 ~ "relative global change loser",
-                                         slope_fact < slope_cfclimlu & slope_fact < 0 & p_fact >= 0.05 ~ "relative global change loser",
-                                         slope_fact < slope_cfclimlu & slope_fact < 0 & p_fact < 0.05 ~ "absolute global change loser",
+                                         slope_fact < slope_cfclimlu & slope_fact < 0 & corr.p_fact >= 0.05 ~ "relative global change loser",
+                                         slope_fact < slope_cfclimlu & slope_fact < 0 & corr.p_fact < 0.05 ~ "absolute global change loser",
                                          .default = NA)) %>% 
   ## add "no change"-category if confidence intervals of slopes overlap (= smaller max. is larger than larger min.):
   mutate(stable_cfclim = pmin(slope_CIhigh_fact, slope_CIhigh_cfclim) > pmax(slope_CIlow_fact, slope_CIlow_cfclim),
@@ -85,12 +85,12 @@ flow_df <- attr_metr_df %>%
   tidyr::pivot_longer(cols = matches("(slope_)|(p_)"), names_to = c("metric", "scenario"), 
                       values_to = "value", names_pattern = "(.*)_(.*)") %>% 
   tidyr::pivot_wider(names_from = metric, values_from = value) %>% 
-  mutate(dynamics = case_when(slope > 0 & p < 0.05 ~ "positive\ntrend",
-                              slope < 0 & p < 0.05 ~ "negative\ntrend",
-                              p >= 0.05 ~ "stable",
+  mutate(dynamics = case_when(slope > 0 & corr.p < 0.05 ~ "positive\ntrend",
+                              slope < 0 & corr.p < 0.05 ~ "negative\ntrend",
+                              corr.p >= 0.05 ~ "stable",
                               .default = NA),
          dynamics = factor(dynamics, levels = c("positive\ntrend", "stable", "negative\ntrend"))) %>% 
-  select(-c(slope, p)) %>% 
+  select(-c(slope, corr.p)) %>% 
   tidyr::pivot_wider(names_from = scenario, values_from = dynamics)
 
 save(flow_df, file =  file.path(dir, "results", "attribution", "trend_categories.RData"))
