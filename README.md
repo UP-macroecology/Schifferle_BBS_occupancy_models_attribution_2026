@@ -1,4 +1,4 @@
-# North American bird occupancy dynamics attributed to climate and land use change
+# Impact-attribution reveals antagonistic effects of climate and land use change on bird occupancy dynamics
 
 
 **Authors:** Katrin Schifferle<sup>1</sup>, Natalie J. Briscoe<sup>2</sup>, Guillermo Fandos<sup>3</sup>, Stefanie Heinicke<sup>4</sup>, Christopher P. O. Reyer<sup>4</sup>, Inga J. Sauer<sup>4</sup>, Mark C. Urban<sup>5</sup>, Damaris Zurell<sup>1</sup>
@@ -32,13 +32,7 @@ Scripts were written by Katrin Schifferle.
 
 ## Abstract
 
-Evidence is accumulating that global change is altering species distributions. Yet, detailed knowledge is missing about the relative and joint contribution of different drivers to observed species responses. 
-
-Here, we implemented an impact attribution framework based on counterfactual simulations to assess the impact of climate and land use change on occupancy dynamics of North American breeding birds. We used a Bayesian framework to fit process-explicit dynamic occupancy models to long-term survey data for 159 species from 1995 to 2019, and quantified predictive performance using spatial and temporal cross-validation. We then assessed the relative importance and effect direction of climate and land use change while accounting for model predictive accuracy. 
-
-Results indicate that climate change negatively affected 90 % of the species and land use change negatively impacted 96 %. Climate change emerged as more important than land use change for driving changes in occupancy across species. Remarkably, the effects of both drivers were mostly antagonistic rather than acting additively or synergistically. Climate was the most important driver for bird communities in the western USA, while land use change dominated in the southeast, and combined climate and land use change in the northeast.
-
-Our analysis demonstrates that recent changes in North American bird distributions are shaped by multiple global change drivers acting in concert. The effect of recent climate and land use change were mostly antagonistic, and thus trends in bird occupancy dynamics could not be understood by studying the impact of those drivers in isolation. By disentangling the effects of climate and land use change on biodiversity trends, impact attribution approaches can improve our understanding of global change impacts and can support conservation planning and more accurate and realistic projections of biodiversity response to global change.
+Climate and land use change are reshaping species distributions, yet their relative and joint contribution to observed biodiversity response remain poorly understood. Here, we apply a novel integration of process-explicit models and an impact attribution framework to disentangle these impacts on the occupancy dynamics of North American bird species from 1995 to 2019. Comparisons of factual and counterfactual simulations indicated that climate change negatively affected 90 % of species and land use change affected 96 % of species, with climate change emerging as the stronger driver. Despite their predominantly negative effects, the two drivers mostly acted antagonistically, generating idiosyncratic occupancy trends that could not be understood by studying either driver in isolation. Our combination of process-explicit models and explicit attribution of interacting global change impacts paves the way for improved understanding of past biodiversity change and inform more realistic projections and conservation planning.
 
 Keywords: biodiversity change, impact attribution, causal inference, climate change, land-use change, dynamic occupancy models, North American breeding birds
 
