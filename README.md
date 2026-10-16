@@ -27,8 +27,7 @@ Scripts were written by Katrin Schifferle.
 [![License: GPL-3.0](https://img.shields.io/badge/License-GPL%203.0-blue.svg)](LICENSE)
 
 
-[![DOI](https://zenodo.org/badge/DOI/PLACEHOLDER.svg)](https://doi.org/PLACEHOLDER)
-
+[![DOI](https://zenodo.org/badge/725186017.svg)](https://doi.org/10.5281/zenodo.22080744)
 
 
 ## Abstract
